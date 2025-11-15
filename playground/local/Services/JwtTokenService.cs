@@ -11,6 +11,34 @@ namespace NuxtIdentity.Playground.Local.Services;
 /// Service for generating and validating JWT tokens.
 /// </summary>
 /// <typeparam name="TUser">The type of user this service works with.</typeparam>
+/// <remarks>
+/// This is a generic implementation of IJwtTokenService that can work with any user type.
+/// The service is designed to be reusable across different applications and user models.
+/// 
+/// Design Principles:
+/// 
+/// 1. **Generic by Design**: The TUser type parameter allows this service to work with any
+///    user model without requiring inheritance or interfaces on the user class itself.
+/// 
+/// 2. **Dependency Injection**: The service relies on IUserClaimsProvider&lt;TUser&gt; to extract
+///    claims from the user, allowing different implementations for different user types or
+///    technologies (ASP.NET Identity, custom user stores, etc.).
+/// 
+/// 3. **Configuration via Options Pattern**: JWT settings (key, issuer, audience, expiration)
+///    are injected via IOptions&lt;JwtOptions&gt;, following ASP.NET Core best practices.
+/// 
+/// 4. **Consistent Validation**: The GetTokenValidationParameters method ensures that the
+///    ASP.NET Core authentication middleware validates tokens using the exact same parameters
+///    as this service, preventing subtle bugs from configuration mismatches.
+/// 
+/// 5. **Structured Logging**: Uses LoggerMessage source generators for high-performance logging
+///    of token operations, marked as protected virtual to allow derived classes to customize.
+/// 
+/// Library Packaging Strategy:
+/// - This class belongs in NuxtIdentity.Core (minimal dependencies)
+/// - Only requires System.IdentityModel.Tokens.Jwt and Microsoft.Extensions.Options
+/// - No dependency on ASP.NET Identity, Entity Framework, or specific user implementations
+/// </remarks>
 public partial class JwtTokenService<TUser> : IJwtTokenService<TUser> where TUser : class
 {
     private readonly JwtOptions _jwtOptions;
