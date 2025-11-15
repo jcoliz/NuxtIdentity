@@ -44,7 +44,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 // Register token services (now generic)
 builder.Services.AddScoped<IUserClaimsProvider<ApplicationUser>, IdentityUserClaimsProvider>();
 builder.Services.AddScoped<IJwtTokenService<ApplicationUser>, JwtTokenService<ApplicationUser>>();
-builder.Services.AddScoped<IRefreshTokenService, EfRefreshTokenService>();
+builder.Services.AddScoped<IRefreshTokenService, EfRefreshTokenService<ApplicationDbContext>>();
 
 // Add CORS
 builder.Services.AddCors(options =>

@@ -1,28 +1,49 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using NuxtIdentity.Playground.Local.Data;
+using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
 
 namespace NuxtIdentity.Playground.Local.Services;
 
 /// <summary>
-/// Entity Framework implementation of refresh token service.
+/// Entity Framework Core implementation of refresh token service.
 /// </summary>
-public class EfRefreshTokenService : IRefreshTokenService
+/// <typeparam name="TContext">The DbContext type that contains RefreshTokens DbSet.</typeparam>
+/// <remarks>
+/// This implementation stores refresh tokens in a database using Entity Framework Core.
+/// Tokens are hashed using SHA256 before storage for security.
+/// 
+/// The DbContext must have a DbSet&lt;RefreshTokenEntity&gt; configured. You can add this
+/// to your context like:
+/// <code>
+/// public DbSet&lt;RefreshTokenEntity&gt; RefreshTokens =&gt; Set&lt;RefreshTokenEntity&gt;();
+/// </code>
+/// </remarks>
+public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
+    where TContext : DbContext
 {
-    private readonly ApplicationDbContext _context;
+    private readonly TContext _context;
+    private readonly ILogger<EfRefreshTokenService<TContext>> _logger;
     private const int RefreshTokenExpirationDays = 30;
 
-    public EfRefreshTokenService(ApplicationDbContext context)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EfRefreshTokenService{TContext}"/> class.
+    /// </summary>
+    /// <param name="context">The database context.</param>
+    /// <param name="logger">Logger instance.</param>
+    public EfRefreshTokenService(TContext context, ILogger<EfRefreshTokenService<TContext>> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
     public async Task<string> GenerateRefreshTokenAsync(string userId)
     {
+        LogGeneratingToken(userId);
+        
         var token = GenerateSecureToken();
         var tokenHash = HashToken(token);
 
@@ -35,8 +56,10 @@ public class EfRefreshTokenService : IRefreshTokenService
             IsRevoked = false
         };
 
-        _context.RefreshTokens.Add(entity);
+        _context.Set<RefreshTokenEntity>().Add(entity);
         await _context.SaveChangesAsync();
+        
+        LogTokenGenerated(userId, entity.ExpiresAt);
         
         return token;
     }
@@ -44,44 +67,65 @@ public class EfRefreshTokenService : IRefreshTokenService
     /// <inheritdoc/>
     public async Task<bool> ValidateRefreshTokenAsync(string token, string userId)
     {
+        LogValidatingToken(userId);
+        
         var tokenHash = HashToken(token);
 
-        var entity = await _context.RefreshTokens
+        var entity = await _context.Set<RefreshTokenEntity>()
             .FirstOrDefaultAsync(t => 
                 t.TokenHash == tokenHash && 
                 t.UserId == userId);
 
         if (entity == null)
+        {
+            LogTokenNotFound(userId);
             return false;
+        }
 
         if (entity.IsRevoked)
+        {
+            LogTokenRevoked(userId);
             return false;
+        }
 
         if (entity.ExpiresAt < DateTime.UtcNow)
+        {
+            LogTokenExpired(userId, entity.ExpiresAt);
             return false;
+        }
 
+        LogTokenValid(userId);
         return true;
     }
 
     /// <inheritdoc/>
     public async Task RevokeRefreshTokenAsync(string token)
     {
+        LogRevokingToken();
+        
         var tokenHash = HashToken(token);
 
-        var entity = await _context.RefreshTokens
+        var entity = await _context.Set<RefreshTokenEntity>()
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
         
         if (entity != null)
         {
             entity.IsRevoked = true;
             await _context.SaveChangesAsync();
+            LogTokenRevokedForUser(entity.UserId);
+        }
+        else
+        {
+            LogTokenNotFoundForRevocation();
         }
     }
 
     /// <inheritdoc/>
     public async Task RevokeAllUserTokensAsync(string userId)
     {
-        var userTokens = await _context.RefreshTokens
+        LogRevokingAllUserTokens(userId);
+        
+        var userTokens = await _context.Set<RefreshTokenEntity>()
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
@@ -91,8 +135,14 @@ public class EfRefreshTokenService : IRefreshTokenService
         }
 
         await _context.SaveChangesAsync();
+        
+        LogAllUserTokensRevoked(userId, userTokens.Count);
     }
 
+    /// <summary>
+    /// Generates a cryptographically secure random token.
+    /// </summary>
+    /// <returns>A base64-encoded random token.</returns>
     private static string GenerateSecureToken()
     {
         var randomBytes = new byte[64];
@@ -101,9 +151,54 @@ public class EfRefreshTokenService : IRefreshTokenService
         return Convert.ToBase64String(randomBytes);
     }
 
+    /// <summary>
+    /// Hashes a token using SHA256.
+    /// </summary>
+    /// <param name="token">The token to hash.</param>
+    /// <returns>A base64-encoded hash of the token.</returns>
     private static string HashToken(string token)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToBase64String(bytes);
     }
+
+    #region Logger Messages
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Generating refresh token for user: {userId}")]
+    private partial void LogGeneratingToken(string userId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token generated for user: {userId}, expires: {expiresAt}")]
+    private partial void LogTokenGenerated(string userId, DateTime expiresAt);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Validating refresh token for user: {userId}")]
+    private partial void LogValidatingToken(string userId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token not found for user: {userId}")]
+    private partial void LogTokenNotFound(string userId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token is revoked for user: {userId}")]
+    private partial void LogTokenRevoked(string userId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token expired for user: {userId} at {expiresAt}")]
+    private partial void LogTokenExpired(string userId, DateTime expiresAt);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token is valid for user: {userId}")]
+    private partial void LogTokenValid(string userId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Revoking refresh token")]
+    private partial void LogRevokingToken();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Token revoked for user: {userId}")]
+    private partial void LogTokenRevokedForUser(string userId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token not found for revocation")]
+    private partial void LogTokenNotFoundForRevocation();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Revoking all refresh tokens for user: {userId}")]
+    private partial void LogRevokingAllUserTokens(string userId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Revoked {count} tokens for user: {userId}")]
+    private partial void LogAllUserTokensRevoked(string userId, int count);
+
+    #endregion
 }
