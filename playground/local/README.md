@@ -7,13 +7,13 @@ https://nuxt.com/modules/sidebase-auth#module-playground
 1. Clone @sidebase/nuxt-auth repo locally
 
 ```
-> git clone https://github.com/sidebase/nuxt-auth
+git clone https://github.com/sidebase/nuxt-auth
 
-> cd nuxt-auth
+cd nuxt-auth
 
-> cd playground-local
+cd playground-local
 
-> pnpm i
+pnpm i
 ```
 
 2. Change the nuxt config
@@ -21,18 +21,22 @@ https://nuxt.com/modules/sidebase-auth#module-playground
 ```diff
 --- a/playground-local/nuxt.config.ts
 +++ b/playground-local/nuxt.config.ts
-@@ -4,7 +4,11 @@ export default defineNuxtConfig({
-   build: {
+@@ -5,6 +5,7 @@ export default defineNuxtConfig({
      transpile: ['jsonwebtoken']
    },
-+  runtimeConfig: {
-+    baseURL: 'http://localhost:3001/api/auth'
-+  },
    auth: {
-+    originEnvKey: 'NUXT_BASE_URL',
++    baseURL: 'http://localhost:3001/api/auth',
      provider: {
        type: 'local',
        endpoints: {
+@@ -26,6 +27,7 @@ export default defineNuxtConfig({
+         // We do an environment variable for E2E testing both options.    
+         isEnabled: process.env.NUXT_AUTH_REFRESH_ENABLED !== 'false',     
+         endpoint: { path: '/refresh', method: 'post' },
++        refreshOnlyToken: false, // rotate refresh tokens!
+         token: {
+           signInResponseRefreshTokenPointer: '/token/refreshToken',       
+           refreshResponseTokenPointer: '',
 ```
 
 3. Start the static frontend
@@ -52,3 +56,15 @@ This will start the backend listening on http://localhost:3001/, which will fulf
 ```
 dotnet run
 ```
+
+5. Register a new user
+
+Visit http://localhost:3000/register. Enter a username and password, then click "sign up".
+
+This will create a new user in the backend.
+
+6. Log in with that user
+  
+Click "navigate to login page"
+
+Enter the user name and password from previous step.
