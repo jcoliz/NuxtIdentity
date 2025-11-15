@@ -21,4 +21,8 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NuxtIdentity\NuxtIdentity.csproj" />
+  </ItemGroup>
+
 </Project>
