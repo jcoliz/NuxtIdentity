@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Core\NuxtIdentity.Core.csproj" />
     <ProjectReference Include="..\..\src\AspNetCore\NuxtIdentity.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\EntityFrameworkCore\NuxtIdentity.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
 </Project>
