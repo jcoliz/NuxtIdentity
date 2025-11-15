@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NuxtIdentity.Playground.Local.Configuration;
@@ -120,19 +121,19 @@ public partial class JwtTokenService<TUser> : IJwtTokenService<TUser> where TUse
     #region Logger Messages
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation started for user: {username}")]
-    protected partial void LogTokenGenerationStarted(string username);
+    private partial void LogTokenGenerationStarted(string username);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
-    protected partial void LogTokenGenerationCompleted(string username);
+    private partial void LogTokenGenerationCompleted(string username);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
-    protected partial void LogTokenValidationStarted();
+    private partial void LogTokenValidationStarted();
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
-    protected partial void LogTokenValidationCompleted();
+    private partial void LogTokenValidationCompleted();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Token validation failed")]
-    protected partial void LogTokenValidationFailed(Exception ex);
+    private partial void LogTokenValidationFailed(Exception ex);
 
     #endregion
 }
