@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 
+/// <summary>
+/// Handles authentication operations including login, signup, token refresh, and session management.
+/// </summary>
 [ApiController]
 [Route("api/auth")]
 public partial class AuthController : ControllerBase
@@ -14,12 +17,24 @@ public partial class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AuthController"/> class.
+    /// </summary>
+    /// <param name="configuration">Application configuration.</param>
+    /// <param name="logger">Logger instance.</param>
     public AuthController(IConfiguration configuration, ILogger<AuthController> logger)
     {
         _configuration = configuration;
         _logger = logger;
     }
 
+    #region Public Endpoints
+
+    /// <summary>
+    /// Authenticates a user with username and password.
+    /// </summary>
+    /// <param name="request">Login credentials.</param>
+    /// <returns>JWT tokens and user information if successful; otherwise, unauthorized.</returns>
     [HttpPost("login")]
     public IActionResult Login([FromBody] LoginRequest request)
     {
@@ -52,7 +67,11 @@ public partial class AuthController : ControllerBase
         return Unauthorized(new { message = "Invalid credentials. Mr. Smith, your password is `hunter2!`" });
     }
 
-
+    /// <summary>
+    /// Registers a new user account.
+    /// </summary>
+    /// <param name="request">Signup credentials.</param>
+    /// <returns>JWT tokens and user information for the newly created account.</returns>
     [HttpPost("signup")]
     public IActionResult SignUp([FromBody] SignUpRequest request)
     {
@@ -78,11 +97,12 @@ public partial class AuthController : ControllerBase
         });
     }
 
-    private static string GenerateRefreshToken(string username)
-    {
-        return Guid.NewGuid().ToString("N");
-    }
-
+    /// <summary>
+    /// Refreshes an expired access token using a valid refresh token.
+    /// </summary>
+    /// <param name="request">Refresh token.</param>
+    /// <returns>New JWT token pair if successful; otherwise, unauthorized.</returns>
+    /// <remarks>Requires a valid JWT access token in the Authorization header.</remarks>
     [HttpPost("refresh")]
     [Authorize]
     public IActionResult RefreshTokens([FromBody] RefreshRequest request)
@@ -117,8 +137,11 @@ public partial class AuthController : ControllerBase
         return Unauthorized(new { message = "Invalid refresh token" });
     }
 
-    private bool IsValidRefreshToken(string refreshToken) => true; // Simplified for demonstration
-
+    /// <summary>
+    /// Retrieves the current user's session information.
+    /// </summary>
+    /// <returns>User information if authenticated; otherwise, unauthorized.</returns>
+    /// <remarks>Requires a valid JWT access token in the Authorization header.</remarks>
     [HttpGet("user")]
     [Authorize]
     public IActionResult GetSession()
@@ -146,6 +169,11 @@ public partial class AuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Logs out the current user.
+    /// </summary>
+    /// <returns>Success response.</returns>
+    /// <remarks>In a stateless JWT setup, logout is handled client-side by discarding tokens.</remarks>
     [HttpPost("logout")]
     public IActionResult Logout()
     {
@@ -155,6 +183,15 @@ public partial class AuthController : ControllerBase
         return Ok(new { success = true });
     }
 
+    #endregion
+
+    #region Private Methods
+
+    /// <summary>
+    /// Generates a JWT access token for the specified user.
+    /// </summary>
+    /// <param name="username">The username to generate the token for.</param>
+    /// <returns>A signed JWT token string.</returns>
     private string GenerateJwtToken(string username)
     {
         LogTokenGenerationStarted(username);
@@ -182,6 +219,29 @@ public partial class AuthController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    /// <summary>
+    /// Generates a refresh token for the specified user.
+    /// </summary>
+    /// <param name="username">The username to generate the refresh token for.</param>
+    /// <returns>A unique refresh token string.</returns>
+    private static string GenerateRefreshToken(string username)
+    {
+        return Guid.NewGuid().ToString("N");
+    }
+
+    /// <summary>
+    /// Validates a refresh token.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to validate.</param>
+    /// <returns>True if the token is valid; otherwise, false.</returns>
+    /// <remarks>Simplified implementation for demonstration purposes.</remarks>
+    private bool IsValidRefreshToken(string refreshToken) => true; // Simplified for demonstration
+
+    #endregion
+
+    #region Logger Messages
+
+    // Login
     [LoggerMessage(Level = LogLevel.Information, Message = "Login attempt for user: {username}")]
     private partial void LogLoginAttempt(string username);
 
@@ -191,12 +251,28 @@ public partial class AuthController : ControllerBase
     [LoggerMessage(Level = LogLevel.Warning, Message = "Login failed for user: {username}")]
     private partial void LogLoginFailed(string username);
 
+    // Signup
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signup attempt for user: {username}")]
+    private partial void LogSignUpAttempt(string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signup successful for user: {username}")]
+    private partial void LogSignupSuccess(string username);
+
+    // Token Generation
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation started for user: {username}")]
     private partial void LogTokenGenerationStarted(string username);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
     private partial void LogTokenGenerationCompleted(string username);
 
+    // Token Validation
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
+    private partial void LogTokenValidationStarted();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
+    private partial void LogTokenValidationCompleted();
+
+    // Session Validation
     [LoggerMessage(Level = LogLevel.Debug, Message = "Session validation started")]
     private partial void LogSessionValidationStarted();
 
@@ -209,15 +285,7 @@ public partial class AuthController : ControllerBase
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session validation failed")]
     private partial void LogSessionValidationFailed(Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
-    private partial void LogTokenValidationStarted();
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
-    private partial void LogTokenValidationCompleted();
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]
-    private partial void LogLogoutRequested();
-
+    // Refresh Token
     [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token attempt started. Token: {RefreshToken}")]
     private partial void LogRefreshAttempt(string refreshToken);
 
@@ -233,74 +301,9 @@ public partial class AuthController : ControllerBase
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token failed")]
     private partial void LogRefreshFailed(Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Signup attempt for user: {username}")]
-    private partial void LogSignUpAttempt(string username);
+    // Logout
+    [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]
+    private partial void LogLogoutRequested();
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Signup successful for user: {username}")]
-    private partial void LogSignupSuccess(string username);
-}
-
-public record LoginRequest
-{
-    public string Username { get; init; } = string.Empty;
-    public string Password { get; init; } = string.Empty;
-}
-
-public record SignUpRequest
-{
-    public string Username { get; init; } = string.Empty;
-    public string Password { get; init; } = string.Empty;
-}
-
-public record RefreshRequest
-{
-    public string RefreshToken { get; init; } = string.Empty;
-}
-
-public record RefreshResponse
-{
-    public TokenPair Token { get; init; } = new();
-}
-
-public record TokenPair
-{
-    public string AccessToken { get; init; } = string.Empty;
-    public string RefreshToken { get; init; } = string.Empty;
-}
-
-public record LoginResponse
-{
-    public TokenPair Token { get; init; } = new();
-    public UserInfo User { get; init; } = new();
-}
-
-public record SessionResponse
-{
-    public UserInfo? User { get; init; } = new();
-}
-
-public record UserInfo
-{
-    public string Id { get; init; } = string.Empty;
-    public string Name { get; init; } = string.Empty;
-    public string Email { get; init; } = string.Empty;
-    public string Role { get; init; } = string.Empty;
-}
-
-public record SubscriptionInfo
-{
-    public int Id
-    {
-        get; init;
-    }
-    public SubscriptionStatus[] Status
-    {
-        get; init;
-    } = [];
-};
-
-public enum SubscriptionStatus
-{
-    Active,
-    Inactive,
+    #endregion
 }
