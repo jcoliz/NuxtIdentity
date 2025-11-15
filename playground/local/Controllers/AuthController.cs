@@ -4,6 +4,8 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
+using NuxtIdentity.Playground.Local.Configuration;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 
@@ -14,17 +16,17 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 [Route("api/auth")]
 public partial class AuthController : ControllerBase
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _jwtOptions;
     private readonly ILogger<AuthController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AuthController"/> class.
     /// </summary>
-    /// <param name="configuration">Application configuration.</param>
+    /// <param name="jwtOptions">JWT configuration options.</param>
     /// <param name="logger">Logger instance.</param>
-    public AuthController(IConfiguration configuration, ILogger<AuthController> logger)
+    public AuthController(IOptions<JwtOptions> jwtOptions, ILogger<AuthController> logger)
     {
-        _configuration = configuration;
+        _jwtOptions = jwtOptions.Value;
         _logger = logger;
     }
 
@@ -204,8 +206,7 @@ public partial class AuthController : ControllerBase
     {
         LogTokenGenerationStarted(username);
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
-            _configuration["Jwt:Key"] ?? "your-secret-key-min-32-characters-long!"));
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -216,10 +217,10 @@ public partial class AuthController : ControllerBase
         };
 
         var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"] ?? "nuxt-identity-playground",
-            audience: _configuration["Jwt:Audience"] ?? "nuxt-identity-playground",
+            issuer: _jwtOptions.Issuer,
+            audience: _jwtOptions.Audience,
             claims: claims,
-            expires: DateTime.Now.AddHours(1),
+            expires: DateTime.Now.AddHours(_jwtOptions.ExpirationHours),
             signingCredentials: credentials
         );
 

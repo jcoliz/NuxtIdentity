@@ -1,12 +1,17 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using NuxtIdentity.Playground.Local.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
+
+// Configure JWT options
+builder.Services.Configure<JwtOptions>(
+    builder.Configuration.GetSection(JwtOptions.SectionName));
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -21,20 +26,23 @@ builder.Services.AddCors(options =>
 });
 
 // Add JWT Authentication
+var jwtOptions = builder.Configuration
+    .GetSection(JwtOptions.SectionName)
+    .Get<JwtOptions>() ?? new JwtOptions();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        var key = Encoding.UTF8.GetBytes(
-            builder.Configuration["Jwt:Key"] ?? "your-secret-key-min-32-characters-long!");
+        var key = Encoding.UTF8.GetBytes(jwtOptions.Key);
         
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(key),
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "nuxt-identity-playground",
+            ValidIssuer = jwtOptions.Issuer,
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "nuxt-identity-playground",
+            ValidAudience = jwtOptions.Audience,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
