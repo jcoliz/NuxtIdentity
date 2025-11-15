@@ -12,7 +12,6 @@ public record SignUpRequest
 {
     public string Username { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
-    public string? Email { get; init; }
 }
 
 public record RefreshRequest

@@ -1,14 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Extensions;
-using NuxtIdentity.AspNetCore.Services;
-using NuxtIdentity.EntityFrameworkCore.Services;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
-using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
-using NuxtIdentity.Core.Models;
-using NuxtIdentity.Core.Services;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Models;
 
@@ -78,11 +72,14 @@ builder.Services.AddOpenApiDocument(config =>
 
 var app = builder.Build();
 
-// Ensure database is created
+// Ensure database is created and roles are seeded
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.EnsureCreated();
+    
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await SeedRolesAsync(roleManager);
 }
 
 // Configure the HTTP request pipeline.
@@ -105,3 +102,17 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Helper method to seed roles
+static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
+{
+    string[] roles = ["guest", "account", "admin"];
+    
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+        }
+    }
+}
