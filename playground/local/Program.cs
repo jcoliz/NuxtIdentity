@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using NuxtIdentity.Playground.Local.Configuration;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Models;
@@ -56,10 +54,6 @@ builder.Services.AddCors(options =>
 });
 
 // Add JWT Authentication
-var jwtOptions = builder.Configuration
-    .GetSection(JwtOptions.SectionName)
-    .Get<JwtOptions>() ?? new JwtOptions();
-
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -67,19 +61,10 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    var key = Encoding.UTF8.GetBytes(jwtOptions.Key);
-    
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = true,
-        ValidIssuer = jwtOptions.Issuer,
-        ValidateAudience = true,
-        ValidAudience = jwtOptions.Audience,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
-    };
+    // Get token validation parameters from the service
+    var serviceProvider = builder.Services.BuildServiceProvider();
+    var jwtTokenService = serviceProvider.GetRequiredService<IJwtTokenService>();
+    options.TokenValidationParameters = jwtTokenService.GetTokenValidationParameters();
 });
 
 // Add NSwag services

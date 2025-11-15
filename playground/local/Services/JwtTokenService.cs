@@ -69,19 +69,7 @@ public partial class JwtTokenService : IJwtTokenService
         try
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.UTF8.GetBytes(_jwtOptions.Key);
-
-            var validationParameters = new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = true,
-                ValidIssuer = _jwtOptions.Issuer,
-                ValidateAudience = true,
-                ValidAudience = _jwtOptions.Audience,
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            };
+            var validationParameters = GetTokenValidationParameters();
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
             LogTokenValidationCompleted();
@@ -92,6 +80,24 @@ public partial class JwtTokenService : IJwtTokenService
             LogTokenValidationFailed(ex);
             return Task.FromResult<ClaimsPrincipal?>(null);
         }
+    }
+
+    /// <inheritdoc/>
+    public TokenValidationParameters GetTokenValidationParameters()
+    {
+        var key = Encoding.UTF8.GetBytes(_jwtOptions.Key);
+
+        return new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateIssuer = true,
+            ValidIssuer = _jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = _jwtOptions.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
     }
 
     #region Logger Messages

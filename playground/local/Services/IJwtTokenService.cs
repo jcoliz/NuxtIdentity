@@ -1,4 +1,5 @@
 using NuxtIdentity.Playground.Local.Models;
+using Microsoft.IdentityModel.Tokens;
 
 namespace NuxtIdentity.Playground.Local.Services;
 
@@ -20,4 +21,10 @@ public interface IJwtTokenService
     /// <param name="token">The JWT token to validate.</param>
     /// <returns>The claims principal if valid; otherwise, null.</returns>
     Task<System.Security.Claims.ClaimsPrincipal?> ValidateTokenAsync(string token);
+
+    /// <summary>
+    /// Gets the token validation parameters for JWT authentication middleware.
+    /// </summary>
+    /// <returns>Token validation parameters.</returns>
+    TokenValidationParameters GetTokenValidationParameters();
 }
