@@ -8,23 +8,28 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public partial class AuthController : ControllerBase
 {
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IConfiguration configuration)
+    public AuthController(IConfiguration configuration, ILogger<AuthController> logger)
     {
         _configuration = configuration;
+        _logger = logger;
     }
 
     [HttpPost("login")]
     public IActionResult Login([FromBody] LoginRequest request)
     {
+        LogLoginAttempt(request.Username);
+
         // Simple validation - accept specific credentials for testing
         if (request.Username == "test" && request.Password == "test")
         {
             var token = GenerateJwtToken(request.Username);
             
+            LogLoginSuccess(request.Username);
             return Ok(new LoginResponse
             {
                 Token = token,
@@ -37,16 +42,20 @@ public class AuthController : ControllerBase
             });
         }
 
+        LogLoginFailed(request.Username);
         return Unauthorized(new { message = "Invalid credentials" });
     }
 
     [HttpGet("session")]
     public IActionResult GetSession()
     {
+        LogSessionValidationStarted();
+
         var authHeader = Request.Headers["Authorization"].FirstOrDefault();
         
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
         {
+            LogSessionValidationNoToken();
             return Ok(new { user = (object?)null });
         }
 
@@ -59,6 +68,7 @@ public class AuthController : ControllerBase
             
             if (username != null)
             {
+                LogSessionValidationSuccess(username);
                 return Ok(new SessionResponse
                 {
                     User = new UserInfo
@@ -70,9 +80,9 @@ public class AuthController : ControllerBase
                 });
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Token validation failed
+            LogSessionValidationFailed(ex);
         }
 
         return Ok(new { user = (object?)null });
@@ -81,6 +91,7 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public IActionResult Logout()
     {
+        LogLogoutRequested();
         // In a stateless JWT setup, logout is handled client-side
         // This endpoint exists to match the expected API
         return Ok(new { success = true });
@@ -88,6 +99,8 @@ public class AuthController : ControllerBase
 
     private string GenerateJwtToken(string username)
     {
+        LogTokenGenerationStarted(username);
+
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
             _configuration["Jwt:Key"] ?? "your-secret-key-min-32-characters-long!"));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -107,11 +120,14 @@ public class AuthController : ControllerBase
             signingCredentials: credentials
         );
 
+        LogTokenGenerationCompleted(username);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private ClaimsPrincipal ValidateToken(string token)
     {
+        LogTokenValidationStarted();
+
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "your-secret-key-min-32-characters-long!");
 
@@ -127,8 +143,46 @@ public class AuthController : ControllerBase
             ClockSkew = TimeSpan.Zero
         };
 
-        return tokenHandler.ValidateToken(token, validationParameters, out _);
+        var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
+        LogTokenValidationCompleted();
+        return principal;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Login attempt for user: {username}")]
+    private partial void LogLoginAttempt(string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Login successful for user: {username}")]
+    private partial void LogLoginSuccess(string username);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Login failed for user: {username}")]
+    private partial void LogLoginFailed(string username);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation started for user: {username}")]
+    private partial void LogTokenGenerationStarted(string username);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
+    private partial void LogTokenGenerationCompleted(string username);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Session validation started")]
+    private partial void LogSessionValidationStarted();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Session validation: no token provided")]
+    private partial void LogSessionValidationNoToken();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Session validation successful for user: {username}")]
+    private partial void LogSessionValidationSuccess(string username);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session validation failed")]
+    private partial void LogSessionValidationFailed(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
+    private partial void LogTokenValidationStarted();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
+    private partial void LogTokenValidationCompleted();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]
+    private partial void LogLogoutRequested();
 }
 
 public record LoginRequest
