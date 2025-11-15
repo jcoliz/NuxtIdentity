@@ -36,6 +36,8 @@ public partial class AuthController : ControllerBase
     /// <param name="request">Login credentials.</param>
     /// <returns>JWT tokens and user information if successful; otherwise, unauthorized.</returns>
     [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult Login([FromBody] LoginRequest request)
     {
         LogLoginAttempt(request.Username);
@@ -73,6 +75,7 @@ public partial class AuthController : ControllerBase
     /// <param name="request">Signup credentials.</param>
     /// <returns>JWT tokens and user information for the newly created account.</returns>
     [HttpPost("signup")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     public IActionResult SignUp([FromBody] SignUpRequest request)
     {
         LogSignUpAttempt(request.Username);
@@ -105,6 +108,8 @@ public partial class AuthController : ControllerBase
     /// <remarks>Requires a valid JWT access token in the Authorization header.</remarks>
     [HttpPost("refresh")]
     [Authorize]
+    [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult RefreshTokens([FromBody] RefreshRequest request)
     {
         LogRefreshAttempt(request.RefreshToken);
@@ -144,6 +149,8 @@ public partial class AuthController : ControllerBase
     /// <remarks>Requires a valid JWT access token in the Authorization header.</remarks>
     [HttpGet("user")]
     [Authorize]
+    [ProducesResponseType(typeof(SessionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult GetSession()
     {
         LogSessionValidationStarted();
@@ -175,6 +182,7 @@ public partial class AuthController : ControllerBase
     /// <returns>Success response.</returns>
     /// <remarks>In a stateless JWT setup, logout is handled client-side by discarding tokens.</remarks>
     [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult Logout()
     {
         LogLogoutRequested();
