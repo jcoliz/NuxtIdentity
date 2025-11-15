@@ -51,6 +51,32 @@ public partial class AuthController : ControllerBase
         return Unauthorized(new { message = "Invalid credentials. Mr. Smith, your password is `hunter2!`" });
     }
 
+
+    [HttpPost("signup")]
+    public IActionResult SignUp([FromBody] SignUpRequest request)
+    {
+        LogSignUpAttempt(request.Username);
+
+        var token = GenerateJwtToken(request.Username);
+        
+        LogSignupSuccess(request.Username);
+        return Ok(new LoginResponse
+        {
+            Token = new TokenPair
+            {
+                AccessToken = token,
+                RefreshToken = GenerateRefreshToken(request.Username)
+            },
+            User = new UserInfo
+            {
+                Id = "1",
+                Name = request.Username,
+                Email = $"{request.Username}@example.com",
+                Role = "guest"
+            }
+        });
+    }
+
     private static string GenerateRefreshToken(string username)
     {
         return Guid.NewGuid().ToString("N");
@@ -261,9 +287,21 @@ public partial class AuthController : ControllerBase
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token failed")]
     private partial void LogRefreshFailed(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signup attempt for user: {username}")]
+    private partial void LogSignUpAttempt(string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signup successful for user: {username}")]
+    private partial void LogSignupSuccess(string username);
 }
 
 public record LoginRequest
+{
+    public string Username { get; init; } = string.Empty;
+    public string Password { get; init; } = string.Empty;
+}
+
+public record SignUpRequest
 {
     public string Username { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
