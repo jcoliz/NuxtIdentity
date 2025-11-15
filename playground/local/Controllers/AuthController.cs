@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 
@@ -83,98 +84,66 @@ public partial class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [Authorize]
     public IActionResult RefreshTokens([FromBody] RefreshRequest request)
     {
         LogRefreshAttempt(request.RefreshToken);
 
-        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+        var username = User.Identity?.Name;
         
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+        if (username == null)
         {
             LogRefreshNoToken();
             return Unauthorized();
         }
-
-        var token = authHeader.Substring("Bearer ".Length).Trim();
         
-        try
+        // Validate the refresh token and issue a new access token
+        if (IsValidRefreshToken(request.RefreshToken))
         {
-            var principal = ValidateToken(token);
-            var username = principal.FindFirst(ClaimTypes.Name)?.Value;
-            
-            if (username != null)
-            {
-                // Validate the refresh token and issue a new access token
-                if (IsValidRefreshToken(request.RefreshToken))
+            var newAccessToken = GenerateJwtToken(username);
+            var newRefreshToken = GenerateRefreshToken(username);
+            LogRefreshSuccess(username, newRefreshToken);
+            return Ok(new RefreshResponse()
+            { 
+                Token = new TokenPair
                 {
-                    var newAccessToken = GenerateJwtToken(username);
-                    var newRefreshToken = GenerateRefreshToken(username);
-                    LogRefreshSuccess(username,newRefreshToken);
-                    return Ok(new RefreshResponse()
-                    { 
-                        Token = new TokenPair
-                        {
-                            AccessToken = newAccessToken,
-                            RefreshToken = newRefreshToken
-                        }
-                    });
+                    AccessToken = newAccessToken,
+                    RefreshToken = newRefreshToken
                 }
-
-                LogRefreshInvalidToken(username);
-                return Unauthorized(new { message = "Invalid refresh token" });
-            }
-        }
-        catch (Exception ex)
-        {
-            LogRefreshFailed(ex);
+            });
         }
 
-        return Unauthorized();
+        LogRefreshInvalidToken(username);
+        return Unauthorized(new { message = "Invalid refresh token" });
     }
 
     private bool IsValidRefreshToken(string refreshToken) => true; // Simplified for demonstration
 
     [HttpGet("user")]
+    [Authorize]
     public IActionResult GetSession()
     {
         LogSessionValidationStarted();
 
-        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+        var username = User.Identity?.Name;
         
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+        if (username == null)
         {
             LogSessionValidationNoToken();
             return Unauthorized();
         }
 
-        var token = authHeader.Substring("Bearer ".Length).Trim();
-        
-        try
+        LogSessionValidationSuccess(username);
+        return Ok(new SessionResponse
         {
-            var principal = ValidateToken(token);
-            var username = principal.FindFirst(ClaimTypes.Name)?.Value;
-            
-            if (username != null)
+            User = new UserInfo
             {
-                LogSessionValidationSuccess(username);
-                return Ok(new SessionResponse
-                {
-                    User = new UserInfo
-                    {
-                        Id = "1",
-                        Name = username,
-                        Email = $"{username}@example.com",
-                        Role = "account"
-                    }
-                });
+                Id = "1",
+                Name = username,
+                Email = $"{username}@example.com",
+                Role = "account"
             }
-        }
-        catch (Exception ex)
-        {
-            LogSessionValidationFailed(ex);
-        }
-
-        return Unauthorized();
+        });
     }
 
     [HttpPost("logout")]
@@ -211,30 +180,6 @@ public partial class AuthController : ControllerBase
 
         LogTokenGenerationCompleted(username);
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private ClaimsPrincipal ValidateToken(string token)
-    {
-        LogTokenValidationStarted();
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "your-secret-key-min-32-characters-long!");
-
-        var validationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            ValidateIssuer = true,
-            ValidIssuer = _configuration["Jwt:Issuer"] ?? "nuxt-identity-playground",
-            ValidateAudience = true,
-            ValidAudience = _configuration["Jwt:Audience"] ?? "nuxt-identity-playground",
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-
-        var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-        LogTokenValidationCompleted();
-        return principal;
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Login attempt for user: {username}")]
