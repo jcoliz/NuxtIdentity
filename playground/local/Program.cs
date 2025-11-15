@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Extensions;
+using NuxtIdentity.AspNetCore.Services;
 using NuxtIdentity.EntityFrameworkCore.Services;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.Core.Abstractions;
@@ -10,7 +11,6 @@ using NuxtIdentity.Core.Models;
 using NuxtIdentity.Core.Services;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Models;
-using NuxtIdentity.Playground.Local.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
 
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.AspNetCore.Services;
 
 /// <summary>
 /// Provides claims for IdentityUser-derived types using ASP.NET Core Identity.
