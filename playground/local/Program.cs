@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using NuxtIdentity.Playground.Local.Configuration;
+using NuxtIdentity.Playground.Local.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,9 @@ builder.Services.AddControllers();
 // Configure JWT options
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection(JwtOptions.SectionName));
+
+// Register refresh token service
+builder.Services.AddSingleton<IRefreshTokenService, InMemoryRefreshTokenService>();
 
 // Add CORS
 builder.Services.AddCors(options =>

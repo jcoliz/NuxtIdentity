@@ -6,30 +6,23 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using NuxtIdentity.Playground.Local.Configuration;
+using NuxtIdentity.Playground.Local.Services;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 
 /// <summary>
 /// Handles authentication operations including login, signup, token refresh, and session management.
 /// </summary>
+/// <param name="jwtOptions">JWT configuration options.</param>
+/// <param name="refreshTokenService">Refresh token service.</param>
+/// <param name="logger">Logger instance.</param>
 [ApiController]
 [Route("api/auth")]
-public partial class AuthController : ControllerBase
+public partial class AuthController(
+    IOptions<JwtOptions> jwtOptions, 
+    IRefreshTokenService refreshTokenService,
+    ILogger<AuthController> logger) : ControllerBase
 {
-    private readonly JwtOptions _jwtOptions;
-    private readonly ILogger<AuthController> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="AuthController"/> class.
-    /// </summary>
-    /// <param name="jwtOptions">JWT configuration options.</param>
-    /// <param name="logger">Logger instance.</param>
-    public AuthController(IOptions<JwtOptions> jwtOptions, ILogger<AuthController> logger)
-    {
-        _jwtOptions = jwtOptions.Value;
-        _logger = logger;
-    }
-
     #region Public Endpoints
 
     /// <summary>
@@ -40,7 +33,7 @@ public partial class AuthController : ControllerBase
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         LogLoginAttempt(request.Username);
 
@@ -48,6 +41,7 @@ public partial class AuthController : ControllerBase
         if (request.Username == "smith" && request.Password == "hunter2")
         {
             var token = GenerateJwtToken(request.Username);
+            var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync("1");
             
             LogLoginSuccess(request.Username);
             return Ok(new LoginResponse
@@ -55,7 +49,7 @@ public partial class AuthController : ControllerBase
                 Token = new TokenPair
                 {
                     AccessToken = token,
-                    RefreshToken = GenerateRefreshToken(request.Username)
+                    RefreshToken = refreshToken
                 },
                 User = new UserInfo
                 {
@@ -78,11 +72,12 @@ public partial class AuthController : ControllerBase
     /// <returns>JWT tokens and user information for the newly created account.</returns>
     [HttpPost("signup")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    public IActionResult SignUp([FromBody] SignUpRequest request)
+    public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
     {
         LogSignUpAttempt(request.Username);
 
         var token = GenerateJwtToken(request.Username);
+        var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync("1");
         
         LogSignupSuccess(request.Username);
         return Ok(new LoginResponse
@@ -90,7 +85,7 @@ public partial class AuthController : ControllerBase
             Token = new TokenPair
             {
                 AccessToken = token,
-                RefreshToken = GenerateRefreshToken(request.Username)
+                RefreshToken = refreshToken
             },
             User = new UserInfo
             {
@@ -112,7 +107,7 @@ public partial class AuthController : ControllerBase
     [Authorize]
     [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult RefreshTokens([FromBody] RefreshRequest request)
+    public async Task<IActionResult> RefreshTokens([FromBody] RefreshRequest request)
     {
         LogRefreshAttempt(request.RefreshToken);
 
@@ -124,11 +119,16 @@ public partial class AuthController : ControllerBase
             return Unauthorized();
         }
         
-        // Validate the refresh token and issue a new access token
-        if (IsValidRefreshToken(request.RefreshToken))
+        // Validate the refresh token
+        var isValid = await refreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, "1");
+        if (isValid)
         {
+            // Revoke old token and issue new ones (token rotation)
+            await refreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
+            
             var newAccessToken = GenerateJwtToken(username);
-            var newRefreshToken = GenerateRefreshToken(username);
+            var newRefreshToken = await refreshTokenService.GenerateRefreshTokenAsync("1");
+            
             LogRefreshSuccess(username, newRefreshToken);
             return Ok(new RefreshResponse()
             { 
@@ -185,11 +185,16 @@ public partial class AuthController : ControllerBase
     /// <remarks>In a stateless JWT setup, logout is handled client-side by discarding tokens.</remarks>
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout([FromBody] RefreshRequest request)
     {
         LogLogoutRequested();
-        // In a stateless JWT setup, logout is handled client-side
-        // This endpoint exists to match the expected API
+        
+        // Revoke the refresh token
+        if (!string.IsNullOrEmpty(request.RefreshToken))
+        {
+            await refreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
+        }
+        
         return Ok(new { success = true });
     }
 
@@ -206,7 +211,7 @@ public partial class AuthController : ControllerBase
     {
         LogTokenGenerationStarted(username);
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Value.Key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -217,10 +222,10 @@ public partial class AuthController : ControllerBase
         };
 
         var token = new JwtSecurityToken(
-            issuer: _jwtOptions.Issuer,
-            audience: _jwtOptions.Audience,
+            issuer: jwtOptions.Value.Issuer,
+            audience: jwtOptions.Value.Audience,
             claims: claims,
-            expires: DateTime.Now.AddHours(_jwtOptions.ExpirationHours),
+            expires: DateTime.Now.AddHours(jwtOptions.Value.ExpirationHours),
             signingCredentials: credentials
         );
 
