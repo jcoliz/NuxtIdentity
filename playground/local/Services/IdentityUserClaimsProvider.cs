@@ -1,59 +1,76 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
-using NuxtIdentity.Core.Models;
-using NuxtIdentity.Playground.Local.Models;
 
 namespace NuxtIdentity.Playground.Local.Services;
 
 /// <summary>
-/// Provides claims for ApplicationUser using ASP.NET Core Identity.
+/// Provides claims for IdentityUser-derived types using ASP.NET Core Identity.
 /// </summary>
+/// <typeparam name="TUser">The user type, must derive from IdentityUser.</typeparam>
 /// <remarks>
 /// This is an ASP.NET Core Identity-specific implementation of IUserClaimsProvider.
-/// It demonstrates how to integrate the generic JWT token service with ASP.NET Core Identity
-/// by extracting user information and roles from the Identity system.
+/// It integrates the generic JWT token service with ASP.NET Core Identity by extracting
+/// user information and roles from the Identity system.
 /// 
-/// Design Rationale:
+/// <para><strong>Design Rationale:</strong></para>
 /// 
-/// 1. **Technology-Specific Implementation**: This class depends on ASP.NET Core Identity
-///    (specifically UserManager&lt;ApplicationUser&gt;), making it suitable for packaging in
-///    a separate library like NuxtIdentity.Identity rather than the core library.
-/// 
-/// 2. **Standard Claims**: Includes common JWT claims that work well with @sidebase/nuxt-auth:
-///    - NameIdentifier: User's unique ID from Identity
-///    - Name: Username for display and authentication
-///    - Email: User's email address
-///    - Sub (Subject): Standard JWT claim, typically the username
-///    - Jti (JWT ID): Unique identifier for this specific token
-///    - Role: User's roles from Identity (can be multiple)
-/// 
-/// 3. **Async Role Loading**: Uses UserManager.GetRolesAsync to retrieve roles, demonstrating
-///    that claim providers can perform async operations to gather user information from
-///    various sources (database, cache, external services, etc.).
-/// 
-/// 4. **Extensibility**: Applications can create their own implementations to add custom claims,
-///    integrate with different identity systems, or modify the claim structure without changing
-///    the core JWT token generation logic.
-/// 
-/// Library Packaging:
-/// - Belongs in NuxtIdentity.Identity (or similar Identity-specific package)
-/// - Depends on Microsoft.AspNetCore.Identity
-/// - Provides a ready-to-use implementation for applications using ASP.NET Core Identity
+/// <list type="number">
+///   <item>
+///     <term>Standard Claims</term>
+///     <description>
+///       Includes common JWT claims that work well with frontend auth libraries:
+///       - NameIdentifier: User's unique ID from Identity
+///       - Name: Username for display and authentication
+///       - Email: User's email address
+///       - Sub (Subject): Standard JWT claim, typically the username
+///       - Jti (JWT ID): Unique identifier for this specific token
+///       - Role: User's roles from Identity (can be multiple)
+///     </description>
+///   </item>
+///   <item>
+///     <term>Async Role Loading</term>
+///     <description>
+///       Uses UserManager.GetRolesAsync to retrieve roles, demonstrating that claim providers
+///       can perform async operations to gather user information from various sources.
+///     </description>
+///   </item>
+///   <item>
+///     <term>Extensibility</term>
+///     <description>
+///       Applications can create their own implementations to add custom claims, integrate
+///       with different identity systems, or modify the claim structure without changing
+///       the core JWT token generation logic.
+///     </description>
+///   </item>
+/// </list>
 /// </remarks>
-public class IdentityUserClaimsProvider : IUserClaimsProvider<ApplicationUser>
+public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUser>
+    where TUser : IdentityUser
 {
-    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly UserManager<TUser> _userManager;
+    private readonly ILogger<IdentityUserClaimsProvider<TUser>> _logger;
 
-    public IdentityUserClaimsProvider(UserManager<ApplicationUser> userManager)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IdentityUserClaimsProvider{TUser}"/> class.
+    /// </summary>
+    /// <param name="userManager">The Identity user manager.</param>
+    /// <param name="logger">Logger instance.</param>
+    public IdentityUserClaimsProvider(
+        UserManager<TUser> userManager,
+        ILogger<IdentityUserClaimsProvider<TUser>> logger)
     {
         _userManager = userManager;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
-    public async Task<IEnumerable<Claim>> GetClaimsAsync(ApplicationUser user)
+    public async Task<IEnumerable<Claim>> GetClaimsAsync(TUser user)
     {
+        LogGeneratingClaims(user.Id);
+
         var roles = await _userManager.GetRolesAsync(user);
 
         var claims = new List<Claim>
@@ -67,6 +84,18 @@ public class IdentityUserClaimsProvider : IUserClaimsProvider<ApplicationUser>
 
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
+        LogClaimsGenerated(user.Id, claims.Count, roles.Count);
+
         return claims;
     }
+
+    #region Logger Messages
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Generating claims for user: {userId}")]
+    private partial void LogGeneratingClaims(string userId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Generated {claimCount} claims for user: {userId}, including {roleCount} roles")]
+    private partial void LogClaimsGenerated(string userId, int claimCount, int roleCount);
+
+    #endregion
 }

@@ -43,8 +43,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Register token services (now generic)
-builder.Services.AddScoped<IUserClaimsProvider<ApplicationUser>, IdentityUserClaimsProvider>();
+// Register token services (now all generic)
+builder.Services.AddScoped<IUserClaimsProvider<ApplicationUser>, IdentityUserClaimsProvider<ApplicationUser>>();
 builder.Services.AddScoped<IJwtTokenService<ApplicationUser>, JwtTokenService<ApplicationUser>>();
 builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
 
