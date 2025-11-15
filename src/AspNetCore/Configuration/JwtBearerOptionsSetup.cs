@@ -4,7 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using NuxtIdentity.Core.Configuration;
 
-namespace NuxtIdentity.Playground.Local.Configuration;
+namespace NuxtIdentity.AspNetCore.Configuration;
 
 /// <summary>
 /// Configures JWT Bearer authentication options.
