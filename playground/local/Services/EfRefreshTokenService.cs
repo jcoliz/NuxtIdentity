@@ -2,7 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.Playground.Local.Data;
-using NuxtIdentity.Playground.Local.Models;
+using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Models;
 
 namespace NuxtIdentity.Playground.Local.Services;
 

@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using NuxtIdentity.Core.Models;
+using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Playground.Local.Models;
-using NuxtIdentity.Playground.Local.Services;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 

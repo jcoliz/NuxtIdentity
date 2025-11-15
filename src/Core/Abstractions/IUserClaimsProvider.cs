@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.Core.Abstractions;
 
 /// <summary>
 /// Provides claims for a user to be included in JWT tokens.

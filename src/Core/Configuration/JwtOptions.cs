@@ -1,4 +1,4 @@
-namespace NuxtIdentity.Playground.Local.Configuration;
+namespace NuxtIdentity.Core.Configuration;
 
 /// <summary>
 /// Configuration options for JWT token generation and validation.

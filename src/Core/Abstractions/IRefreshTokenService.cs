@@ -1,4 +1,4 @@
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.Core.Abstractions;
 
 /// <summary>
 /// Service for managing refresh tokens.

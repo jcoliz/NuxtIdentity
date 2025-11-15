@@ -1,4 +1,4 @@
-namespace NuxtIdentity.Playground.Local.Models;
+namespace NuxtIdentity.Core.Models;
 
 #region Request Models
 

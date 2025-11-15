@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using NuxtIdentity.Core.Models;
 using NuxtIdentity.Playground.Local.Models;
 
 namespace NuxtIdentity.Playground.Local.Data;

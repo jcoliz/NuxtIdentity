@@ -4,9 +4,10 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using NuxtIdentity.Playground.Local.Configuration;
+using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Configuration;
 
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.Core.Services;
 
 /// <summary>
 /// Service for generating and validating JWT tokens.

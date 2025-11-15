@@ -1,8 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
-using NuxtIdentity.Playground.Local.Models;
+using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Models;
 
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.Core.Services;
 
 /// <summary>
 /// In-memory implementation of refresh token service using collections.

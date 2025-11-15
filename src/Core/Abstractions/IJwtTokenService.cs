@@ -1,7 +1,7 @@
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.Core.Abstractions;
 
 /// <summary>
 /// Service for generating and validating JWT tokens.

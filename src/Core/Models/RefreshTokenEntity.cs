@@ -1,4 +1,4 @@
-namespace NuxtIdentity.Playground.Local.Models;
+namespace NuxtIdentity.Core.Models;
 
 /// <summary>
 /// Represents a refresh token stored in the system.

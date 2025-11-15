@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Configuration;
+using NuxtIdentity.Core.Models;
+using NuxtIdentity.Core.Services;
 using NuxtIdentity.Playground.Local.Configuration;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Models;

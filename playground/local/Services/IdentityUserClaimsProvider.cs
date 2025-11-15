@@ -1,6 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Models;
 using NuxtIdentity.Playground.Local.Models;
 
 namespace NuxtIdentity.Playground.Local.Services;
