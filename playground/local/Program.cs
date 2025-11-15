@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using NuxtIdentity.Playground.Local.Configuration;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Models;
@@ -59,13 +62,10 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
-{
-    // Get token validation parameters from the service
-    var serviceProvider = builder.Services.BuildServiceProvider();
-    var jwtTokenService = serviceProvider.GetRequiredService<IJwtTokenService>();
-    options.TokenValidationParameters = jwtTokenService.GetTokenValidationParameters();
-});
+.AddJwtBearer();
+
+// Configure JWT Bearer options using IOptions pattern
+builder.Services.ConfigureOptions<JwtBearerOptionsSetup>();
 
 // Add NSwag services
 builder.Services.AddOpenApiDocument(config =>
