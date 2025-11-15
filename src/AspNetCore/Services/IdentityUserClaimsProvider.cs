@@ -72,6 +72,7 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
         LogGeneratingClaims(user.Id);
 
         var roles = await _userManager.GetRolesAsync(user);
+        var userClaims = await _userManager.GetClaimsAsync(user);
 
         var claims = new List<Claim>
         {
@@ -82,9 +83,14 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
+        // Add all roles as claims
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        
+        // Add ALL user claims from Identity
+        // This includes any custom claims added via UserManager.AddClaimAsync()
+        claims.AddRange(userClaims);
 
-        LogClaimsGenerated(user.Id, claims.Count, roles.Count);
+        LogClaimsGenerated(user.Id, claims.Count, roles.Count, userClaims.Count);
 
         return claims;
     }
@@ -94,8 +100,8 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
     [LoggerMessage(Level = LogLevel.Debug, Message = "Generating claims for user: {userId}")]
     private partial void LogGeneratingClaims(string userId);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Generated {claimCount} claims for user: {userId}, including {roleCount} roles")]
-    private partial void LogClaimsGenerated(string userId, int claimCount, int roleCount);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Generated {claimCount} claims for user: {userId}, including {roleCount} roles and {userClaimCount} user claims")]
+    private partial void LogClaimsGenerated(string userId, int claimCount, int roleCount, int userClaimCount);
 
     #endregion
 }

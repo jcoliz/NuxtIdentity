@@ -5,6 +5,8 @@ using NuxtIdentity.AspNetCore.Controllers;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
 using NuxtIdentity.Playground.Local.Models;
+using NuxtIdentity.Playground.Local.Constants;
+using System.Text.Json;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 
@@ -36,7 +38,6 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 ///   <item><description>Login endpoint - Identity-specific authentication logic</description></item>
 ///   <item><description>SignUp endpoint - User registration with 'guest' role assignment</description></item>
 ///   <item><description>GetSession endpoint - retrieves current user information</description></item>
-///   <item><description>SetRole endpoint (admin only) - changes user roles</description></item>
 /// </list>
 /// 
 /// <para><strong>Why This Design:</strong></para>
@@ -180,6 +181,8 @@ public partial class AuthController(
         var roles = await userManager.GetRolesAsync(user);
         var role = roles.FirstOrDefault() ?? "guest";
 
+        var subscriptions = await GetUserSubscriptionsAsync(user);
+
         return Ok(new SessionResponse
         {
             User = new UserInfo
@@ -187,56 +190,38 @@ public partial class AuthController(
                 Id = user.Id,
                 Name = user.DisplayName,
                 Email = user.Email ?? "",
-                Role = role
+                Role = role,
+                Subscriptions = subscriptions.ToArray()
             }
         });
     }
 
     /// <summary>
-    /// Changes a user's role (admin only).
+    /// Helper method to retrieve user subscriptions from Identity claims.
     /// </summary>
-    /// <param name="request">User ID and new role.</param>
-    /// <returns>Success if role changed; otherwise, error.</returns>
-    [HttpPost("setrole")]
-    [Authorize(Roles = "admin")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> SetRole([FromBody] SetRoleRequest request)
+    private async Task<List<Core.Models.SubscriptionInfo>> GetUserSubscriptionsAsync(ApplicationUser user)
     {
-        LogSetRoleAttempt(request.UserId, request.Role);
+        var claims = await userManager.GetClaimsAsync(user);
+        var subscriptionClaims = claims.Where(c => c.Type == CustomClaimTypes.Subscription);
         
-        var user = await userManager.FindByIdAsync(request.UserId);
-        if (user == null)
+        var subscriptions = new List<Core.Models.SubscriptionInfo>();
+        foreach (var claim in subscriptionClaims)
         {
-            LogSetRoleFailed(request.UserId, "User not found");
-            return NotFound(new { message = "User not found" });
+            try
+            {
+                var subscription = JsonSerializer.Deserialize<Core.Models.SubscriptionInfo>(claim.Value);
+                if (subscription != null)
+                {
+                    subscriptions.Add(subscription);
+                }
+            }
+            catch (JsonException ex)
+            {
+                LogSubscriptionDeserializationError(user.Id, claim.Value, ex.Message);
+            }
         }
         
-        var validRoles = new[] { "guest", "account", "admin" };
-        if (!validRoles.Contains(request.Role))
-        {
-            LogSetRoleFailed(request.UserId, "Invalid role");
-            return BadRequest(new { message = "Invalid role. Must be 'guest', 'account', or 'admin'" });
-        }
-        
-        // Remove all current roles
-        var currentRoles = await userManager.GetRolesAsync(user);
-        await userManager.RemoveFromRolesAsync(user, currentRoles);
-        
-        // Add new role
-        var result = await userManager.AddToRoleAsync(user, request.Role);
-        
-        if (!result.Succeeded)
-        {
-            LogSetRoleFailed(request.UserId, string.Join(", ", result.Errors.Select(e => e.Description)));
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        LogSetRoleSuccess(request.UserId, request.Role);
-        return Ok(new { success = true, userId = request.UserId, role = request.Role });
+        return subscriptions;
     }
 
     // Refresh and Logout are inherited from base class
@@ -262,30 +247,8 @@ public partial class AuthController(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Login failed for user: {username}. Reason: {reason}")]
     private partial void LogLoginFailed(string username, string reason);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Set role attempt for user: {userId} to role: {role}")]
-    private partial void LogSetRoleAttempt(string userId, string role);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Set role successful for user: {userId} to role: {role}")]
-    private partial void LogSetRoleSuccess(string userId, string role);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Set role failed for user: {userId}. Reason: {reason}")]
-    private partial void LogSetRoleFailed(string userId, string reason);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to deserialize subscription claim for user: {userId}. Value: {claimValue}. Error: {error}")]
+    private partial void LogSubscriptionDeserializationError(string userId, string claimValue, string error);
 
     #endregion
-}
-
-/// <summary>
-/// Request model for setting a user's role.
-/// </summary>
-public record SetRoleRequest
-{
-    /// <summary>
-    /// The ID of the user whose role should be changed.
-    /// </summary>
-    public required string UserId { get; init; }
-    
-    /// <summary>
-    /// The new role to assign ('guest', 'account', or 'admin').
-    /// </summary>
-    public required string Role { get; init; }
 }

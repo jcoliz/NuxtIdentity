@@ -55,6 +55,7 @@ public record UserInfo
     public string Name { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
     public string Role { get; init; } = string.Empty;
+    public SubscriptionInfo[] Subscriptions { get; init; } = [];
 }
 
 public record SubscriptionInfo
