@@ -4,8 +4,10 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using NuxtIdentity.Playground.Local.Configuration;
+using NuxtIdentity.Playground.Local.Models;
 using NuxtIdentity.Playground.Local.Services;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
@@ -15,12 +17,16 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 /// </summary>
 /// <param name="jwtOptions">JWT configuration options.</param>
 /// <param name="refreshTokenService">Refresh token service.</param>
+/// <param name="userManager">User manager for Identity.</param>
+/// <param name="signInManager">Sign in manager for Identity.</param>
 /// <param name="logger">Logger instance.</param>
 [ApiController]
 [Route("api/auth")]
 public partial class AuthController(
     IOptions<JwtOptions> jwtOptions, 
     IRefreshTokenService refreshTokenService,
+    UserManager<ApplicationUser> userManager,
+    SignInManager<ApplicationUser> signInManager,
     ILogger<AuthController> logger) : ControllerBase
 {
     #region Public Endpoints
@@ -37,11 +43,18 @@ public partial class AuthController(
     {
         LogLoginAttempt(request.Username);
 
-        // Simple validation - accept specific credentials for testing
-        if (request.Username == "smith" && request.Password == "hunter2")
+        var user = await userManager.FindByNameAsync(request.Username);
+        if (user == null)
         {
-            var token = GenerateJwtToken(request.Username);
-            var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync("1");
+            LogLoginFailed(request.Username);
+            return Unauthorized(new { message = "Invalid credentials" });
+        }
+
+        var result = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
+        if (result.Succeeded)
+        {
+            var token = await GenerateJwtTokenAsync(user);
+            var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync(user.Id);
             
             LogLoginSuccess(request.Username);
             return Ok(new LoginResponse
@@ -53,16 +66,16 @@ public partial class AuthController(
                 },
                 User = new UserInfo
                 {
-                    Id = "1",
-                    Name = request.Username,
-                    Email = $"{request.Username}@example.com",
+                    Id = user.Id,
+                    Name = user.DisplayName ?? user.UserName ?? "",
+                    Email = user.Email ?? "",
                     Role = "admin"
                 }
             });
         }
 
         LogLoginFailed(request.Username);
-        return Unauthorized(new { message = "Invalid credentials. Mr. Smith, your password is `hunter2!`" });
+        return Unauthorized(new { message = "Invalid credentials" });
     }
 
     /// <summary>
@@ -72,29 +85,44 @@ public partial class AuthController(
     /// <returns>JWT tokens and user information for the newly created account.</returns>
     [HttpPost("signup")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
     {
         LogSignUpAttempt(request.Username);
 
-        var token = GenerateJwtToken(request.Username);
-        var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync("1");
-        
-        LogSignupSuccess(request.Username);
-        return Ok(new LoginResponse
+        var user = new ApplicationUser
         {
-            Token = new TokenPair
+            UserName = request.Username,
+            Email = request.Email ?? $"{request.Username}@example.com",
+            DisplayName = request.Username
+        };
+
+        var result = await userManager.CreateAsync(user, request.Password);
+        
+        if (result.Succeeded)
+        {
+            var token = await GenerateJwtTokenAsync(user);
+            var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync(user.Id);
+            
+            LogSignupSuccess(request.Username);
+            return Ok(new LoginResponse
             {
-                AccessToken = token,
-                RefreshToken = refreshToken
-            },
-            User = new UserInfo
-            {
-                Id = "1",
-                Name = request.Username,
-                Email = $"{request.Username}@example.com",
-                Role = "guest"
-            }
-        });
+                Token = new TokenPair
+                {
+                    AccessToken = token,
+                    RefreshToken = refreshToken
+                },
+                User = new UserInfo
+                {
+                    Id = user.Id,
+                    Name = user.DisplayName,
+                    Email = user.Email,
+                    Role = "guest"
+                }
+            });
+        }
+
+        return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
     }
 
     /// <summary>
@@ -112,22 +140,27 @@ public partial class AuthController(
         LogRefreshAttempt(request.RefreshToken);
 
         var username = User.Identity?.Name;
-        
         if (username == null)
         {
             LogRefreshNoToken();
             return Unauthorized();
         }
+
+        var user = await userManager.FindByNameAsync(username);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
         
         // Validate the refresh token
-        var isValid = await refreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, "1");
+        var isValid = await refreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, user.Id);
         if (isValid)
         {
             // Revoke old token and issue new ones (token rotation)
             await refreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
             
-            var newAccessToken = GenerateJwtToken(username);
-            var newRefreshToken = await refreshTokenService.GenerateRefreshTokenAsync("1");
+            var newAccessToken = await GenerateJwtTokenAsync(user);
+            var newRefreshToken = await refreshTokenService.GenerateRefreshTokenAsync(user.Id);
             
             LogRefreshSuccess(username, newRefreshToken);
             return Ok(new RefreshResponse()
@@ -153,15 +186,20 @@ public partial class AuthController(
     [Authorize]
     [ProducesResponseType(typeof(SessionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult GetSession()
+    public async Task<IActionResult> GetSession()
     {
         LogSessionValidationStarted();
 
         var username = User.Identity?.Name;
-        
         if (username == null)
         {
             LogSessionValidationNoToken();
+            return Unauthorized();
+        }
+
+        var user = await userManager.FindByNameAsync(username);
+        if (user == null)
+        {
             return Unauthorized();
         }
 
@@ -170,9 +208,9 @@ public partial class AuthController(
         {
             User = new UserInfo
             {
-                Id = "1",
-                Name = username,
-                Email = $"{username}@example.com",
+                Id = user.Id,
+                Name = user.DisplayName ?? user.UserName ?? "",
+                Email = user.Email ?? "",
                 Role = "account"
             }
         });
@@ -205,51 +243,39 @@ public partial class AuthController(
     /// <summary>
     /// Generates a JWT access token for the specified user.
     /// </summary>
-    /// <param name="username">The username to generate the token for.</param>
+    /// <param name="user">The user to generate the token for.</param>
     /// <returns>A signed JWT token string.</returns>
-    private string GenerateJwtToken(string username)
+    private async Task<string> GenerateJwtTokenAsync(ApplicationUser user)
     {
-        LogTokenGenerationStarted(username);
+        LogTokenGenerationStarted(user.UserName ?? "");
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Value.Key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var roles = await userManager.GetRolesAsync(user);
+
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, username),
-            new Claim(JwtRegisteredClaimNames.Sub, username),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(ClaimTypes.NameIdentifier, user.Id),
+            new(ClaimTypes.Name, user.UserName ?? ""),
+            new(ClaimTypes.Email, user.Email ?? ""),
+            new(JwtRegisteredClaimNames.Sub, user.UserName ?? ""),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var token = new JwtSecurityToken(
             issuer: jwtOptions.Value.Issuer,
             audience: jwtOptions.Value.Audience,
             claims: claims,
-            expires: DateTime.Now.AddHours(jwtOptions.Value.ExpirationHours),
+            expires: DateTime.UtcNow.AddHours(jwtOptions.Value.ExpirationHours),
             signingCredentials: credentials
         );
 
-        LogTokenGenerationCompleted(username);
+        LogTokenGenerationCompleted(user.UserName ?? "");
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-
-    /// <summary>
-    /// Generates a refresh token for the specified user.
-    /// </summary>
-    /// <param name="username">The username to generate the refresh token for.</param>
-    /// <returns>A unique refresh token string.</returns>
-    private static string GenerateRefreshToken(string username)
-    {
-        return Guid.NewGuid().ToString("N");
-    }
-
-    /// <summary>
-    /// Validates a refresh token.
-    /// </summary>
-    /// <param name="refreshToken">The refresh token to validate.</param>
-    /// <returns>True if the token is valid; otherwise, false.</returns>
-    /// <remarks>Simplified implementation for demonstration purposes.</remarks>
-    private bool IsValidRefreshToken(string refreshToken) => true; // Simplified for demonstration
 
     #endregion
 
@@ -279,13 +305,6 @@ public partial class AuthController(
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
     private partial void LogTokenGenerationCompleted(string username);
 
-    // Token Validation
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
-    private partial void LogTokenValidationStarted();
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
-    private partial void LogTokenValidationCompleted();
-
     // Session Validation
     [LoggerMessage(Level = LogLevel.Debug, Message = "Session validation started")]
     private partial void LogSessionValidationStarted();
@@ -295,9 +314,6 @@ public partial class AuthController(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Session validation successful for user: {username}")]
     private partial void LogSessionValidationSuccess(string username);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Session validation failed")]
-    private partial void LogSessionValidationFailed(Exception ex);
 
     // Refresh Token
     [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token attempt started. Token: {RefreshToken}")]
@@ -311,9 +327,6 @@ public partial class AuthController(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token invalid for user: {username}")]
     private partial void LogRefreshInvalidToken(string username);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token failed")]
-    private partial void LogRefreshFailed(Exception ex);
 
     // Logout
     [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]

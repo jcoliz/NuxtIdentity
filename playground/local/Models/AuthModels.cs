@@ -1,4 +1,4 @@
-namespace NuxtIdentity.Playground.Local.Controllers;
+namespace NuxtIdentity.Playground.Local.Models;
 
 #region Request Models
 
@@ -12,6 +12,7 @@ public record SignUpRequest
 {
     public string Username { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
+    public string? Email { get; init; }
 }
 
 public record RefreshRequest
