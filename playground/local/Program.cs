@@ -43,10 +43,11 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Register token services (now all generic)
-builder.Services.AddScoped<IUserClaimsProvider<ApplicationUser>, IdentityUserClaimsProvider<ApplicationUser>>();
-builder.Services.AddScoped<IJwtTokenService<ApplicationUser>, JwtTokenService<ApplicationUser>>();
+
+// Add NuxtIdentity
+builder.Services.AddNuxtIdentity<ApplicationUser>();
 builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
+builder.Services.AddNuxtIdentityAuthentication();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -59,9 +60,6 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
-
-// Add Nuxt Identity Authentication
-builder.Services.AddNuxtIdentityAuthentication();
 
 // Add NSwag services
 builder.Services.AddOpenApiDocument(config =>
