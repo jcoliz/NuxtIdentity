@@ -1,53 +1,42 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NuxtIdentity.Playground.Local.Configuration;
-using NuxtIdentity.Playground.Local.Models;
 
 namespace NuxtIdentity.Playground.Local.Services;
 
 /// <summary>
 /// Service for generating and validating JWT tokens.
 /// </summary>
-public partial class JwtTokenService : IJwtTokenService
+/// <typeparam name="TUser">The type of user this service works with.</typeparam>
+public partial class JwtTokenService<TUser> : IJwtTokenService<TUser> where TUser : class
 {
     private readonly JwtOptions _jwtOptions;
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly ILogger<JwtTokenService> _logger;
+    private readonly IUserClaimsProvider<TUser> _claimsProvider;
+    private readonly ILogger<JwtTokenService<TUser>> _logger;
 
     public JwtTokenService(
         IOptions<JwtOptions> jwtOptions,
-        UserManager<ApplicationUser> userManager,
-        ILogger<JwtTokenService> logger)
+        IUserClaimsProvider<TUser> claimsProvider,
+        ILogger<JwtTokenService<TUser>> logger)
     {
         _jwtOptions = jwtOptions.Value;
-        _userManager = userManager;
+        _claimsProvider = claimsProvider;
         _logger = logger;
     }
 
     /// <inheritdoc/>
-    public async Task<string> GenerateAccessTokenAsync(ApplicationUser user)
+    public async Task<string> GenerateAccessTokenAsync(TUser user)
     {
-        LogTokenGenerationStarted(user.UserName ?? "");
+        var claims = await _claimsProvider.GetClaimsAsync(user);
+        var username = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "unknown";
+        
+        LogTokenGenerationStarted(username);
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-        var roles = await _userManager.GetRolesAsync(user);
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id),
-            new(ClaimTypes.Name, user.UserName ?? ""),
-            new(ClaimTypes.Email, user.Email ?? ""),
-            new(JwtRegisteredClaimNames.Sub, user.UserName ?? ""),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
@@ -57,7 +46,7 @@ public partial class JwtTokenService : IJwtTokenService
             signingCredentials: credentials
         );
 
-        LogTokenGenerationCompleted(user.UserName ?? "");
+        LogTokenGenerationCompleted(username);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
@@ -103,19 +92,19 @@ public partial class JwtTokenService : IJwtTokenService
     #region Logger Messages
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation started for user: {username}")]
-    private partial void LogTokenGenerationStarted(string username);
+    protected partial void LogTokenGenerationStarted(string username);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
-    private partial void LogTokenGenerationCompleted(string username);
+    protected partial void LogTokenGenerationCompleted(string username);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
-    private partial void LogTokenValidationStarted();
+    protected partial void LogTokenValidationStarted();
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
-    private partial void LogTokenValidationCompleted();
+    protected partial void LogTokenValidationCompleted();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Token validation failed")]
-    private partial void LogTokenValidationFailed(Exception ex);
+    protected partial void LogTokenValidationFailed(Exception ex);
 
     #endregion
 }

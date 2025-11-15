@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using NuxtIdentity.Playground.Local.Configuration;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Models;
@@ -40,8 +37,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Register token services
-builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+// Register token services (now generic)
+builder.Services.AddScoped<IUserClaimsProvider<ApplicationUser>, IdentityUserClaimsProvider>();
+builder.Services.AddScoped<IJwtTokenService<ApplicationUser>, JwtTokenService<ApplicationUser>>();
 builder.Services.AddScoped<IRefreshTokenService, EfRefreshTokenService>();
 
 // Add CORS

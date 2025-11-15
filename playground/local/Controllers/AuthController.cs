@@ -17,7 +17,7 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 [ApiController]
 [Route("api/auth")]
 public partial class AuthController(
-    IJwtTokenService jwtTokenService,
+    IJwtTokenService<ApplicationUser> jwtTokenService,  // <- Changed to generic
     IRefreshTokenService refreshTokenService,
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
