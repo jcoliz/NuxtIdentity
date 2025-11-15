@@ -1,12 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Options;
-using NuxtIdentity.Playground.Local.Configuration;
 using NuxtIdentity.Playground.Local.Models;
 using NuxtIdentity.Playground.Local.Services;
 
@@ -15,7 +9,7 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 /// <summary>
 /// Handles authentication operations including login, signup, token refresh, and session management.
 /// </summary>
-/// <param name="jwtOptions">JWT configuration options.</param>
+/// <param name="jwtTokenService">JWT token service.</param>
 /// <param name="refreshTokenService">Refresh token service.</param>
 /// <param name="userManager">User manager for Identity.</param>
 /// <param name="signInManager">Sign in manager for Identity.</param>
@@ -23,7 +17,7 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 [ApiController]
 [Route("api/auth")]
 public partial class AuthController(
-    IOptions<JwtOptions> jwtOptions, 
+    IJwtTokenService jwtTokenService,
     IRefreshTokenService refreshTokenService,
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
@@ -53,7 +47,7 @@ public partial class AuthController(
         var result = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
         if (result.Succeeded)
         {
-            var token = await GenerateJwtTokenAsync(user);
+            var token = await jwtTokenService.GenerateAccessTokenAsync(user);
             var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync(user.Id);
             
             LogLoginSuccess(request.Username);
@@ -101,7 +95,7 @@ public partial class AuthController(
         
         if (result.Succeeded)
         {
-            var token = await GenerateJwtTokenAsync(user);
+            var token = await jwtTokenService.GenerateAccessTokenAsync(user);
             var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync(user.Id);
             
             LogSignupSuccess(request.Username);
@@ -159,7 +153,7 @@ public partial class AuthController(
             // Revoke old token and issue new ones (token rotation)
             await refreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
             
-            var newAccessToken = await GenerateJwtTokenAsync(user);
+            var newAccessToken = await jwtTokenService.GenerateAccessTokenAsync(user);
             var newRefreshToken = await refreshTokenService.GenerateRefreshTokenAsync(user.Id);
             
             LogRefreshSuccess(username, newRefreshToken);
@@ -238,47 +232,6 @@ public partial class AuthController(
 
     #endregion
 
-    #region Private Methods
-
-    /// <summary>
-    /// Generates a JWT access token for the specified user.
-    /// </summary>
-    /// <param name="user">The user to generate the token for.</param>
-    /// <returns>A signed JWT token string.</returns>
-    private async Task<string> GenerateJwtTokenAsync(ApplicationUser user)
-    {
-        LogTokenGenerationStarted(user.UserName ?? "");
-
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Value.Key));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-        var roles = await userManager.GetRolesAsync(user);
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id),
-            new(ClaimTypes.Name, user.UserName ?? ""),
-            new(ClaimTypes.Email, user.Email ?? ""),
-            new(JwtRegisteredClaimNames.Sub, user.UserName ?? ""),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
-
-        var token = new JwtSecurityToken(
-            issuer: jwtOptions.Value.Issuer,
-            audience: jwtOptions.Value.Audience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(jwtOptions.Value.ExpirationHours),
-            signingCredentials: credentials
-        );
-
-        LogTokenGenerationCompleted(user.UserName ?? "");
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    #endregion
-
     #region Logger Messages
 
     // Login
@@ -297,13 +250,6 @@ public partial class AuthController(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Signup successful for user: {username}")]
     private partial void LogSignupSuccess(string username);
-
-    // Token Generation
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation started for user: {username}")]
-    private partial void LogTokenGenerationStarted(string username);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
-    private partial void LogTokenGenerationCompleted(string username);
 
     // Session Validation
     [LoggerMessage(Level = LogLevel.Debug, Message = "Session validation started")]
