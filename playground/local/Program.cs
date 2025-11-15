@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Extensions;
+using NuxtIdentity.EntityFrameworkCore.Services;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Core.Models;

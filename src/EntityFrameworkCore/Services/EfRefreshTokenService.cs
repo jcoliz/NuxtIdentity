@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
 
-namespace NuxtIdentity.Playground.Local.Services;
+namespace NuxtIdentity.EntityFrameworkCore.Services;
 
 /// <summary>
 /// Entity Framework Core implementation of refresh token service.
