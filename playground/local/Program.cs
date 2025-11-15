@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Extensions;
 using NuxtIdentity.EntityFrameworkCore.Services;
+using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Core.Models;
@@ -45,7 +46,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 // Register token services (now generic)
 builder.Services.AddScoped<IUserClaimsProvider<ApplicationUser>, IdentityUserClaimsProvider>();
 builder.Services.AddScoped<IJwtTokenService<ApplicationUser>, JwtTokenService<ApplicationUser>>();
-builder.Services.AddScoped<IRefreshTokenService, EfRefreshTokenService<ApplicationDbContext>>();
+builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
 
 // Add CORS
 builder.Services.AddCors(options =>

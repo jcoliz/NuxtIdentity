@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.Core.Models;
+using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.Playground.Local.Models;
 
 namespace NuxtIdentity.Playground.Local.Data;
@@ -24,13 +25,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
 
-        builder.Entity<RefreshTokenEntity>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.TokenHash);
-            entity.HasIndex(e => e.UserId);
-            entity.Property(e => e.TokenHash).IsRequired();
-            entity.Property(e => e.UserId).IsRequired();
-        });
+        // Use the extension method from the library
+        builder.ConfigureNuxtIdentityRefreshTokens();
     }
 }
