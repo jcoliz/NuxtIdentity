@@ -66,20 +66,29 @@ builder.Services.AddOpenApiDocument(config =>
         Type = NSwag.OpenApiSecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Description = "Enter your JWT token"
+        Description = "Enter your JWT token (without 'Bearer' prefix)"
     });
+    
+    // Make all endpoints require the Bearer token by default
+    config.OperationProcessors.Add(new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("Bearer"));
+
 });
 
 var app = builder.Build();
 
-// Ensure database is created and roles are seeded
+// Ensure database is created and seed roles and admin user
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var services = scope.ServiceProvider;
+    var db = services.GetRequiredService<ApplicationDbContext>();
     db.Database.EnsureCreated();
     
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    await SeedRolesAsync(roleManager);
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    
+    await SeedRolesAsync(roleManager, logger);
+    await SeedAdminUserAsync(userManager, logger);
 }
 
 // Configure the HTTP request pipeline.
@@ -103,8 +112,10 @@ app.MapControllers();
 
 app.Run();
 
-// Helper method to seed roles
-static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
+/// <summary>
+/// Seeds the application roles if they don't exist.
+/// </summary>
+static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager, ILogger logger)
 {
     string[] roles = ["guest", "account", "admin"];
     
@@ -113,6 +124,44 @@ static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
         if (!await roleManager.RoleExistsAsync(role))
         {
             await roleManager.CreateAsync(new IdentityRole(role));
+            logger.LogInformation("Created role: {Role}", role);
+        }
+    }
+}
+
+/// <summary>
+/// Seeds the default admin user if it doesn't exist.
+/// </summary>
+static async Task SeedAdminUserAsync(UserManager<ApplicationUser> userManager, ILogger logger)
+{
+    const string adminUsername = "admin";
+    const string adminPassword = "Admin123!";
+    const string adminEmail = "admin@nuxtidentity.local";
+    
+    var adminUser = await userManager.FindByNameAsync(adminUsername);
+    
+    if (adminUser == null)
+    {
+        adminUser = new ApplicationUser
+        {
+            UserName = adminUsername,
+            Email = adminEmail,
+            DisplayName = "Administrator",
+            EmailConfirmed = true
+        };
+        
+        var result = await userManager.CreateAsync(adminUser, adminPassword);
+        
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(adminUser, "admin");
+            logger.LogInformation("Created admin user: {Username} with password: {Password}", adminUsername, adminPassword);
+            logger.LogWarning("IMPORTANT: Change the admin password in production!");
+        }
+        else
+        {
+            logger.LogError("Failed to create admin user: {Errors}", 
+                string.Join(", ", result.Errors.Select(e => e.Description)));
         }
     }
 }
