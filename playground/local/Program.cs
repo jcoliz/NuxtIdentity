@@ -43,7 +43,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-
 // Add NuxtIdentity
 builder.Services.AddNuxtIdentity<ApplicationUser>();
 builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();

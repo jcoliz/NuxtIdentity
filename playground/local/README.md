@@ -1,22 +1,77 @@
-# Local auth playground provider
+# NuxtIdentity Playground
 
-This sample is meant to be used with the @sidebase/nuxt-auth local playground.
+Reference implementation demonstrating how to use the NuxtIdentity libraries to build a complete JWT authentication system with ASP.NET Core Identity and Entity Framework Core.
 
-https://nuxt.com/modules/sidebase-auth#module-playground
+## Overview
 
-1. Clone @sidebase/nuxt-auth repo locally
+This playground application shows best practices for integrating all three NuxtIdentity libraries:
+- **NuxtIdentity.Core** - Generic JWT and refresh token services
+- **NuxtIdentity.AspNetCore** - Base controller and Identity integration
+- **NuxtIdentity.EntityFrameworkCore** - Persistent refresh token storage
 
+## What's Included
+
+### Authentication
+
+- ✅ **Login** - Username/password authentication via ASP.NET Core Identity
+- ✅ **Refresh** - Token refresh with automatic rotation (inherited from base controller)
+- ✅ **Logout** - Token revocation (inherited from base controller)
+- ✅ **Session** - Get current user information
+
+### Infrastructure
+
+- ✅ SQLite database with EF Core
+- ✅ ASP.NET Core Identity (Users, Roles)
+- ✅ Refresh token storage with token rotation
+- ✅ NSwag/Swagger UI with JWT support
+- ✅ CORS configured for Nuxt.js frontend
+
+## Running the Playground
+
+### Standalone API Testing
+
+1. **Build and Run**
+   ```bash
+   cd playground/local
+   dotnet run
+   ```
+
+2. **Access Swagger UI**  
+   Navigate to `https://localhost:5001/swagger`
+
+3. **Test Endpoints**
+   - Login, get tokens
+   - Use "Authorize" button to add token
+   - Test authorized endpoints
+   - Refresh tokens
+   - Logout
+
+## Using with @sidebase/nuxt-auth Frontend
+
+This sample is designed to work with the [@sidebase/nuxt-auth](https://nuxt.com/modules/sidebase-auth) local playground.
+
+### 1. Start the .NET Backend
+
+```bash
+cd playground/local
+dotnet run
 ```
+
+The backend will listen on `http://localhost:3001/` for auth requests.
+
+### 2. Clone and Setup nuxt-auth
+
+In a separate terminal:
+
+```bash
 git clone https://github.com/sidebase/nuxt-auth
-
-cd nuxt-auth
-
-cd playground-local
-
+cd nuxt-auth/playground-local
 pnpm i
 ```
 
-2. Change the nuxt config
+### 3. Configure the Nuxt App
+
+Update `playground-local/nuxt.config.ts`:
 
 ```diff
 --- a/playground-local/nuxt.config.ts
@@ -39,32 +94,91 @@ pnpm i
            refreshResponseTokenPointer: '',
 ```
 
-3. Start the static frontend
+### 4. Start the Nuxt Frontend
 
-This will start the frontend listening on http://localhost:3000/
-
-```
+```bash
 pnpm generate
-
 pnpm start
 ```
 
-4. Run the .NET Web API in this folder
+The frontend will be available at `http://localhost:3000/`
 
-This will start the backend listening on http://localhost:3001/, which will fulfill the auth requests made by the local playground frontend.
+### 5. Register and Login
 
+1. Visit `http://localhost:3000/register`
+2. Enter a username and password, click "sign up"
+3. Click "navigate to login page"
+4. Enter the same credentials to log in
+
+The Nuxt app will automatically handle token refresh and rotation!
+
+## Configuration
+
+See `appsettings.json` for JWT settings, connection strings, and CORS configuration.
+
+## What to Learn From This
+
+This playground demonstrates:
+- Minimal setup with maximum functionality
+- Token rotation best practices
+- Integration with ASP.NET Core Identity
+- CORS configuration for frontend apps
+- Working with @sidebase/nuxt-auth
+
+## Next Steps
+
+- See library READMEs for detailed API documentation
+- Customize the user model for your needs
+- Add signup, password reset, email verification
+- Deploy with proper production configuration
+
+## Key Implementation Details
+
+### Custom User Model
+
+```csharp
+public class ApplicationUser : IdentityUser
+{
+    public string DisplayName { get; set; } = string.Empty;
+}
 ```
-dotnet run
+
+### Auth Controller
+
+```csharp
+public class AuthController : NuxtAuthControllerBase<ApplicationUser>
+{
+    // Implement required abstract method
+    protected override async Task<ApplicationUser?> GetUserByIdAsync(string userId)
+    {
+        return await _userManager.FindByIdAsync(userId);
+    }
+    
+    // Implement login endpoint
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        // Authenticate with Identity, generate tokens using helper methods
+    }
+    
+    // Refresh and Logout are inherited from base controller!
+}
 ```
 
-5. Register a new user
+### Complete Setup (Program.cs)
 
-Visit http://localhost:3000/register. Enter a username and password, then click "sign up".
+```csharp
+// Configure JWT
+builder.Services.Configure<JwtOptions>(
+    builder.Configuration.GetSection(JwtOptions.SectionName));
 
-This will create a new user in the backend.
+// Add DbContext and Identity
+builder.Services.AddDbContext<ApplicationDbContext>(...);
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(...)
+    .AddEntityFrameworkStores<ApplicationDbContext>();
 
-6. Log in with that user
-  
-Click "navigate to login page"
-
-Enter the user name and password from previous step.
+// Add NuxtIdentity - Three simple calls!
+builder.Services.AddNuxtIdentity<ApplicationUser>();
+builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
+builder.Services.AddNuxtIdentityAuthentication();
+```
