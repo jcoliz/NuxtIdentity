@@ -164,7 +164,7 @@ The application includes three predefined roles that work seamlessly with the lo
    - Request body:
      ```json
      {
-       "userId": "user-id-from-session",
+       "userId": "user-guid-here",
        "role": "account"
      }
      ```
@@ -189,15 +189,11 @@ Subscriptions are implemented using ASP.NET Core Identity's claims system, allow
 
 #### Understanding Subscriptions
 
-In this example, a subscription represents access to a specific feature or service, with status tracking:
-```json
-{
-  "id": 1,
-  "status": ["Active"]
-}
-```
+In this example, a subscription represents access to a specific feature or service with active/inactive status. Each subscription is stored as an Identity claim with:
+- **Claim Type**: `"subscription"`
+- **Claim Value**: `"{Guid}:{IsActive}"` (e.g., `"550e8400-e29b-41d4-a716-446655440000:true"`)
 
-Possible statuses: `Active`, `Inactive`
+The `SubscriptionClaim` helper class handles creating and parsing these claims.
 
 #### Testing Subscription Management
 
@@ -217,39 +213,36 @@ Possible statuses: `Active`, `Inactive`
    - Request body:
      ```json
      {
-       "userId": "abc123...",
+       "userId": "user-guid-here",
        "subscriptions": [
          {
-           "id": 1,
-           "status": ["Active"]
+           "id": "550e8400-e29b-41d4-a716-446655440000",
+           "isActive": true
          },
          {
-           "id": 2,
-           "status": ["Active"]
-         },
-         {
-           "id": 99,
-           "status": ["Inactive"]
+           "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+           "isActive": true
          }
        ]
      }
      ```
-   - This creates Identity claims of type `"subscription"` with JSON values
+   - This creates Identity claims with type `"subscription"` and values like `"550e8400-e29b-41d4-a716-446655440000:true"`
 
 4. **Verify Subscriptions in Session** (via Frontend)
    - Return to Nuxt app logged in as `subscriber`
    - Refresh the page (to get new JWT token)
-   - View session data - you'll see:
+   - View session data - you'll see subscription claims in the `claims` array:
      ```json
      {
-       "id": "abc123...",
-       "name": "subscriber",
-       "email": "subscriber@sample.com",
-       "role": "guest",
-       "subscriptions": [
-         { "id": 1, "status": ["Active"] },
-         { "id": 2, "status": ["Active"] },
-         { "id": 99, "status": ["Inactive"] }
+       "claims": [
+         {
+           "type": "subscription",
+           "value": "550e8400-e29b-41d4-a716-446655440000:true"
+         },
+         {
+           "type": "subscription",
+           "value": "6ba7b810-9dad-11d1-80b4-00c04fd430c8:true"
+         }
        ]
      }
      ```
@@ -257,104 +250,77 @@ Possible statuses: `Active`, `Inactive`
 5. **View Subscriptions** (via Swagger as Admin)
    - Use GET `/api/admin/subscriptions/{userId}`
    - Replace `{userId}` with the user's ID
-   - Returns all subscriptions for that user
+   - Returns all subscriptions for that user in a parsed format:
+     ```json
+     {
+       "userId": "user-guid-here",
+       "subscriptions": [
+         {
+           "id": "550e8400-e29b-41d4-a716-446655440000",
+           "isActive": true
+         },
+         {
+           "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+           "isActive": true
+         }
+       ]
+     }
+     ```
 
 #### Testing Subscription-Based Authorization
 
 The playground includes a `WeatherForecastController` that demonstrates subscription-based access control using a custom authorization policy.
 
 1. **Ensure User Has Subscriptions**
-   - Follow steps above to give `subscriber` user subscriptions with IDs 1 and 2 (both Active)
+   - Follow steps above to give `subscriber` user subscriptions with IDs `550e8400-e29b-41d4-a716-446655440000` and `6ba7b810-9dad-11d1-80b4-00c04fd430c8` (both Active)
 
 2. **Login as Subscriber** (via Swagger)
    - POST `/api/auth/login` as `subscriber`
    - Authorize with the subscriber's token
 
 3. **Access Protected Endpoint - Success Case**
-   - Use GET `/api/Subscriptions/1/WeatherForecast`
+   - Use GET `/api/Subscriptions/550e8400-e29b-41d4-a716-446655440000/WeatherForecast`
    - ✅ **Success** - Returns weather data because:
      - User is authenticated
-     - User has subscription with `id: 1`
-     - Subscription status is `Active`
+     - User has a subscription claim with matching ID
+     - Subscription `isActive` is `true`
 
 4. **Access Protected Endpoint - Different Subscription**
-   - Use GET `/api/Subscriptions/2/WeatherForecast`
-   - ✅ **Success** - Returns weather data (user has active subscription 2)
+   - Use GET `/api/Subscriptions/6ba7b810-9dad-11d1-80b4-00c04fd430c8/WeatherForecast`
+   - ✅ **Success** - Returns weather data (user has active subscription)
 
-5. **Access Protected Endpoint - No Subscription**
-   - Use GET `/api/Subscriptions/99/WeatherForecast`
-   - ❌ **403 Forbidden** - Access denied because:
-     - Subscription 99 exists but status is `Inactive`
+5. **Access Protected Endpoint - Inactive Subscription**
+   - First, set the subscription to inactive via admin endpoint
+   - Then try GET `/api/Subscriptions/550e8400-e29b-41d4-a716-446655440000/WeatherForecast`
+   - ❌ **403 Forbidden** - Access denied because subscription `isActive` is `false`
 
 6. **Access Protected Endpoint - Missing Subscription**
-   - Use GET `/api/Subscriptions/999/WeatherForecast`
-   - ❌ **403 Forbidden** - User doesn't have subscription 999
+   - Use GET `/api/Subscriptions/00000000-0000-0000-0000-000000000000/WeatherForecast`
+   - ❌ **403 Forbidden** - User doesn't have that subscription
 
 #### How Subscription Authorization Works
 
 1. **Storage**: Subscriptions are stored as Identity claims:
    - Claim Type: `"subscription"`
-   - Claim Value: JSON-serialized `SubscriptionInfo`
+   - Claim Value: `"{SubscriptionId}:{IsActive}"` (e.g., `"550e8400-e29b-41d4-a716-446655440000:true"`)
+   - The `SubscriptionClaim` class provides typed creation and parsing
 
 2. **JWT Inclusion**: The `IdentityUserClaimsProvider` automatically includes all user claims in the JWT token
 
 3. **Authorization Policy**: Custom `SubscriptionRequirement` and `SubscriptionHandler`:
    - Extracts `subscriptionId` from the route (e.g., `/api/Subscriptions/{subscriptionId}/WeatherForecast`)
-   - Reads subscription claims from the JWT token
-   - Deserializes each claim to find matching subscription ID
-   - Verifies the subscription status is `Active`
+   - Uses `SubscriptionClaim.Parse()` to extract subscription claims from the user's token
+   - Matches the route subscription ID with the user's subscription claims
+   - Checks that the matching subscription has `isActive == true`
    - Returns 403 Forbidden if no matching active subscription
 
 4. **Controller Protection**: Apply the policy with:
    ```csharp
-   [Authorize(Policy = "RequireActiveSubscription")]
-   public class WeatherForecastController : ControllerBase
+   [Authorize(Policy = "Subscription")]
+   [Route("/api/Subscriptions/{subscription}/[controller]")]
    ```
 
 5. **Token Refresh**: Subscriptions update when the JWT refreshes (not in real-time)
-
-#### Subscription Workflow Summary
-
-```
-Admin → POST /api/admin/setsubscriptions
-  ↓
-Identity Claim Created (type: "subscription", value: JSON)
-  ↓
-IdentityUserClaimsProvider includes all claims in JWT
-  ↓
-User Logs In / Refreshes Token
-  ↓
-JWT Contains Subscription Claims
-  ↓
-Frontend: Session shows subscriptions array
-  ↓
-Backend: Authorization handler validates subscription for protected resources
-```
-
-### Real-World Use Cases
-
-**Subscriptions enable:**
-- SaaS tier management (free, pro, enterprise)
-- Feature flags per user
-- Multi-tenant resource access
-- Time-limited access (add expiry date to claim value)
-- A/B testing cohorts
-
-**Example: Multi-tier SaaS**
-```json
-{
-  "subscriptions": [
-    { "id": "basic", "status": ["Active"] },
-    { "id": "advanced-analytics", "status": ["Active"] },
-    { "id": "api-access", "status": ["Inactive"] }
-  ]
-}
-```
-
-Different routes/controllers can require different subscriptions:
-- `/api/Subscriptions/basic/*` - Available to all tiers
-- `/api/Subscriptions/advanced-analytics/*` - Pro tier and above
-- `/api/Subscriptions/api-access/*` - Enterprise only
 
 ## Configuration
 
@@ -368,6 +334,7 @@ This playground demonstrates:
 - Integration with ASP.NET Core Identity (Users, Roles, Claims)
 - Role-based authorization
 - Custom authorization policies using claims
+- Custom claim types with helper classes for type safety
 - CORS configuration for frontend apps
 - Working with @sidebase/nuxt-auth
 
@@ -378,5 +345,6 @@ This playground demonstrates:
 - Customize the user model for your needs
 - Add password reset, email verification
 - Implement more complex subscription logic (expiry, limits, etc.)
+- Extend the `SubscriptionClaim` format for additional metadata
 - Add middleware for subscription validation
 - Deploy with proper production configuration

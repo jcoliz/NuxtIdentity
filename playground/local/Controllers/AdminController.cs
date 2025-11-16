@@ -2,9 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using NuxtIdentity.Playground.Local.Models;
-using NuxtIdentity.Playground.Local.Constants;
-using System.Security.Claims;
-using System.Text.Json;
+using NuxtIdentity.Playground.Local.Authorization;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
 
@@ -91,7 +89,7 @@ public partial class AdminController(
 
         // Remove all existing subscription claims
         var existingClaims = await userManager.GetClaimsAsync(user);
-        var subscriptionClaims = existingClaims.Where(c => c.Type == CustomClaimTypes.Subscription).ToList();
+        var subscriptionClaims = existingClaims.Where(c => c.Type == SubscriptionClaim.ClaimType).ToList();
         
         if (subscriptionClaims.Any())
         {
@@ -103,11 +101,10 @@ public partial class AdminController(
             }
         }
 
-        // Add new subscription claims
+        // Add new subscription claims using SubscriptionClaim helper
         foreach (var subscription in request.Subscriptions)
         {
-            var subscriptionJson = JsonSerializer.Serialize(subscription);
-            var claim = new Claim(CustomClaimTypes.Subscription, subscriptionJson);
+            var claim = new SubscriptionClaim(subscription.Id, subscription.IsActive);
             var addResult = await userManager.AddClaimAsync(user, claim);
             
             if (!addResult.Succeeded)
@@ -158,22 +155,18 @@ public partial class AdminController(
     private async Task<List<SubscriptionInfo>> GetUserSubscriptionsAsync(ApplicationUser user)
     {
         var claims = await userManager.GetClaimsAsync(user);
-        var subscriptionClaims = claims.Where(c => c.Type == CustomClaimTypes.Subscription);
         
         var subscriptions = new List<SubscriptionInfo>();
-        foreach (var claim in subscriptionClaims)
+        foreach (var claim in claims)
         {
-            try
+            var parsed = SubscriptionClaim.Parse(claim);
+            if (parsed.HasValue)
             {
-                var subscription = JsonSerializer.Deserialize<SubscriptionInfo>(claim.Value);
-                if (subscription != null)
+                subscriptions.Add(new SubscriptionInfo
                 {
-                    subscriptions.Add(subscription);
-                }
-            }
-            catch (JsonException ex)
-            {
-                LogSubscriptionDeserializationError(user.Id, claim.Value, ex.Message);
+                    Id = parsed.Value.SubscriptionId,
+                    IsActive = parsed.Value.IsActive
+                });
             }
         }
         
@@ -208,9 +201,6 @@ public partial class AdminController(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Get subscriptions failed for user: {userId}. Reason: {reason}")]
     private partial void LogGetSubscriptionsFailed(string userId, string reason);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to deserialize subscription claim for user: {userId}. Value: {claimValue}. Error: {error}")]
-    private partial void LogSubscriptionDeserializationError(string userId, string claimValue, string error);
 
     #endregion
 }
@@ -269,28 +259,12 @@ public record GetSubscriptionsResponse
 public record SubscriptionInfo
 {
     /// <summary>
-    /// The subscription identifier (e.g., "premium", "enterprise").
+    /// The subscription identifier.
     /// </summary>
-    public required string Id { get; init; }
+    public required Guid Id { get; init; }
     
     /// <summary>
-    /// The current status of the subscription.
+    /// Whether the subscription is currently active.
     /// </summary>
-    public required SubscriptionStatus[] Status { get; init; }
-}
-
-/// <summary>
-/// Subscription status values.
-/// </summary>
-public enum SubscriptionStatus
-{
-    /// <summary>
-    /// Subscription is currently active.
-    /// </summary>
-    Active,
-    
-    /// <summary>
-    /// Subscription is inactive.
-    /// </summary>
-    Inactive
+    public required bool IsActive { get; init; }
 }
