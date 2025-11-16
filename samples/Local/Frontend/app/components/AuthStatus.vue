@@ -27,10 +27,10 @@ const statusVariant = computed(() => {
 <template>
   <div class="card mt-4">
     <div class="card-header bg-primary text-white">
-      <h5 class="card-title mb-0">
-        <FeatherIcon icon="shield" size="20" class="me-2" />
-        <span>Authentication Status</span>
-      </h5>
+        <h5 class="card-title mb-0 d-flex align-items-center">
+            <FeatherIcon icon="shield" size="20" class="me-2 icon-up-1" />
+            <span>Authentication Status</span>
+        </h5>
     </div>
     <div class="card-body">
       <!-- Status Badge -->
@@ -167,5 +167,9 @@ const statusVariant = computed(() => {
 
 .bg-light {
   background-color: #f8f9fa !important;
+}
+/* Artificially adjust shield icon to appear visually centered */
+.icon-up-1 {
+  transform: translateY(-2px);
 }
 </style>
