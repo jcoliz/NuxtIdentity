@@ -13,6 +13,17 @@ const formatRefreshTime = (timestamp: any) => {
   return new Date(timestamp).toLocaleString()
 }
 
+// Helper function to copy text to clipboard
+const copyToClipboard = async (text: string) => {
+  if (process.client && window.navigator?.clipboard) {
+    try {
+      await window.navigator.clipboard.writeText(text)
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+    }
+  }
+}
+
 // Status badge variant based on auth status
 const statusVariant = computed(() => {
   switch (status.value) {
@@ -99,7 +110,7 @@ const statusVariant = computed(() => {
                 v-if="token" 
                 class="btn btn-outline-secondary" 
                 type="button"
-                @click="navigator.clipboard?.writeText(token)"
+                @click="copyToClipboard(token)"
                 title="Copy token"
               >
                 <FeatherIcon icon="copy" size="16" />
@@ -125,7 +136,7 @@ const statusVariant = computed(() => {
                 v-if="refreshToken" 
                 class="btn btn-outline-secondary" 
                 type="button"
-                @click="navigator.clipboard?.writeText(refreshToken)"
+                @click="copyToClipboard(refreshToken)"
                 title="Copy token"
               >
                 <FeatherIcon icon="copy" size="16" />
