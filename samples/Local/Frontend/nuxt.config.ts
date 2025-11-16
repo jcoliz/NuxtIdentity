@@ -27,6 +27,8 @@ export default defineNuxtConfig({
     provider: {
       type: 'local',
       endpoints: {
+        signIn: { path: '/login', method: 'post' }, // ADD THIS LINE
+        signOut: { path: '/logout', method: 'post' },
         getSession: { path: '/user' },
         signUp: { path: '/signup', method: 'post' }
       },
@@ -69,11 +71,9 @@ export default defineNuxtConfig({
     },
     globalAppMiddleware: {
       isEnabled: true
-    },
-    runtimeConfig: {
-      public : {
-        authOrigin: 'http://localhost:3000/'
-      }
     }
+  },
+  runtimeConfig: {
+    authOrigin: 'http://localhost:3000/'
   }
 })
