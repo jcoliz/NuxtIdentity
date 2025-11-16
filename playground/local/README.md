@@ -92,13 +92,22 @@ Update `playground-local/nuxt.config.ts`:
      provider: {
        type: 'local',
        endpoints: {
+@@ -18,7 +19,7 @@ export default defineNuxtConfig({
+         signInResponseTokenPointer: '/token/accessToken'
+       },
+       session: {
+-        dataType: { id: 'string', email: 'string', name: 'string', role: '\'admin\' | \'guest\' | \'account\'', subscriptions: '{ id: number, status: \'ACTIVE\' | \'INACTIVE\' }[]' },
++        dataType: { id: 'string', email: 'string', userName: 'string', roles: '(\'admin\' | \'guest\' | \'account\')[]', claims: '{ type: string, value: string }[]' },
+         dataResponsePointer: '/'
+       },
+       refresh: {
 @@ -26,6 +27,7 @@ export default defineNuxtConfig({
-         // We do an environment variable for E2E testing both options.    
-         isEnabled: process.env.NUXT_AUTH_REFRESH_ENABLED !== 'false',     
+         // We do an environment variable for E2E testing both options.
+         isEnabled: process.env.NUXT_AUTH_REFRESH_ENABLED !== 'false',
          endpoint: { path: '/refresh', method: 'post' },
-+        refreshOnlyToken: false, // rotate refresh tokens!
++        refreshOnlyToken: false, // Add this line - rotate refresh tokens!
          token: {
-           signInResponseRefreshTokenPointer: '/token/refreshToken',       
+           signInResponseRefreshTokenPointer: '/token/refreshToken',
            refreshResponseTokenPointer: '',
 ```
 
@@ -126,7 +135,7 @@ This playground demonstrates advanced authorization features using ASP.NET Core 
 
 ### User Roles
 
-The application includes three predefined roles that work seamlessly with @sidebase/nuxt-auth:
+The application includes three predefined roles that work seamlessly with the local playground:
 - **guest** - Default role for new users (limited access)
 - **account** - Standard authenticated users
 - **admin** - Full administrative access
@@ -164,7 +173,7 @@ The application includes three predefined roles that work seamlessly with @sideb
 5. **Verify Role Change** (via Frontend)
    - Return to the Nuxt app logged in as `testuser`
    - Refresh the page or wait for token refresh
-   - View session data - you'll now see `"role": "account"`
+   - View session data - you'll now see `"roles": [ "account" ]`
    - **Important**: The role is embedded in the JWT token, so it updates when the token refreshes
 
 #### How It Works
@@ -180,7 +189,7 @@ Subscriptions are implemented using ASP.NET Core Identity's claims system, allow
 
 #### Understanding Subscriptions
 
-A subscription represents access to a specific feature or service, with status tracking:
+In this example, a subscription represents access to a specific feature or service, with status tracking:
 ```json
 {
   "id": 1,

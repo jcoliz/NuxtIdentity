@@ -6,7 +6,7 @@ using NuxtIdentity.Playground.Local.Authorization;
 namespace NuxtIdentity.Playground.Local.Controllers;
 
 [ApiController]
-[Route("api/Subscriptions/{subscriptionId}/[controller]")]
+[Route("api/Subscriptions/{subscription}/[controller]")]
 [Authorize(Policy = "RequireActiveSubscription")]
 public class WeatherForecastController : ControllerBase
 {
@@ -26,10 +26,10 @@ public class WeatherForecastController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<WeatherForecast>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public IEnumerable<WeatherForecast> Get(string subscriptionId)
+    public IEnumerable<WeatherForecast> Get(string subscription)
     {
-        _logger.LogInformation("Getting weather forecast for subscription: {SubscriptionId}", subscriptionId);
-        
+        _logger.LogInformation("Getting weather forecast for subscription: {SubscriptionId}", subscription);
+
         return Enumerable.Range(1, 5).Select(index => new WeatherForecast
         {
             Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),

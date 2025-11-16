@@ -1,41 +1,68 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
+using System.Security.Claims;
 
 namespace NuxtIdentity.AspNetCore.Controllers;
 
 /// <summary>
-/// Base controller for NuxtIdentity authentication endpoints.
+/// Base controller for NuxtIdentity authentication endpoints with ASP.NET Core Identity integration.
 /// </summary>
-/// <typeparam name="TUser">The type of user this controller works with.</typeparam>
+/// <typeparam name="TUser">The type of user this controller works with. Must inherit from IdentityUser.</typeparam>
 /// <remarks>
-/// This base controller provides common infrastructure for authentication endpoints
-/// without depending on any specific user store (ASP.NET Identity, custom, etc.).
+/// <para>
+/// This base controller provides complete authentication endpoints that work with ASP.NET Core Identity:
+/// - Login: Username/password authentication
+/// - SignUp: User registration
+/// - Session: Get current user information
+/// - Refresh: Token refresh with rotation
+/// - Logout: Token revocation
+/// </para>
 /// 
-/// It's designed to be extended by application-specific controllers that implement
-/// the actual authentication logic using their chosen user management system.
+/// <para><strong>Default Behavior:</strong></para>
+/// <para>
+/// All endpoints have sensible default implementations that work with standard IdentityUser.
+/// The defaults handle:
+/// - User authentication via SignInManager
+/// - User creation via UserManager
+/// - Role and claim extraction from Identity
+/// - Token generation and validation
+/// </para>
 /// 
-/// The controller provides:
-/// - Protected access to JWT token service
-/// - Protected access to refresh token service
-/// - Structured logging support
-/// - Common response models
-/// - Standard endpoint routing
+/// <para><strong>Customization:</strong></para>
+/// <para>
+/// All endpoint methods are virtual and can be overridden for custom behavior.
+/// Common scenarios for overriding:
+/// - Custom user properties (extend IdentityUser)
+/// - Additional validation logic
+/// - Email verification requirements
+/// - Multi-factor authentication
+/// - Custom response formats
+/// </para>
 /// 
-/// Applications should inherit from this class and implement their own authentication
-/// logic (login, signup, etc.) using UserManager, custom repositories, or other
-/// user management approaches.
+/// <para><strong>User Information Mapping:</strong></para>
+/// <para>
+/// The controller automatically maps ASP.NET Core Identity data to the UserInfo model:
+/// - Id: User.Id
+/// - Name: User.UserName
+/// - Email: User.Email
+/// - Roles: All roles assigned to the user
+/// - Claims: All user claims and role claims
+/// </para>
 /// </remarks>
 [ApiController]
 [Route("api/auth")]
 public abstract partial class NuxtAuthControllerBase<TUser>(
     IJwtTokenService<TUser> jwtTokenService,
     IRefreshTokenService refreshTokenService,
+    UserManager<TUser> userManager,
+    SignInManager<TUser> signInManager,
     ILogger logger) : ControllerBase 
-    where TUser : class
+    where TUser : IdentityUser, new()
 {
     /// <summary>
     /// Gets the JWT token service for generating and validating tokens.
@@ -47,22 +74,28 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// </summary>
     protected IRefreshTokenService RefreshTokenService { get; } = refreshTokenService;
     
+    /// <summary>
+    /// Gets the user manager for Identity operations.
+    /// </summary>
+    protected UserManager<TUser> UserManager { get; } = userManager;
+    
+    /// <summary>
+    /// Gets the sign-in manager for authentication operations.
+    /// </summary>
+    protected SignInManager<TUser> SignInManager { get; } = signInManager;
+    
     #region Helper Methods
 
     /// <summary>
     /// Creates a login response with tokens and user information.
     /// </summary>
     /// <param name="user">The authenticated user.</param>
-    /// <param name="userId">The user's unique identifier.</param>
-    /// <param name="userInfo">User information for the response.</param>
     /// <returns>A login response containing tokens and user data.</returns>
-    protected async Task<LoginResponse> CreateLoginResponseAsync(
-        TUser user,
-        string userId,
-        UserInfo userInfo)
+    protected async Task<LoginResponse> CreateLoginResponseAsync(TUser user)
     {
         var accessToken = await JwtTokenService.GenerateAccessTokenAsync(user);
-        var refreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(userId);
+        var refreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(user.Id);
+        var userInfo = await CreateUserInfoAsync(user);
 
         return new LoginResponse
         {
@@ -79,19 +112,17 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// Creates a refresh response with new tokens.
     /// </summary>
     /// <param name="user">The user to generate tokens for.</param>
-    /// <param name="userId">The user's unique identifier.</param>
     /// <param name="oldRefreshToken">The old refresh token to revoke.</param>
     /// <returns>A refresh response containing new token pair.</returns>
     protected async Task<RefreshResponse> CreateRefreshResponseAsync(
         TUser user,
-        string userId,
         string oldRefreshToken)
     {
         // Revoke old token (token rotation)
         await RefreshTokenService.RevokeRefreshTokenAsync(oldRefreshToken);
 
         var newAccessToken = await JwtTokenService.GenerateAccessTokenAsync(user);
-        var newRefreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(userId);
+        var newRefreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(user.Id);
 
         return new RefreshResponse
         {
@@ -100,6 +131,46 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
                 AccessToken = newAccessToken,
                 RefreshToken = newRefreshToken
             }
+        };
+    }
+
+    /// <summary>
+    /// Creates a UserInfo object from an IdentityUser with roles and claims.
+    /// </summary>
+    /// <param name="user">The user to create info for.</param>
+    /// <returns>UserInfo populated with user data, roles, and claims.</returns>
+    protected virtual async Task<UserInfo> CreateUserInfoAsync(TUser user)
+    {
+        var roles = await UserManager.GetRolesAsync(user);
+        var userClaims = await UserManager.GetClaimsAsync(user);
+        
+        // Get role claims
+        var roleClaims = new List<Claim>();
+        foreach (var roleName in roles)
+        {
+            var role = await UserManager.FindByNameAsync(roleName);
+            if (role != null)
+            {
+                var claims = await UserManager.GetClaimsAsync(user);
+                roleClaims.AddRange(claims);
+            }
+        }
+        
+        // Combine user claims and role claims, removing duplicates
+        var allClaims = userClaims
+            .Concat(roleClaims)
+            .GroupBy(c => new { c.Type, c.Value })
+            .Select(g => g.First())
+            .Select(c => new ClaimInfo { Type = c.Type, Value = c.Value })
+            .ToArray();
+
+        return new UserInfo
+        {
+            Id = user.Id,
+            Name = user.UserName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
+            Roles = roles.ToArray(),
+            Claims = allClaims
         };
     }
 
@@ -121,23 +192,116 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         return User.Identity?.Name;
     }
 
-    #endregion
-
-    #region Abstract Methods - Must Be Implemented
-
-    // Note: We don't define abstract methods for Login/Signup here because
-    // the implementation will vary greatly depending on the authentication system
-    // (Identity vs custom) and the application's requirements.
-    
-    // Applications should implement their own:
-    // - [HttpPost("login")] Login(LoginRequest request)
-    // - [HttpPost("signup")] SignUp(SignUpRequest request)
-    // - [HttpGet("user")] GetSession()
-    // etc.
+    /// <summary>
+    /// Gets a user by their ID. Can be overridden for custom user lookup logic.
+    /// </summary>
+    /// <param name="userId">The user ID to look up.</param>
+    /// <returns>The user if found; otherwise, null.</returns>
+    protected virtual async Task<TUser?> GetUserByIdAsync(string userId)
+    {
+        return await UserManager.FindByIdAsync(userId);
+    }
 
     #endregion
 
-    #region Optional Virtual Methods - Can Be Overridden
+    #region Authentication Endpoints
+
+    /// <summary>
+    /// Authenticates a user with username and password.
+    /// </summary>
+    /// <param name="request">Login credentials.</param>
+    /// <returns>JWT tokens and user information if successful; otherwise, unauthorized.</returns>
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public virtual async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        LogLoginAttempt(request.Username);
+        
+        var user = await UserManager.FindByNameAsync(request.Username);
+        if (user == null)
+        {
+            LogLoginFailed(request.Username, "User not found");
+            return Unauthorized(new { message = "Invalid credentials" });
+        }
+
+        var result = await SignInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
+        if (!result.Succeeded)
+        {
+            LogLoginFailed(request.Username, "Invalid password");
+            return Unauthorized(new { message = "Invalid credentials" });
+        }
+
+        var response = await CreateLoginResponseAsync(user);
+        LogLoginSuccess(request.Username);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Registers a new user.
+    /// </summary>
+    /// <param name="request">Signup credentials.</param>
+    /// <returns>JWT tokens and user information if successful; otherwise, bad request.</returns>
+    [HttpPost("signup")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public virtual async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
+    {
+        LogSignupAttempt(request.Username);
+        
+        var user = new TUser
+        {
+            UserName = request.Username,
+            Email = request.Email
+        };
+        
+        var result = await UserManager.CreateAsync(user, request.Password);
+        
+        if (!result.Succeeded)
+        {
+            LogSignupFailed(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        }
+        
+        LogSignupSuccess(request.Username);
+        
+        var response = await CreateLoginResponseAsync(user);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Retrieves the current user's session information.
+    /// </summary>
+    /// <returns>User information if authenticated; otherwise, unauthorized.</returns>
+    /// <remarks>Requires a valid JWT access token in the Authorization header.</remarks>
+    [HttpGet("user")]
+    [Authorize]
+    [ProducesResponseType(typeof(SessionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public virtual async Task<IActionResult> GetSession()
+    {
+        var username = GetCurrentUsername();
+        if (username == null)
+        {
+            LogSessionUnauthorized("No username in token");
+            return Unauthorized();
+        }
+
+        var user = await UserManager.FindByNameAsync(username);
+        if (user == null)
+        {
+            LogSessionUnauthorized($"User not found: {username}");
+            return Unauthorized();
+        }
+
+        var userInfo = await CreateUserInfoAsync(user);
+        LogSessionSuccess(username);
+        
+        return Ok(new SessionResponse
+        {
+            User = userInfo
+        });
+    }
 
     /// <summary>
     /// Handles token refresh logic. Can be overridden for custom behavior.
@@ -169,14 +333,15 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             return Unauthorized(new { message = "Invalid refresh token" });
         }
 
-        // Get the user - this must be implemented by derived class
+        // Get the user
         var user = await GetUserByIdAsync(userId);
         if (user == null)
         {
+            LogRefreshUserNotFound(username);
             return Unauthorized();
         }
 
-        var response = await CreateRefreshResponseAsync(user, userId, request.RefreshToken);
+        var response = await CreateRefreshResponseAsync(user, request.RefreshToken);
         LogRefreshSuccess(username, response.Token.RefreshToken);
         
         return Ok(response);
@@ -201,28 +366,48 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         return Ok(new { success = true });
     }
 
-    /// <summary>
-    /// Gets a user by their ID. Must be implemented by derived classes.
-    /// </summary>
-    /// <param name="userId">The user ID to look up.</param>
-    /// <returns>The user if found; otherwise, null.</returns>
-    protected abstract Task<TUser?> GetUserByIdAsync(string userId);
-
     #endregion
 
     #region Logger Messages
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token attempt started. Token: {RefreshToken}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Login attempt for user: {username}")]
+    private partial void LogLoginAttempt(string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Login successful for user: {username}")]
+    private partial void LogLoginSuccess(string username);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Login failed for user: {username}. Reason: {reason}")]
+    private partial void LogLoginFailed(string username, string reason);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signup attempt for user: {username}")]
+    private partial void LogSignupAttempt(string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signup successful for user: {username}")]
+    private partial void LogSignupSuccess(string username);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Signup failed for user: {username}. Errors: {errors}")]
+    private partial void LogSignupFailed(string username, string errors);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Session request for user: {username}")]
+    private partial void LogSessionSuccess(string username);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session request unauthorized: {reason}")]
+    private partial void LogSessionUnauthorized(string reason);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token attempt started. Token: {refreshToken}")]
     private partial void LogRefreshAttempt(string refreshToken);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token attempt: no token provided")]
     private partial void LogRefreshNoToken();
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token successful for user: {username}. New token: {RefreshToken}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token successful for user: {username}. New token: {refreshToken}")]
     private partial void LogRefreshSuccess(string username, string refreshToken);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token invalid for user: {username}")]
     private partial void LogRefreshInvalidToken(string username);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: user not found: {username}")]
+    private partial void LogRefreshUserNotFound(string username);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]
     private partial void LogLogoutRequested();

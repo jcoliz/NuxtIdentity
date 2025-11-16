@@ -7,6 +7,9 @@ namespace NuxtIdentity.Playground.Local.Authorization;
 /// <summary>
 /// Requirement that the user must have an active subscription.
 /// </summary>
+/// <remarks>
+/// This could be made much more generic
+/// </remarks>
 public class SubscriptionRequirement : IAuthorizationRequirement
 {
     /// <summary>
@@ -14,7 +17,7 @@ public class SubscriptionRequirement : IAuthorizationRequirement
     /// </summary>
     public string RouteParameterName { get; }
 
-    public SubscriptionRequirement(string routeParameterName = "subscriptionId")
+    public SubscriptionRequirement(string routeParameterName = "subscription")
     {
         RouteParameterName = routeParameterName;
     }
@@ -57,7 +60,8 @@ public class SubscriptionHandler : AuthorizationHandler<SubscriptionRequirement>
 
         // Get subscription claims from the user
         var subscriptionClaims = context.User.Claims
-            .Where(c => c.Type == "subscription")
+            .Select(c => SubscriptionClaim.Parse(c))
+            .Where(c => c != null)
             .ToList();
 
         if (!subscriptionClaims.Any())
@@ -66,34 +70,33 @@ public class SubscriptionHandler : AuthorizationHandler<SubscriptionRequirement>
             return Task.CompletedTask;
         }
 
-        // Check if any subscription claim matches and is active
-        foreach (var claim in subscriptionClaims)
+        var matching = subscriptionClaims.Where(c => c?.SubscriptionId.ToString() == requiredSubscriptionId).ToList();
+
+        if (!matching.Any())
         {
-            try
-            {
-                var subscription = JsonSerializer.Deserialize<SubscriptionInfo>(claim.Value);
-                if (subscription != null 
-                    && subscription.Id.ToString() == requiredSubscriptionId 
-                    && subscription.Status.Contains(SubscriptionStatus.Active))
-                {
-                    _logger.LogInformation(
-                        "User {UserId} has active subscription {SubscriptionId}", 
-                        context.User.Identity?.Name, 
-                        requiredSubscriptionId);
-                    context.Succeed(requirement);
-                    return Task.CompletedTask;
-                }
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to deserialize subscription claim: {ClaimValue}", claim.Value);
-            }
+            _logger.LogWarning(
+                "User {UserId} has no subscription claim matching ID {SubscriptionId}", 
+                context.User.Identity?.Name, 
+                requiredSubscriptionId);
+            return Task.CompletedTask;
         }
 
-        _logger.LogWarning(
-            "User {UserId} does not have active subscription {SubscriptionId}", 
-            context.User.Identity?.Name, 
-            requiredSubscriptionId);
+        var valid = matching.Any(c => c?.IsActive == true);
+        if (valid)
+        {
+            _logger.LogInformation(
+                "User {UserId} has active subscription {SubscriptionId}", 
+                context.User.Identity?.Name, 
+                requiredSubscriptionId);
+            context.Succeed(requirement);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "User {UserId} has no active subscription {SubscriptionId}", 
+                context.User.Identity?.Name, 
+                requiredSubscriptionId);
+        }
 
         return Task.CompletedTask;
     }

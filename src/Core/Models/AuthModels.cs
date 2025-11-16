@@ -11,6 +11,7 @@ public record LoginRequest
 public record SignUpRequest
 {
     public string Username { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
 }
 
@@ -54,20 +55,14 @@ public record UserInfo
     public string Id { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
-    public string Role { get; init; } = string.Empty;
-    public SubscriptionInfo[] Subscriptions { get; init; } = [];
+    public string[] Roles { get; init; } = [];
+    public ClaimInfo[] Claims { get; init; } = [];
 }
 
-public record SubscriptionInfo
+public record ClaimInfo
 {
-    public int Id { get; init; }
-    public SubscriptionStatus[] Status { get; init; } = [];
-}
-
-public enum SubscriptionStatus
-{
-    Active,
-    Inactive,
+    public string Type { get; init; } = string.Empty;
+    public string Value { get; init; } = string.Empty;
 }
 
 #endregion
