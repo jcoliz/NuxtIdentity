@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authorization;
 using NuxtIdentity.AspNetCore.Extensions;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Extensions;
-using NuxtIdentity.Playground.Local.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,18 +64,8 @@ builder.Services.AddOpenApiDocument(config =>
     config.OperationProcessors.Add(new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("Bearer"));
 });
 
-// Add authorization with custom policies
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("RequireActiveSubscription", policy =>
-        policy.Requirements.Add(new SubscriptionRequirement()));
-});
-
-// Register the authorization handler
-builder.Services.AddSingleton<IAuthorizationHandler, SubscriptionHandler>();
-
-// Register HttpContextAccessor (needed by the handler)
-builder.Services.AddHttpContextAccessor();
+// Add application authorization
+builder.Services.AddApplicationAuthorization();
 
 var app = builder.Build();
 
