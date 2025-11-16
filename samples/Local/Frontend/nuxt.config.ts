@@ -23,33 +23,28 @@ export default defineNuxtConfig({
   },
   modules: ['@sidebase/nuxt-auth'],
   auth: {
-    baseURL: 'http://localhost:5000/api/auth', // Update this to your backend URL
+    baseURL: 'http://localhost:5074/api/auth', // Update this to your backend URL
     provider: {
       type: 'local',
       endpoints: {
-        signIn: { path: '/login', method: 'post' },
-        signOut: { path: '/logout', method: 'post' },
-        signUp: { path: '/signup', method: 'post' }, // Changed from /register to /signup
-        getSession: { path: '/user', method: 'get' } // Changed from /profile to /user
+        getSession: { path: '/user' },
+        signUp: { path: '/signup', method: 'post' }
       },
       pages: {
         login: '/login',
-        logout: '/', // Redirect to home page after logout
       },
       token: {
-        signInResponseTokenPointer: '/token/accessToken', // Updated to match LoginResponse structure
-        type: 'Bearer',
-        cookieName: 'auth.token',
-        headerName: 'Authorization',
-        headerType: 'Bearer',
-        maxAgeInSeconds: 60 * 60 * 24 * 30 // Changed from cookieMaxAge to maxAgeInSeconds
+        signInResponseTokenPointer: '/token/accessToken'
       },
       refresh: {
         isEnabled: true,
         endpoint: { path: '/refresh', method: 'post' },
+        refreshOnlyToken: true, //??
         token: {
-          signInResponseRefreshTokenPointer: '/token/refreshToken'
-        }
+          signInResponseRefreshTokenPointer: '/token/refreshToken',
+          refreshResponseTokenPointer: '/token/refreshToken',
+            refreshRequestTokenPointer: '/refreshToken'
+        },
       },
       session: {
         dataType:  {
@@ -59,19 +54,24 @@ export default defineNuxtConfig({
           roles: 'string[]', // Updated to match your UserInfo model
           claims: '{ type:string, value:string }[]'
         },
-        dataResponsePointer: '/' // May be incorrect?
+        dataResponsePointer: '/user'
       }
     },
     sessionRefresh: {
       // Whether to refresh the session every time the browser window is refocused.
       enableOnWindowFocus: true,
       // Whether to refresh the session every `X` milliseconds. Set this to `false` to turn it off. The session will only be refreshed if a session already exists.
-      enablePeriodically: 10000, // just for demo!!
+      enablePeriodically: 5000, // just for demo!!
       // Custom refresh handler - uncomment to use
       // handler: './config/AuthRefreshHandler'
     },
     globalAppMiddleware: {
       isEnabled: true
-    }    
+    },
+    runtimeConfig: {
+      public : {
+        authOrigin: 'http://localhost:3000/'
+      }
+    }
   }
 })

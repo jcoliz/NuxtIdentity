@@ -59,7 +59,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         _context.Set<RefreshTokenEntity>().Add(entity);
         await _context.SaveChangesAsync();
         
-        LogTokenGenerated(userId, entity.ExpiresAt);
+        LogTokenGenerated(userId, entity.ExpiresAt, token);
         
         return token;
     }
@@ -67,7 +67,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     /// <inheritdoc/>
     public async Task<bool> ValidateRefreshTokenAsync(string token, string userId)
     {
-        LogValidatingToken(userId);
+        LogValidatingToken(userId, token);
         
         var tokenHash = HashToken(token);
 
@@ -84,7 +84,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         if (entity.IsRevoked)
         {
-            LogTokenRevoked(userId);
+            LogTokenRevoked(userId,entity);
             return false;
         }
 
@@ -101,7 +101,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     /// <inheritdoc/>
     public async Task RevokeRefreshTokenAsync(string token)
     {
-        LogRevokingToken();
+        LogRevokingToken(token);
         
         var tokenHash = HashToken(token);
 
@@ -167,17 +167,17 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(Level = LogLevel.Debug, Message = "Generating refresh token for user: {userId}")]
     private partial void LogGeneratingToken(string userId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token generated for user: {userId}, expires: {expiresAt}")]
-    private partial void LogTokenGenerated(string userId, DateTime expiresAt);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token generated for user: {userId}, expires: {expiresAt}, token: {token}")]
+    private partial void LogTokenGenerated(string userId, DateTime expiresAt, string token);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Validating refresh token for user: {userId}")]
-    private partial void LogValidatingToken(string userId);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Validating refresh token for user: {userId} token: {token}")]
+    private partial void LogValidatingToken(string userId, string token);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token not found for user: {userId}")]
     private partial void LogTokenNotFound(string userId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token is revoked for user: {userId}")]
-    private partial void LogTokenRevoked(string userId);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token is revoked for user: {userId} token: {TokenEntity}")]
+    private partial void LogTokenRevoked(string userId, RefreshTokenEntity tokenEntity);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token expired for user: {userId} at {expiresAt}")]
     private partial void LogTokenExpired(string userId, DateTime expiresAt);
@@ -185,8 +185,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token is valid for user: {userId}")]
     private partial void LogTokenValid(string userId);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Revoking refresh token")]
-    private partial void LogRevokingToken();
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Revoking refresh token: {token}")]
+    private partial void LogRevokingToken(string token);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Token revoked for user: {userId}")]
     private partial void LogTokenRevokedForUser(string userId);
