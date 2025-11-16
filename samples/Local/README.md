@@ -9,11 +9,11 @@ Frontend
 * With @sidebase/nuxt-auth
 * Recommended configuration of local provider for calling a backend running NuxtIdentity.
 * Good-looking professional-quality UI
-* Demonstrates all capabilities of backend APIs, including Admin pages
+* Demonstrates only the auth capabilities of the backend
 * Custom UI we control, so don't have to rely on external repo for front end
 
 Backend
 
 * .NET Web API
 * Using NuxtIdentity
-* Same features as the playground
+* Bare minimum functionality, just the auth backend APIs

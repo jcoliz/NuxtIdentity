@@ -10,6 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>f4ee7781-fe0c-4585-b4cd-5e9a893d4ba1</UserSecretsId>
+    <!-- Configure dotnet watch to ignore database files -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/*.db;**/*.db-shm;**/*.db-wal</DefaultItemExcludes>
   </PropertyGroup>
 
 </Project>
