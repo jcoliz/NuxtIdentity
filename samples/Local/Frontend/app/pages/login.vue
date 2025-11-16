@@ -135,7 +135,7 @@ const togglePasswordVisibility = () => {
               <!-- Additional Links -->
               <div class="text-center">
                 <p class="text-muted mb-2">Don't have an account?</p>
-                <NuxtLink to="/signup" class="btn btn-outline-primary btn-sm">
+                <NuxtLink to="/register" class="btn btn-outline-primary btn-sm">
                   <FeatherIcon icon="user-plus" size="16" class="me-1 icon-up-2" /> Create Account
                 </NuxtLink>
               </div>
