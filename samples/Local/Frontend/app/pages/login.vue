@@ -67,7 +67,8 @@ const togglePasswordVisibility = () => {
 
               <!-- Error Message -->
               <div v-if="errorMessage" class="alert alert-danger d-flex align-items-center mb-3">
-                ⚠️ {{ errorMessage }}
+                <FeatherIcon icon="alert-triangle" size="16" class="me-2" />
+                {{ errorMessage }}
               </div>
 
               <!-- Login Form -->
@@ -112,7 +113,7 @@ const togglePasswordVisibility = () => {
                       :disabled="isLoading"
                       tabindex="-1"
                     >
-                      {{ showPassword ? '🙈' : '👁️' }}
+                      <FeatherIcon :icon="showPassword ? 'eye-off' : 'eye'" size="16" />
                     </button>
                   </div>
                 </div>
@@ -127,7 +128,13 @@ const togglePasswordVisibility = () => {
                     <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status">
                       <span class="visually-hidden">Loading...</span>
                     </span>
-                    {{ isLoading ? '🔄 Signing In...' : '🔐 Sign In' }}
+                    <span v-if="!isLoading">
+                      <FeatherIcon icon="log-in" size="16" class="me-2" />
+                      Sign In
+                    </span>
+                    <span v-else>
+                      Signing In...
+                    </span>
                   </button>
                 </div>
               </form>
@@ -144,7 +151,8 @@ const togglePasswordVisibility = () => {
             <!-- Footer -->
             <div class="card-footer bg-light text-center py-3">
               <small class="text-muted">
-                🛡️ Secured with NuxtIdentity
+                <FeatherIcon icon="shield" size="14" class="me-1" />
+                Secured with NuxtIdentity
               </small>
             </div>
           </div>
