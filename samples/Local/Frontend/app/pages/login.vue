@@ -53,7 +53,7 @@ const togglePasswordVisibility = () => {
           <div class="card shadow-lg border-0 rounded-lg">
             <div class="card-header bg-primary text-white text-center py-4">
               <div class="mb-2">
-                🛡️
+                <FeatherIcon icon="shield" size="48" class="icon-up-1" />
               </div>
               <h3 class="mb-0">Welcome Back</h3>
               <p class="mb-0 opacity-75">Sign in to your account</p>
@@ -75,7 +75,7 @@ const togglePasswordVisibility = () => {
                 <!-- Username Field -->
                 <div class="mb-3">
                   <label for="username" class="form-label">
-                    👤 Username
+                    <FeatherIcon icon="user" size="24" /> Username
                   </label>
                   <input 
                     id="username"
@@ -92,7 +92,7 @@ const togglePasswordVisibility = () => {
                 <!-- Password Field -->
                 <div class="mb-4">
                   <label for="password" class="form-label">
-                    🔒 Password
+                    <FeatherIcon icon="lock" size="24" class="icon-up-2" /> Password
                   </label>
                   <div class="input-group">
                     <input 
@@ -136,7 +136,7 @@ const togglePasswordVisibility = () => {
               <div class="text-center">
                 <p class="text-muted mb-2">Don't have an account?</p>
                 <NuxtLink to="/signup" class="btn btn-outline-primary btn-sm">
-                  ➕ Create Account
+                  <FeatherIcon icon="user-plus" size="16" class="me-1 icon-up-2" /> Create Account
                 </NuxtLink>
               </div>
             </div>
@@ -145,15 +145,6 @@ const togglePasswordVisibility = () => {
             <div class="card-footer bg-light text-center py-3">
               <small class="text-muted">
                 🛡️ Secured with NuxtIdentity
-              </small>
-            </div>
-          </div>
-
-          <!-- Demo Credentials -->
-          <div class="card mt-3 border-warning">
-            <div class="card-body bg-warning bg-opacity-10 py-2">
-              <small class="text-warning">
-                ℹ️ <strong>Demo:</strong> Try any username/password to create an account
               </small>
             </div>
           </div>
@@ -202,5 +193,14 @@ const togglePasswordVisibility = () => {
 
 .shadow-lg {
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175) !important;
+}
+
+/* Artificially adjust shield icon to appear visually centered */
+.icon-up-1 {
+  transform: translateY(-1px);
+}
+/* Artificially adjust shield icon to appear visually centered */
+.icon-up-2 {
+  transform: translateY(-2px);
 }
 </style>
