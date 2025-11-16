@@ -16,6 +16,7 @@
     "@sidebase/nuxt-auth": "^1.1.0",
     "@types/bootstrap": "^5.2.10",
     "bootstrap": "^5.3.8",
+    "jwt-decode": "^4.0.0",
     "nuxt": "^4.2.1",
     "vue": "^3.5.24",
     "vue-router": "^4.6.3"
