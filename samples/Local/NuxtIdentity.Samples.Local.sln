@@ -2,9 +2,9 @@
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.0.0
 MinimumVisualStudioVersion = 17.8.0.0
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuxtIdentity.Samples.Local.AppHost", "NuxtIdentity.Samples.Local.AppHost\NuxtIdentity.Samples.Local.AppHost.csproj", "{317B63FF-7094-44A5-B951-56F3ABA92407}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuxtIdentity.Samples.Local.AppHost", "AppHost\NuxtIdentity.Samples.Local.AppHost.csproj", "{317B63FF-7094-44A5-B951-56F3ABA92407}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuxtIdentity.Samples.Local.ServiceDefaults", "NuxtIdentity.Samples.Local.ServiceDefaults\NuxtIdentity.Samples.Local.ServiceDefaults.csproj", "{8BC28B47-9BFB-4CD7-9C8A-74341C812604}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuxtIdentity.Samples.Local.ServiceDefaults", "ServiceDefaults\NuxtIdentity.Samples.Local.ServiceDefaults.csproj", "{8BC28B47-9BFB-4CD7-9C8A-74341C812604}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
