@@ -30,8 +30,10 @@ export default defineNuxtConfig({
         getSession: { path: '/user' },
         signUp: { path: '/signup', method: 'post' }
       },
-      pages: {
-        login: '/login',
+      // not 'pages'??
+      redirect: {
+        login: '/login', // Path to the login page (where unauthenticated users are sent)
+        home: '/', // The default path after successful login
       },
       token: {
         signInResponseTokenPointer: '/token/accessToken'
@@ -39,10 +41,10 @@ export default defineNuxtConfig({
       refresh: {
         isEnabled: true,
         endpoint: { path: '/refresh', method: 'post' },
-        refreshOnlyToken: true, //??
+        refreshOnlyToken: false, //??
         token: {
           signInResponseRefreshTokenPointer: '/token/refreshToken',
-          refreshResponseTokenPointer: '/token/refreshToken',
+          refreshResponseTokenPointer: '',
             refreshRequestTokenPointer: '/refreshToken'
         },
       },
