@@ -75,7 +75,7 @@ const toggleConfirmPasswordVisibility = () => {
           <div class="card shadow-lg border-0 rounded-lg">
             <div class="card-header bg-success text-white text-center py-4">
               <div class="mb-2">
-                🚀
+                <FeatherIcon icon="user-plus" size="48" class="icon-up-1" />
               </div>
               <h3 class="mb-0">Join Us</h3>
               <p class="mb-0 opacity-75">Create your account</p>
@@ -84,12 +84,14 @@ const toggleConfirmPasswordVisibility = () => {
             <div class="card-body p-4">
               <!-- Success Message -->
               <div v-if="response && !response.error" class="alert alert-success d-flex align-items-center mb-3">
-                ✅ Account created successfully! You can now sign in.
+                <FeatherIcon icon="check-circle" size="16" class="me-2" />
+                Account created successfully! You can now sign in.
               </div>
 
               <!-- Error Message -->
               <div v-if="errorMessage || (response && response.error)" class="alert alert-danger d-flex align-items-center mb-3">
-                ⚠️ {{ errorMessage || response.error }}
+                <FeatherIcon icon="alert-triangle" size="16" class="me-2" />
+                {{ errorMessage || response.error }}
               </div>
 
               <!-- Registration Form -->
@@ -97,7 +99,8 @@ const toggleConfirmPasswordVisibility = () => {
                 <!-- Username Field -->
                 <div class="mb-3">
                   <label for="username" class="form-label">
-                    👤 Username
+                    <FeatherIcon icon="user" size="16" class="me-1" />
+                    Username
                   </label>
                   <input 
                     id="username"
@@ -115,7 +118,8 @@ const toggleConfirmPasswordVisibility = () => {
                 <!-- Email Field -->
                 <div class="mb-3">
                   <label for="email" class="form-label">
-                    📧 Email Address
+                    <FeatherIcon icon="mail" size="16" class="me-1" />
+                    Email Address
                   </label>
                   <input 
                     id="email"
@@ -134,7 +138,8 @@ const toggleConfirmPasswordVisibility = () => {
                 <!-- Password Field -->
                 <div class="mb-3">
                   <label for="password" class="form-label">
-                    🔒 Password
+                    <FeatherIcon icon="lock" size="16" class="me-1" />
+                    Password
                   </label>
                   <div class="input-group">
                     <input 
@@ -156,7 +161,7 @@ const toggleConfirmPasswordVisibility = () => {
                       :disabled="isLoading"
                       tabindex="-1"
                     >
-                      {{ showPassword ? '🙈' : '👁️' }}
+                      <FeatherIcon :icon="showPassword ? 'eye-off' : 'eye'" size="16" />
                     </button>
                   </div>
                   <small class="text-muted">
@@ -167,7 +172,8 @@ const toggleConfirmPasswordVisibility = () => {
                 <!-- Confirm Password Field -->
                 <div class="mb-4">
                   <label for="confirmPassword" class="form-label">
-                    🔒 Confirm Password
+                    <FeatherIcon icon="lock" size="16" class="me-1" />
+                    Confirm Password
                   </label>
                   <div class="input-group">
                     <input 
@@ -188,14 +194,14 @@ const toggleConfirmPasswordVisibility = () => {
                       :disabled="isLoading"
                       tabindex="-1"
                     >
-                      {{ showConfirmPassword ? '🙈' : '👁️' }}
+                      <FeatherIcon :icon="showConfirmPassword ? 'eye-off' : 'eye'" size="16" />
                     </button>
                   </div>
                   <div v-if="confirmPassword && !passwordsMatch" class="text-danger mt-1">
-                    <small>⚠️ Passwords do not match</small>
+                    <small><FeatherIcon icon="alert-circle" size="14" class="me-1" />Passwords do not match</small>
                   </div>
                   <div v-else-if="passwordsMatch" class="text-success mt-1">
-                    <small>✅ Passwords match</small>
+                    <small><FeatherIcon icon="check-circle" size="14" class="me-1" />Passwords match</small>
                   </div>
                 </div>
 
@@ -210,7 +216,13 @@ const toggleConfirmPasswordVisibility = () => {
                     <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status">
                       <span class="visually-hidden">Loading...</span>
                     </span>
-                    {{ isLoading ? '🔄 Creating Account...' : '🚀 Create Account' }}
+                    <span v-if="!isLoading">
+                      <FeatherIcon icon="user-plus" size="16" class="me-2" />
+                      Create Account
+                    </span>
+                    <span v-else>
+                      Creating Account...
+                    </span>
                   </button>
                 </div>
               </form>
@@ -218,7 +230,8 @@ const toggleConfirmPasswordVisibility = () => {
               <!-- Success Actions -->
               <div v-if="response && !response.error" class="text-center">
                 <NuxtLink to="/login" class="btn btn-primary btn-lg">
-                  🔐 Sign In Now
+                  <FeatherIcon icon="log-in" size="16" class="me-2" />
+                  Sign In Now
                 </NuxtLink>
               </div>
 
@@ -226,7 +239,8 @@ const toggleConfirmPasswordVisibility = () => {
               <div v-if="!response || response.error" class="text-center">
                 <p class="text-muted mb-2">Already have an account?</p>
                 <NuxtLink to="/login" class="btn btn-outline-success btn-sm">
-                  🔐 Sign In
+                  <FeatherIcon icon="log-in" size="16" class="me-1" />
+                  Sign In
                 </NuxtLink>
               </div>
             </div>
@@ -234,7 +248,8 @@ const toggleConfirmPasswordVisibility = () => {
             <!-- Footer -->
             <div class="card-footer bg-light text-center py-3">
               <small class="text-muted">
-                🛡️ Secured with NuxtIdentity
+                <FeatherIcon icon="shield" size="14" class="me-1" />
+                Secured with NuxtIdentity
               </small>
             </div>
           </div>
@@ -243,7 +258,8 @@ const toggleConfirmPasswordVisibility = () => {
           <div class="card mt-3 border-info">
             <div class="card-body bg-info bg-opacity-10 py-2">
               <small class="text-info">
-                ℹ️ <strong>Demo:</strong> Create an account to test the authentication flow
+                <FeatherIcon icon="info" size="14" class="me-1" />
+                <strong>Demo:</strong> Create an account to test the authentication flow
               </small>
             </div>
           </div>
