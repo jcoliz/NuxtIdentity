@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { token, refreshToken, data, status, lastRefreshedAt } = useAuth()
+const { token, refreshToken, data, status, lastRefreshedAt, signOut } = useAuth()
 
 // Computed properties to strip "Bearer " prefix from tokens
 const cleanToken = computed(() => {
@@ -39,16 +39,66 @@ const statusVariant = computed(() => {
     default: return 'secondary'
   }
 })
+
+// Handle logout
+const handleLogout = async () => {
+  try {
+    await signOut()
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
+}
+
+// Navigate to login
+const goToLogin = () => {
+  navigateTo('/login')
+}
 </script>
 
 <template>
   <div class="card mt-4">
     <div class="card-header bg-primary text-white">
-        <h5 class="card-title mb-0 d-flex align-items-center">
-            <FeatherIcon icon="shield" size="20" class="me-2 icon-up-2" />
-            <span>Authentication Status</span>
-        </h5>
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+          <FeatherIcon icon="shield" size="20" class="me-2 icon-up-2" />
+          <h5 class="card-title mb-0">Authentication Status</h5>
+        </div>
+        
+        <!-- Login/Logout Button -->
+        <div>
+          <button 
+            v-if="status === 'authenticated'"
+            @click="handleLogout"
+            class="btn btn-outline-light btn-sm"
+            type="button"
+            title="Sign out"
+          >
+            <FeatherIcon icon="log-out" size="16" class="me-1" />
+            Logout
+          </button>
+          
+          <button 
+            v-else-if="status === 'unauthenticated'"
+            @click="goToLogin"
+            class="btn btn-outline-light btn-sm"
+            type="button"
+            title="Sign in"
+          >
+            <FeatherIcon icon="log-in" size="16" class="me-1" />
+            Login
+          </button>
+          
+          <!-- Loading state - show spinner -->
+          <div v-else class="btn btn-outline-light btn-sm disabled">
+            <span class="spinner-border spinner-border-sm me-1" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </span>
+            Loading
+          </div>
+        </div>
+      </div>
     </div>
+    
     <div class="card-body">
       <!-- Status Badge -->
       <div class="mb-3">
@@ -185,8 +235,20 @@ const statusVariant = computed(() => {
 .bg-light {
   background-color: #f8f9fa !important;
 }
+
 /* Artificially adjust shield icon to appear visually centered */
 .icon-up-2 {
   transform: translateY(-2px);
+}
+
+/* Button styling */
+.btn-outline-light:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.spinner-border-sm {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 </style>
