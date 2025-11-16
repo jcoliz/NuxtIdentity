@@ -1,18 +1,34 @@
 var builder = WebApplication.CreateBuilder(args);
 
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+
+// Add NSwag services
+builder.Services.AddOpenApiDocument(config =>
+{
+    config.DocumentName = "swagger";
+    config.Title = "Weather Forecast API";
+    config.Version = "v1";
+    config.Description = "A simple ASP.NET Core Web API for weather forecasts";
+});
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // Add OpenAPI/Swagger generator and the Swagger UI
+    app.UseOpenApi();
+    app.UseSwaggerUi(config =>
+    {
+        config.DocumentTitle = "Weather Forecast API";
+        config.Path = "/swagger";
+        config.DocumentPath = "/swagger/{documentName}/swagger.json";
+    });
 }
-
-app.UseHttpsRedirection();
 
 var summaries = new[]
 {
@@ -21,7 +37,7 @@ var summaries = new[]
 
 app.MapGet("/weatherforecast", () =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
+    var forecast = Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
@@ -31,7 +47,10 @@ app.MapGet("/weatherforecast", () =>
         .ToArray();
     return forecast;
 })
-.WithName("GetWeatherForecast");
+.WithName("GetWeatherForecast")
+.WithSummary("Get weather forecast")
+.WithDescription("Returns a 5-day weather forecast")
+.WithTags("Weather");
 
 app.Run();
 
