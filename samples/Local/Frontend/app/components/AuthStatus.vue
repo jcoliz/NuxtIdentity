@@ -1,6 +1,12 @@
 <script setup lang="ts">
 const { token, refreshToken, data, status, lastRefreshedAt } = useAuth()
 
+// Computed properties to strip "Bearer " prefix from tokens
+const cleanToken = computed(() => {
+  if (!token.value) return null
+  return token.value.startsWith('Bearer ') ? token.value.substring(7) : token.value
+})
+
 // Helper function to truncate long tokens for display
 const truncateToken = (token: string | null, length = 20) => {
   if (!token) return 'N/A'
@@ -102,7 +108,7 @@ const statusVariant = computed(() => {
               <input 
                 type="text" 
                 class="form-control font-monospace" 
-                :value="truncateToken(token, 50)" 
+                :value="truncateToken(cleanToken, 50)" 
                 readonly
                 :placeholder="token ? 'Access Token' : 'No access token present'"
               >
@@ -110,7 +116,7 @@ const statusVariant = computed(() => {
                 v-if="token" 
                 class="btn btn-outline-secondary" 
                 type="button"
-                @click="copyToClipboard(token)"
+                @click="copyToClipboard(cleanToken ?? '')"
                 title="Copy token"
               >
                 <FeatherIcon icon="copy" size="16" />
