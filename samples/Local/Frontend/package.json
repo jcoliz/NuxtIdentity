@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@coliz/vue-base-controls": "^0.0.15",
+    "@sidebase/nuxt-auth": "^1.1.0",
     "@types/bootstrap": "^5.2.10",
     "bootstrap": "^5.3.8",
     "nuxt": "^4.2.1",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
-    "sass": "1.93.3"
-  }  
+    "sass": "1.93.3",
+    "typescript": "^5.9.3"
+  }
 }
