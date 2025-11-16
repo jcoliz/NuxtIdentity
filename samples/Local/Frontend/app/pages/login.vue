@@ -30,6 +30,9 @@ const handleLogin = async () => {
     await signIn({ 
       username: username.value, 
       password: password.value 
+    },{ 
+      redirect: true, 
+      callbackUrl: '/' 
     })
   } catch (error: any) {
     console.error('Login error:', error)
