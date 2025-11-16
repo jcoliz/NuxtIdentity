@@ -5,7 +5,6 @@ using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Playground.Local.Data;
 using NuxtIdentity.Playground.Local.Extensions;
-using NuxtIdentity.Playground.Local.Models;
 using NuxtIdentity.Playground.Local.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,7 +20,7 @@ builder.Services.Configure<JwtOptions>(
 builder.Services.AddApplicationDatabase(builder.Configuration);
 
 // Add Identity
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
 {
     options.Password.RequireDigit = false;
     options.Password.RequireLowercase = false;
@@ -34,7 +33,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // Add NuxtIdentity
-builder.Services.AddNuxtIdentity<ApplicationUser>();
+builder.Services.AddNuxtIdentity<IdentityUser>();
 builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
 builder.Services.AddNuxtIdentityAuthentication();
 

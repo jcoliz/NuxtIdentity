@@ -4,8 +4,6 @@ using Microsoft.AspNetCore.Identity;
 using NuxtIdentity.AspNetCore.Controllers;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
-using NuxtIdentity.Playground.Local.Models;
-using NuxtIdentity.Playground.Local.Constants;
 using System.Text.Json;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
@@ -29,12 +27,12 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 /// work well for most ASP.NET Core Identity scenarios.
 /// </remarks>
 public class AuthController(
-    IJwtTokenService<ApplicationUser> jwtTokenService,
+    IJwtTokenService<IdentityUser> jwtTokenService,
     IRefreshTokenService refreshTokenService,
-    UserManager<ApplicationUser> userManager,
-    SignInManager<ApplicationUser> signInManager,
+    UserManager<IdentityUser> userManager,
+    SignInManager<IdentityUser> signInManager,
     ILogger<AuthController> logger) 
-    : NuxtAuthControllerBase<ApplicationUser>(
+    : NuxtAuthControllerBase<IdentityUser>(
         jwtTokenService, 
         refreshTokenService, 
         userManager,

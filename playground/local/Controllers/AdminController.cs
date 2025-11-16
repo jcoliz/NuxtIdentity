@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using NuxtIdentity.Playground.Local.Models;
 using NuxtIdentity.Playground.Local.Authorization;
 
 namespace NuxtIdentity.Playground.Local.Controllers;
@@ -16,7 +15,7 @@ namespace NuxtIdentity.Playground.Local.Controllers;
 [Route("api/[controller]")]
 [Authorize(Roles = "admin")]
 public partial class AdminController(
-    UserManager<ApplicationUser> userManager,
+    UserManager<IdentityUser> userManager,
     ILogger<AdminController> logger) : ControllerBase
 {
     /// <summary>
@@ -152,7 +151,7 @@ public partial class AdminController(
     /// <summary>
     /// Helper method to retrieve user subscriptions from Identity claims.
     /// </summary>
-    private async Task<List<SubscriptionInfo>> GetUserSubscriptionsAsync(ApplicationUser user)
+    private async Task<List<SubscriptionInfo>> GetUserSubscriptionsAsync(IdentityUser user)
     {
         var claims = await userManager.GetClaimsAsync(user);
         

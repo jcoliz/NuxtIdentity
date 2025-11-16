@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.Playground.Local.Data;
-using NuxtIdentity.Playground.Local.Models;
 
 namespace NuxtIdentity.Playground.Local.Extensions;
 
@@ -37,7 +36,7 @@ public static class DatabaseExtensions
         db.Database.EnsureCreated();
         
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
         var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         var logger = loggerFactory.CreateLogger("DatabaseSetup");
         
@@ -67,7 +66,7 @@ public static class DatabaseExtensions
     /// <summary>
     /// Seeds the default admin user if it doesn't exist.
     /// </summary>
-    private static async Task SeedAdminUserAsync(UserManager<ApplicationUser> userManager, ILogger logger)
+    private static async Task SeedAdminUserAsync(UserManager<IdentityUser> userManager, ILogger logger)
     {
         const string adminUsername = "admin";
         const string adminPassword = "Admin123!";
@@ -77,11 +76,10 @@ public static class DatabaseExtensions
         
         if (adminUser == null)
         {
-            adminUser = new ApplicationUser
+            adminUser = new IdentityUser
             {
                 UserName = adminUsername,
                 Email = adminEmail,
-                DisplayName = "Administrator",
                 EmailConfirmed = true
             };
             
