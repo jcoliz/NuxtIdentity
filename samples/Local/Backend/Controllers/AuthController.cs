@@ -1,15 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using NuxtIdentity.AspNetCore.Controllers;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
-using System.Text.Json;
 
-namespace NuxtIdentity.Samples.Local.Controllers;
+namespace NuxtIdentity.Samples.Local.Backend.Controllers;
 
 /// <summary>
-/// Authentication controller for the NuxtIdentity playground.
+/// Authentication controller for the NuxtIdentity sample backend.
 /// </summary>
 /// <remarks>
 /// This controller demonstrates the minimal implementation needed when using
@@ -39,5 +37,24 @@ public class AuthController(
         signInManager,
         logger)
 {
-    // No overrides needed! The base controller provides complete functionality.
+    /// <summary>
+    /// Override signup to assign guest role to new users.
+    /// </summary>
+    public override async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
+    {
+        // Call the base implementation first
+        var result = await base.SignUp(request);
+        
+        // If signup was successful, assign the guest role
+        if (result is OkObjectResult okResult && okResult.Value is LoginResponse loginResponse)
+        {
+            var user = await UserManager.FindByEmailAsync(request.Email);
+            if (user != null)
+            {
+                await UserManager.AddToRoleAsync(user, "guest");
+            }
+        }
+        
+        return result;
+    }
 }
