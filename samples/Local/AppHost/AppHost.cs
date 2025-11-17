@@ -8,6 +8,7 @@ builder.AddNpmApp("frontend", "../Frontend")
     //.WaitFor(backend)
     .WithHttpEndpoint(port: 3000, env: "PORT")
     .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
     .PublishAsDockerFile();
 
 builder.Build().Run();
