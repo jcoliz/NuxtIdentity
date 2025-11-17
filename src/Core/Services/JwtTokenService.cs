@@ -13,6 +13,9 @@ namespace NuxtIdentity.Core.Services;
 /// Service for generating and validating JWT tokens.
 /// </summary>
 /// <typeparam name="TUser">The type of user this service works with.</typeparam>
+/// <param name="jwtOptions">JWT configuration options including key, issuer, audience, and expiration settings.</param>
+/// <param name="claimsProviders">Collection of claims providers to extract user claims for token generation. Application may provide a custom provider for application-specific claim logic</param>
+/// <param name="logger">Logger instance for structured logging of token operations.</param>
 /// <remarks>
 /// This is a generic implementation of IJwtTokenService that can work with any user type.
 /// The service is designed to be reusable across different applications and user models.
@@ -41,26 +44,17 @@ namespace NuxtIdentity.Core.Services;
 /// - Only requires System.IdentityModel.Tokens.Jwt and Microsoft.Extensions.Options
 /// - No dependency on ASP.NET Identity, Entity Framework, or specific user implementations
 /// </remarks>
-public partial class JwtTokenService<TUser> : IJwtTokenService<TUser> where TUser : class
+public partial class JwtTokenService<TUser>(
+    IOptions<JwtOptions> jwtOptions,
+    IEnumerable<IUserClaimsProvider<TUser>> claimsProviders,
+    ILogger<JwtTokenService<TUser>> logger) : IJwtTokenService<TUser> where TUser : class
 {
-    private readonly JwtOptions _jwtOptions;
-    private readonly IEnumerable<IUserClaimsProvider<TUser>> _claimsProviders;
-    private readonly ILogger<JwtTokenService<TUser>> _logger;
-
-    public JwtTokenService(
-        IOptions<JwtOptions> jwtOptions,
-        IEnumerable<IUserClaimsProvider<TUser>> claimsProviders,
-        ILogger<JwtTokenService<TUser>> logger)
-    {
-        _jwtOptions = jwtOptions.Value;
-        _claimsProviders = claimsProviders;
-        _logger = logger;
-    }
+    private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     /// <inheritdoc/>
     public async Task<string> GenerateAccessTokenAsync(TUser user)
     {
-        var claimsTasks = _claimsProviders.Select(provider => provider.GetClaimsAsync(user));
+        var claimsTasks = claimsProviders.Select(provider => provider.GetClaimsAsync(user));
         var claimsArrays = await Task.WhenAll(claimsTasks);
         var claims = claimsArrays.SelectMany(c => c).ToList();
 
