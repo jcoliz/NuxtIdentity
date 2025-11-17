@@ -65,13 +65,22 @@ public partial class JwtTokenService<TUser> : IJwtTokenService<TUser> where TUse
         
         LogTokenGenerationStarted(username);
 
+        // Add standard security claims
+        var allClaims = claims.ToList();
+        
+        // Add issued-at claim for replay attack prevention
+        allClaims.Add(new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+        
+        // Optional: Add not-before claim
+        allClaims.Add(new Claim("nbf", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
             audience: _jwtOptions.Audience,
-            claims: claims,
+            claims: allClaims,  // Use the enhanced claims list
             expires: DateTime.UtcNow.AddHours(_jwtOptions.ExpirationHours),
             signingCredentials: credentials
         );
