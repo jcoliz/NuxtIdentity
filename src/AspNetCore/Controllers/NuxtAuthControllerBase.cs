@@ -118,6 +118,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         TUser user,
         string oldRefreshToken)
     {
+        LogRefreshTokenRevoking(user.UserName ?? "unknown", oldRefreshToken);
+
         // Revoke old token (token rotation)
         await RefreshTokenService.RevokeRefreshTokenAsync(oldRefreshToken);
 
@@ -335,8 +337,6 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> RefreshTokens([FromBody] RefreshRequest request)
     {
-        LogRefreshAttempt(request.RefreshToken);
-
         var userId = GetCurrentUserId();
         var username = GetCurrentUsername();
         
@@ -349,12 +349,14 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
                 statusCode: StatusCodes.Status401Unauthorized
             );
         }
+
+        LogRefreshTokenChecking(username, request.RefreshToken);
         
         // Validate the refresh token
         var isValid = await RefreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, userId);
         if (!isValid)
         {
-            LogRefreshInvalidToken(username);
+            LogRefreshTokenInvalid(username, request.RefreshToken);
             return Problem(
                 title: "Token Refresh Failed",
                 detail: "Invalid or expired refresh token",
@@ -366,7 +368,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var user = await GetUserByIdAsync(userId);
         if (user == null)
         {
-            LogRefreshUserNotFound(username);
+            LogRefreshTokenNoUser(username, request.RefreshToken);
             return Problem(
                 title: "User Not Found",
                 detail: "The authenticated user no longer exists",
@@ -374,8 +376,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             );
         }
 
+        LogRefreshTokenOk(username, request.RefreshToken);
+
         var response = await CreateRefreshResponseAsync(user, request.RefreshToken);
-        LogRefreshSuccess(username, response.Token.RefreshToken);
+
+        LogRefreshTokenCreated(username, response.Token.RefreshToken);
         
         return Ok(response);
     }
@@ -427,23 +432,29 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session request unauthorized: {reason}")]
     private partial void LogSessionUnauthorized(string reason);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token attempt started. Token: {refreshToken}")]
-    private partial void LogRefreshAttempt(string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token attempt: no token provided")]
-    private partial void LogRefreshNoToken();
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token successful for user: {username}. New token: {refreshToken}")]
-    private partial void LogRefreshSuccess(string username, string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token invalid for user: {username}")]
-    private partial void LogRefreshInvalidToken(string username);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: user not found: {username}")]
-    private partial void LogRefreshUserNotFound(string username);
-
     [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]
     private partial void LogLogoutRequested();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Not provided")]
+    private partial void LogRefreshNoToken();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh Token: Checking {UserName} {RefreshToken} ")]
+    private partial void LogRefreshTokenChecking(string userName, string refreshToken);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh Token: Invalid {UserName} {RefreshToken} ")]
+    private partial void LogRefreshTokenInvalid(string userName, string refreshToken);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh Token: Ok {UserName} {RefreshToken} ")]
+    private partial void LogRefreshTokenOk(string userName, string refreshToken);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh Token: Revoking {UserName} {RefreshToken} ")]
+    private partial void LogRefreshTokenRevoking(string userName, string refreshToken);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh Token: No such user {UserName} {RefreshToken} ")]
+    private partial void LogRefreshTokenNoUser(string userName, string refreshToken);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh Token: Created {UserName} {RefreshToken} ")]
+    private partial void LogRefreshTokenCreated(string userName, string refreshToken);
 
     #endregion
 }

@@ -42,8 +42,6 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     /// <inheritdoc/>
     public async Task<string> GenerateRefreshTokenAsync(string userId)
     {
-        LogGeneratingToken(userId);
-        
         var token = GenerateSecureToken();
         var tokenHash = HashToken(token);
 
@@ -59,16 +57,12 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         _context.Set<RefreshTokenEntity>().Add(entity);
         await _context.SaveChangesAsync();
         
-        LogTokenGenerated(userId, entity.ExpiresAt, token);
-        
         return token;
     }
 
     /// <inheritdoc/>
     public async Task<bool> ValidateRefreshTokenAsync(string token, string userId)
     {
-        LogValidatingToken(userId, token);
-        
         var tokenHash = HashToken(token);
 
         var entity = await _context.Set<RefreshTokenEntity>()
@@ -94,15 +88,12 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             return false;
         }
 
-        LogTokenValid(userId);
         return true;
     }
 
     /// <inheritdoc/>
     public async Task RevokeRefreshTokenAsync(string token)
     {
-        LogRevokingToken(token);
-        
         var tokenHash = HashToken(token);
 
         var entity = await _context.Set<RefreshTokenEntity>()
@@ -112,7 +103,6 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         {
             entity.IsRevoked = true;
             await _context.SaveChangesAsync();
-            LogTokenRevokedForUser(entity.UserId);
         }
         else
         {
@@ -167,28 +157,28 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(Level = LogLevel.Debug, Message = "Generating refresh token for user: {userId}")]
     private partial void LogGeneratingToken(string userId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token generated for user: {userId}, expires: {expiresAt}, token: {token}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token generated for user: {userId}, expires: {expiresAt}, token: {token}")]
     private partial void LogTokenGenerated(string userId, DateTime expiresAt, string token);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Validating refresh token for user: {userId} token: {token}")]
     private partial void LogValidatingToken(string userId, string token);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token not found for user: {userId}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, not found for user: {userId}")]
     private partial void LogTokenNotFound(string userId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token is revoked for user: {userId} token: {TokenEntity}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, revoked for user {userId} token: {TokenEntity}")]
     private partial void LogTokenRevoked(string userId, RefreshTokenEntity tokenEntity);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token expired for user: {userId} at {expiresAt}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, expired for user: {userId} at {expiresAt}")]
     private partial void LogTokenExpired(string userId, DateTime expiresAt);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token is valid for user: {userId}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token: Valid for user: {userId}")]
     private partial void LogTokenValid(string userId);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Revoking refresh token: {token}")]
     private partial void LogRevokingToken(string token);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Token revoked for user: {userId}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token revoked for user: {userId}")]
     private partial void LogTokenRevokedForUser(string userId);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token not found for revocation")]
