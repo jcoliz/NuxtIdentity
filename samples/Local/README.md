@@ -7,38 +7,27 @@ This playground application shows best practices for integrating all three NuxtI
 - **NuxtIdentity.AspNetCore** - Base controller and Identity integration  
 - **NuxtIdentity.EntityFrameworkCore** - Persistent refresh token storage
 
-## 🎯 What You'll Learn
+## 🎯 What You'll Find
 
 - Setting up JWT authentication with refresh token rotation
 - Integrating ASP.NET Core Identity with a modern frontend
 - Configuring @sidebase/nuxt-auth for secure token management
-- Building professional authentication UI with Bootstrap and Vue
 - Using .NET Aspire for local development orchestration
 
 ## ✨ Features
 
-### Authentication Flow
-
 - ✅ **Login** - Username/password authentication via ASP.NET Core Identity
-- ✅ **Sign Up** - User registration with automatic 'guest' role assignment
-- ✅ **Refresh** - Automatic token refresh with secure rotation (inherited from base controller)
-- ✅ **Logout** - Token revocation and cleanup (inherited from base controller)
+- ✅ **Sign Up** - User registration, enabling quick demo usage
+- ✅ **Refresh** - Automatic token refresh with secure rotation
+- ✅ **Logout** - Token revocation and cleanup
 - ✅ **Session** - Get current user information including roles and claims
 - ✅ **Protected Routes** - Automatic redirect for unauthenticated users
-
-### User Interface
-
-- 🎨 **Professional UI** - Bootstrap 5 with custom styling and animations
-- 📱 **Responsive Design** - Mobile-friendly authentication forms
-- 🔍 **Form Validation** - Real-time validation with helpful error messages
-- 🔐 **Security Indicators** - Clear visual feedback for auth states
 
 ## 🏗️ Architecture
 
 ### Frontend Stack
 - **Framework**: Nuxt 4 with TypeScript
 - **Authentication**: @sidebase/nuxt-auth with local provider
-- **Styling**: Bootstrap 5 + Custom SCSS
 - **Token Management**: JWT with automatic refresh
 
 ### Backend Stack  
@@ -57,7 +46,7 @@ This playground application shows best practices for integrating all three NuxtI
 
 ### Prerequisites
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Node.js 18+](https://nodejs.org/) (for frontend development)
+- [Node.js 24+](https://nodejs.org/) (for frontend development)
 
 ### Running the Application
 
@@ -74,7 +63,7 @@ This playground application shows best practices for integrating all three NuxtI
 3. **Try it out**
    - Create a new account on the registration page
    - Log in with your credentials
-   - Explore the protected dashboard area
+   - Review the auth token details on the profile page
 
 ## 📁 Project Structure
 
