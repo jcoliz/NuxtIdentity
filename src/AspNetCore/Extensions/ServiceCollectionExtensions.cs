@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Services;
 using NuxtIdentity.Core.Abstractions;
@@ -21,6 +23,11 @@ public static class NuxtIdentityServiceCollectionExtensions
     /// <remarks>
     /// This configures JWT Bearer authentication as the default authentication scheme.
     /// JWT options are configured from the "Jwt" section in appsettings.json.
+    /// 
+    /// Features included:
+    /// - JWT Bearer authentication configuration
+    /// - Enhanced logging for authentication failures and successes
+    /// - Detailed error logging in development environments
     /// 
     /// Example appsettings.json:
     /// <code>
@@ -45,6 +52,49 @@ public static class NuxtIdentityServiceCollectionExtensions
         .AddJwtBearer();
         
         services.ConfigureOptions<JwtBearerOptionsSetup>();
+        
+        // Add enhanced JWT Bearer events for logging
+        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+        {
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    var logger = context.HttpContext.RequestServices
+                        .GetRequiredService<ILogger<JwtBearerEvents>>();
+                    
+                    logger.LogWarning(context.Exception,"JWT Authentication failed for token from {RemoteIp}", 
+                        context.HttpContext.Connection.RemoteIpAddress);
+                    logger.LogDebug("JWT Authentication failure details: {Exception}", context.Exception);
+                    
+                    return Task.CompletedTask;
+                },
+                
+                OnChallenge = context =>
+                {
+                    var logger = context.HttpContext.RequestServices
+                        .GetRequiredService<ILogger<JwtBearerEvents>>();
+                        
+                    logger.LogInformation("JWT Challenge triggered: {Error} {ErrorDescription} for path {Path}", 
+                        context.Error, 
+                        context.ErrorDescription,
+                        context.Request.Path);
+                        
+                    return Task.CompletedTask;
+                },
+                
+                OnTokenValidated = context =>
+                {
+                    var logger = context.HttpContext.RequestServices
+                        .GetRequiredService<ILogger<JwtBearerEvents>>();
+                        
+                    var username = context.Principal?.Identity?.Name ?? "unknown";
+                    logger.LogDebug("JWT token validated successfully for user: {Username}", username);
+                    
+                    return Task.CompletedTask;
+                }
+            };
+        });
         
         return services;
     }
