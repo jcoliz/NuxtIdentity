@@ -23,6 +23,26 @@ and @sidebase/nuxt-auth. Here's what it's doing:
 - 👤 **Role/claim visibility**: Surfacing user's roles and claims in auth tokens and in the user session.
 - 🔄 **Refresh tokens**: .NET Identity doesn't handle refresh tokens at all, so a big part of this libraries work is storing and validating those with automatic rotation.
 
+## High-Level Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Nuxt as Nuxt Frontend
+    participant Auth as @sidebase/nuxt-auth (local)
+    participant API as NuxtIdentity
+    participant Identity as ASP.NET Core Identity
+
+    User->>Nuxt: Enter credentials
+    Nuxt->>Auth: signIn(credentials)
+    Auth->>API: POST /api/auth/login
+    API->>Identity: ValidateUser(credentials)
+    Identity-->>API: User validated
+    API-->>Auth: JWT token + user info
+    Auth-->>Nuxt: Session established
+    Nuxt-->>User: Logged in
+```
+
 ## What's coming?
 
 - 📦 **NuGet packages** developers can drop in
