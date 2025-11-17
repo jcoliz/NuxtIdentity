@@ -11,8 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add services to the container.
-builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
+builder.Services.AddControllers();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -86,6 +86,9 @@ else
 {
     app.UseHttpsRedirection();
 }
+
+app.UseExceptionHandler();  // This enables ProblemDetails for exceptions
+app.UseStatusCodePages(); // This enables ProblemDetails for status codes like 404
 
 app.UseCors();
 app.UseAuthentication();
