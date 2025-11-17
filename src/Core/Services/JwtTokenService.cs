@@ -44,23 +44,26 @@ namespace NuxtIdentity.Core.Services;
 public partial class JwtTokenService<TUser> : IJwtTokenService<TUser> where TUser : class
 {
     private readonly JwtOptions _jwtOptions;
-    private readonly IUserClaimsProvider<TUser> _claimsProvider;
+    private readonly IEnumerable<IUserClaimsProvider<TUser>> _claimsProviders;
     private readonly ILogger<JwtTokenService<TUser>> _logger;
 
     public JwtTokenService(
         IOptions<JwtOptions> jwtOptions,
-        IUserClaimsProvider<TUser> claimsProvider,
+        IEnumerable<IUserClaimsProvider<TUser>> claimsProviders,
         ILogger<JwtTokenService<TUser>> logger)
     {
         _jwtOptions = jwtOptions.Value;
-        _claimsProvider = claimsProvider;
+        _claimsProviders = claimsProviders;
         _logger = logger;
     }
 
     /// <inheritdoc/>
     public async Task<string> GenerateAccessTokenAsync(TUser user)
     {
-        var claims = await _claimsProvider.GetClaimsAsync(user);
+        var claimsTasks = _claimsProviders.Select(provider => provider.GetClaimsAsync(user));
+        var claimsArrays = await Task.WhenAll(claimsTasks);
+        var claims = claimsArrays.SelectMany(c => c).ToList();
+
         var username = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "unknown";
         
         LogTokenGenerationStarted(username);
