@@ -1,20 +1,33 @@
 # Basic Authentication Example with Local Provider
 
-This sample demonstrates the basic authentication features ASP.NET Core Identity working with
-@sidebase/nuxt-auth, brought together by NuxtIdentity.
+Reference implementation demonstrating how to use the NuxtIdentity libraries to build a complete JWT authentication system with ASP.NET Core Identity and Entity Framework Core, surfaced to a Nuxt frontend.
 
-## Features
+This playground application shows best practices for integrating all three NuxtIdentity libraries:
+- **NuxtIdentity.Core** - Generic JWT and refresh token services
+- **NuxtIdentity.AspNetCore** - Base controller and Identity integration
+- **NuxtIdentity.EntityFrameworkCore** - Persistent refresh token storage
 
-* Register as a new user
-* Log in, receiving an auth token
-* View user session information
-* Stay logged in, refreshing the auth token
-* Log out, invalidating further refreshes
+## What's Included
 
-### What's not here
+### Authentication
+
+- ✅ **Login** - Username/password authentication via ASP.NET Core Identity
+- ✅ **SignUp** - User registration with automatic 'guest' role assignment
+- ✅ **Refresh** - Token refresh with automatic rotation (inherited from base controller)
+- ✅ **Logout** - Token revocation (inherited from base controller)
+- ✅ **Session** - Get current user information including roles and subscriptions
+
+## What's Not Included
+
+### Authorization
 
 NuxtIdentity also supports authorization scenarios by surfacing ASP.NET Core Identity roles and claims.
-These more advanced scenarios will be covered in a future sample.
+These more advanced scenarios will be covered in a future sample. See [ASPNET-IDENTITY](../../docs/ASPNET-IDENTITY.md) 
+for a dicussion on how these are integrated.
+
+- ✅ **Role-Based Access Control** - Application-defined roles.
+- ✅ **Subscription-Based Access** - Custom authorization using Identity claims
+- ✅ **Admin Endpoints** - User and subscription management
 
 ## Getting Started
 

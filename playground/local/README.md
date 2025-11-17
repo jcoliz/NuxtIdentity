@@ -1,13 +1,11 @@
 # NuxtIdentity Playground
 
-Reference implementation demonstrating how to use the NuxtIdentity libraries to build a complete JWT authentication system with ASP.NET Core Identity and Entity Framework Core.
-
 ## Overview
 
-This playground application shows best practices for integrating all three NuxtIdentity libraries:
-- **NuxtIdentity.Core** - Generic JWT and refresh token services
-- **NuxtIdentity.AspNetCore** - Base controller and Identity integration
-- **NuxtIdentity.EntityFrameworkCore** - Persistent refresh token storage
+This playground provides a backend auth service to integrate with the [nuxt-auth local playground](https://github.com/sidebase/nuxt-auth/tree/main/playground-local). The important distiction with this the local playground is that it runs against the current source tree. This is a good way to ensure NuxtIdentity is up to date with the latest front end source code.
+
+Note that the playground is not intended to be a demonstration space to learn how to use the libraries.
+That would be the function of the [samples](../../samples/).
 
 ## What's Included
 
