@@ -12,6 +12,7 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
 
 // Add CORS
 builder.Services.AddCors(options =>

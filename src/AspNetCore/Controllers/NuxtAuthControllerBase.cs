@@ -213,7 +213,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <returns>JWT tokens and user information if successful; otherwise, unauthorized.</returns>
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         LogLoginAttempt(request.Username);
@@ -222,14 +222,22 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         if (user == null)
         {
             LogLoginFailed(request.Username, "User not found");
-            return Unauthorized(new { message = "Invalid credentials" });
+            return Problem(
+                title: "Authentication Failed",
+                detail: "Invalid credentials",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
 
         var result = await SignInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
         if (!result.Succeeded)
         {
             LogLoginFailed(request.Username, "Invalid password");
-            return Unauthorized(new { message = "Invalid credentials" });
+            return Problem(
+                title: "Authentication Failed", 
+                detail: "Invalid credentials",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
 
         var response = await CreateLoginResponseAsync(user);
@@ -244,7 +252,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <returns>JWT tokens and user information if successful; otherwise, bad request.</returns>
     [HttpPost("signup")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public virtual async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
     {
         LogSignupAttempt(request.Username);
@@ -260,7 +268,12 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         if (!result.Succeeded)
         {
             LogSignupFailed(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+            
+            return Problem(
+                title: "Registration Failed",
+                detail: string.Join("; ", result.Errors.Select(e => e.Description)),
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
         
         LogSignupSuccess(request.Username);
@@ -277,21 +290,29 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [HttpGet("user")]
     [Authorize]
     [ProducesResponseType(typeof(SessionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> GetSession()
     {
         var username = GetCurrentUsername();
         if (username == null)
         {
             LogSessionUnauthorized("No username in token");
-            return Unauthorized();
+            return Problem(
+                title: "Authentication Required",
+                detail: "No valid authentication token provided",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
 
         var user = await UserManager.FindByNameAsync(username);
         if (user == null)
         {
             LogSessionUnauthorized($"User not found: {username}");
-            return Unauthorized();
+            return Problem(
+                title: "User Not Found",
+                detail: "The authenticated user no longer exists",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
 
         var userInfo = await CreateUserInfoAsync(user);
@@ -311,7 +332,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [HttpPost("refresh")]
     [Authorize]
     [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> RefreshTokens([FromBody] RefreshRequest request)
     {
         LogRefreshAttempt(request.RefreshToken);
@@ -322,7 +343,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
         {
             LogRefreshNoToken();
-            return Unauthorized();
+            return Problem(
+                title: "Authentication Required",
+                detail: "No valid authentication token provided",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
         
         // Validate the refresh token
@@ -330,7 +355,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         if (!isValid)
         {
             LogRefreshInvalidToken(username);
-            return Unauthorized(new { message = "Invalid refresh token" });
+            return Problem(
+                title: "Token Refresh Failed",
+                detail: "Invalid or expired refresh token",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
 
         // Get the user
@@ -338,7 +367,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         if (user == null)
         {
             LogRefreshUserNotFound(username);
-            return Unauthorized();
+            return Problem(
+                title: "User Not Found",
+                detail: "The authenticated user no longer exists",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
         }
 
         var response = await CreateRefreshResponseAsync(user, request.RefreshToken);

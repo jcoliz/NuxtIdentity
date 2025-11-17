@@ -35,8 +35,16 @@ const handleLogin = async () => {
       callbackUrl: '/' 
     })
   } catch (error: any) {
-    console.error('Login error:', error)
-    errorMessage.value = error.message || 'Login failed. Please check your credentials.'
+    console.error('*** Login error:')
+    console.log('- Status:', error.status)
+    console.log('- Message:', error.message) 
+    console.log('- Data:', error.data)
+    console.log('- Full error object:', error)
+    
+    // Handle ProblemDetails format
+    const title = error.data?.title ?? "Login failed"
+    const detail = error.data?.detail ?? error.message ?? 'Please check your credentials'
+    errorMessage.value = `${title}: ${detail}`
   } finally {
     isLoading.value = false
   }

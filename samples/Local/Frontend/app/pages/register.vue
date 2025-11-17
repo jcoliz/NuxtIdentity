@@ -49,9 +49,16 @@ async function register() {
       password: password.value
     }, { preventLoginFlow: true })
   } catch (error: any) {
-    console.error('Registration error:', error)
-    errorMessage.value = error.message || 'Failed to create account. Please try again.'
-    response.value = { error: 'Failed to sign up: ' + error.message }
+    console.error('*** Registration error:')
+    console.log('- Status:', error.status)
+    console.log('- Message:', error.message) 
+    console.log('- Data:', error.data)
+    console.log('- Full error object:', error)
+    
+    // Handle ProblemDetails format
+    const title = error.data?.title ?? "Registration failed"
+    const detail = error.data?.detail ?? error.message ?? 'Please try again'
+    errorMessage.value = `${title}: ${detail}`
   } finally {
     isLoading.value = false
   }
