@@ -13,7 +13,7 @@ namespace NuxtIdentity.AspNetCore.Extensions;
 /// <summary>
 /// Extension methods for registering NuxtIdentity ASP.NET Core services.
 /// </summary>
-public static class NuxtIdentityServiceCollectionExtensions
+public static partial class NuxtIdentityServiceCollectionExtensions
 {
     /// <summary>
     /// Adds NuxtIdentity JWT Bearer authentication to the application.
@@ -63,9 +63,8 @@ public static class NuxtIdentityServiceCollectionExtensions
                     var logger = context.HttpContext.RequestServices
                         .GetRequiredService<ILogger<JwtBearerEvents>>();
                     
-                    logger.LogWarning(context.Exception,"JWT Authentication failed for token from {RemoteIp}", 
-                        context.HttpContext.Connection.RemoteIpAddress);
-                    logger.LogDebug("JWT Authentication failure details: {Exception}", context.Exception);
+                    LogJwtAuthenticationFailed(logger, context.Exception, 
+                        context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
                     
                     return Task.CompletedTask;
                 },
@@ -75,10 +74,8 @@ public static class NuxtIdentityServiceCollectionExtensions
                     var logger = context.HttpContext.RequestServices
                         .GetRequiredService<ILogger<JwtBearerEvents>>();
                         
-                    logger.LogInformation("JWT Challenge triggered: {Error} {ErrorDescription} for path {Path}", 
-                        context.Error, 
-                        context.ErrorDescription,
-                        context.Request.Path);
+                    LogJwtChallenge(logger, context.Error ?? "unknown", 
+                        context.ErrorDescription ?? "unknown", context.Request.Path);
                         
                     return Task.CompletedTask;
                 },
@@ -89,7 +86,7 @@ public static class NuxtIdentityServiceCollectionExtensions
                         .GetRequiredService<ILogger<JwtBearerEvents>>();
                         
                     var username = context.Principal?.Identity?.Name ?? "unknown";
-                    logger.LogDebug("JWT token validated successfully for user: {Username}", username);
+                    LogJwtTokenValidated(logger, username);
                     
                     return Task.CompletedTask;
                 }
@@ -136,4 +133,17 @@ public static class NuxtIdentityServiceCollectionExtensions
         
         return services;
     }
+
+    #region Logger Messages
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "JWT Authentication failed for token from {remoteIp}")]
+    private static partial void LogJwtAuthenticationFailed(ILogger logger, Exception exception, string remoteIp);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "JWT Challenge triggered: {error} {errorDescription} for path {path}")]
+    private static partial void LogJwtChallenge(ILogger logger, string error, string errorDescription, string path);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "JWT token validated successfully for user: {username}")]
+    private static partial void LogJwtTokenValidated(ILogger logger, string username);
+
+    #endregion
 }
