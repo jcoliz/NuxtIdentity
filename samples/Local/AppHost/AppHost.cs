@@ -7,8 +7,9 @@ builder.AddNpmApp("frontend", "../Frontend")
     .WithReference(backend)
     //.WaitFor(backend)
     .WithHttpEndpoint(port: 3000, env: "PORT")
-    .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
+    .WithEnvironment("NUXT_LAZY", "false")  // Disable lazy loading
+    .WithExternalHttpEndpoints()
     .PublishAsDockerFile();
 
 builder.Build().Run();

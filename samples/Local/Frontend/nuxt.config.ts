@@ -3,6 +3,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   vite: {
+    server: {
+      warmup: {
+        // Pre-warm these files for faster initial load
+        clientFiles: ['**/*.vue'],
+      }
+    },
     css: {
       preprocessorOptions: {
         scss: {
@@ -13,6 +19,11 @@ export default defineNuxtConfig({
       },
     },
   },
+  // Reduce build time in development
+  sourcemap: {
+    server: false,  // Disable server sourcemaps for faster startup
+    client: true    // Keep client sourcemaps for debugging
+  },  
   css: [
     '~/assets/scss/custom.scss'
   ],
