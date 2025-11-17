@@ -37,24 +37,5 @@ public class AuthController(
         signInManager,
         logger)
 {
-    /// <summary>
-    /// Override signup to assign guest role to new users.
-    /// </summary>
-    public override async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
-    {
-        // Call the base implementation first
-        var result = await base.SignUp(request);
-        
-        // If signup was successful, assign the guest role
-        if (result is OkObjectResult okResult && okResult.Value is LoginResponse loginResponse)
-        {
-            var user = await UserManager.FindByEmailAsync(request.Email);
-            if (user != null)
-            {
-                await UserManager.AddToRoleAsync(user, "guest");
-            }
-        }
-        
-        return result;
-    }
+    // No additional implementation needed; all functionality is in the base class.
 }

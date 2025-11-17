@@ -40,26 +40,6 @@ public static class DatabaseExtensions
         var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         var logger = loggerFactory.CreateLogger("DatabaseSetup");
         
-        await SeedRolesAsync(roleManager, logger);
-        
         return app;
     }
-
-    /// <summary>
-    /// Seeds the application roles if they don't exist.
-    /// </summary>
-    private static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager, ILogger logger)
-    {
-        string[] roles = ["guest", "account", "admin"];
-        
-        foreach (var role in roles)
-        {
-            if (!await roleManager.RoleExistsAsync(role))
-            {
-                await roleManager.CreateAsync(new IdentityRole(role));
-                logger.LogInformation("Created role: {Role}", role);
-            }
-        }
-    }
-
 }
