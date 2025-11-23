@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Tenancy.Models;
 
 namespace NuxtIdentity.Tenancy.Abstractions;
@@ -5,7 +8,7 @@ namespace NuxtIdentity.Tenancy.Abstractions;
 /// <summary>
 /// Service for managing tenant operations and user-tenant relationships.
 /// </summary>
-public interface ITenantService
+public interface ITenantService<TUser> : IUserClaimsProvider<TUser> where TUser : IdentityUser
 {
     /// <summary>
     /// Gets all tenants that a user has access to with their roles.
@@ -13,7 +16,7 @@ public interface ITenantService
     /// <param name="userId">The user ID to get tenants for.</param>
     /// <returns>Collection of user tenant relationships.</returns>
     Task<IEnumerable<UserTenantRole>> GetUserTenantsAsync(string userId);
-    
+
     /// <summary>
     /// Gets a specific tenant by ID if the user has access.
     /// </summary>

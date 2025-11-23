@@ -1,3 +1,5 @@
+using NuxtIdentity.Core.Models;
+
 namespace NuxtIdentity.Tenancy.Models;
 
 public class Tenant
@@ -24,13 +26,6 @@ public enum TenantRole
     Viewer = 1,
     Editor = 2, 
     Owner = 3
-}
-
-// Enhanced UserInfo for tenancy
-public record TenantUserInfo : UserInfo
-{
-    public TenantInfo[] Tenants { get; init; } = [];
-    public Guid? DefaultTenantId { get; init; }
 }
 
 public record TenantInfo

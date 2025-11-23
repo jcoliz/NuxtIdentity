@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using NuxtIdentity.Tenancy.Models;
+
 namespace NuxtIdentity.Tenancy.Extensions;
 
 public static class TenancyModelBuilderExtensions
@@ -9,7 +12,7 @@ public static class TenancyModelBuilderExtensions
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.Name).IsUnique();
         });
         
         modelBuilder.Entity<UserTenantRole>(entity =>
