@@ -26,10 +26,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Configure JWT options
-builder.Services.Configure<JwtOptions>(
-    builder.Configuration.GetSection(JwtOptions.SectionName));
-
 // Add Database
 builder.Services.AddApplicationDatabase(builder.Configuration);
 
@@ -47,9 +43,8 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // Add NuxtIdentity
-builder.Services.AddNuxtIdentity<IdentityUser>();
-builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
-builder.Services.AddNuxtIdentityAuthentication();
+builder.Services.AddNuxtIdentityWithEntityFramework<IdentityUser, ApplicationDbContext>(
+    builder.Configuration);
 
 // Add NSwag services
 builder.Services.AddOpenApiDocument(config =>

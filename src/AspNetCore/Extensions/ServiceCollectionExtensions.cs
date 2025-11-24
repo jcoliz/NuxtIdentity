@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Services;
 using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Core.Services;
 
 namespace NuxtIdentity.AspNetCore.Extensions;
@@ -19,12 +21,14 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// Adds NuxtIdentity JWT Bearer authentication to the application.
     /// </summary>
     /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration containing JWT options.</param>
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
-    /// This configures JWT Bearer authentication as the default authentication scheme.
-    /// JWT options are configured from the "Jwt" section in appsettings.json.
+    /// This configures JWT Bearer authentication as the default authentication scheme
+    /// and automatically configures JWT options from the "Jwt" section in appsettings.json.
     /// 
     /// Features included:
+    /// - JWT options configuration from appsettings.json
     /// - JWT Bearer authentication configuration
     /// - Enhanced logging for authentication failures and successes
     /// - Detailed error logging in development environments
@@ -33,13 +37,55 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// <code>
     /// {
     ///   "Jwt": {
-    ///     "SecretKey": "your-secret-key-min-32-chars",
+    ///     "Key": "your-secret-key-min-32-chars",
     ///     "Issuer": "your-app",
     ///     "Audience": "your-app-users",
-    ///     "ExpirationMinutes": 60
+    ///     "ExpirationHours": 1
     ///   }
     /// }
     /// </code>
+    /// 
+    /// Example usage:
+    /// <code>
+    /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddNuxtIdentityAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Configure JWT options from configuration
+        services.Configure<JwtOptions>(
+            configuration.GetSection(JwtOptions.SectionName));
+
+        // Add authentication with the parameterless overload
+        return services.AddNuxtIdentityAuthentication();
+    }
+
+    /// <summary>
+    /// Adds NuxtIdentity JWT Bearer authentication to the application.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// This configures JWT Bearer authentication as the default authentication scheme.
+    /// 
+    /// Note: When using this overload, you must manually configure JWT options before calling this method:
+    /// <code>
+    /// builder.Services.Configure&lt;JwtOptions&gt;(
+    ///     builder.Configuration.GetSection(JwtOptions.SectionName));
+    /// builder.Services.AddNuxtIdentityAuthentication();
+    /// </code>
+    /// 
+    /// For convenience, consider using the overload that takes IConfiguration:
+    /// <code>
+    /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
+    /// </code>
+    /// 
+    /// Features included:
+    /// - JWT Bearer authentication configuration
+    /// - Enhanced logging for authentication failures and successes
+    /// - Detailed error logging in development environments
     /// </remarks>
     public static IServiceCollection AddNuxtIdentityAuthentication(
         this IServiceCollection services)
@@ -110,18 +156,15 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// Prerequisites:
     /// - ASP.NET Core Identity must be configured with AddIdentity&lt;TUser, TRole&gt;()
     /// - UserManager&lt;TUser&gt; must be available in DI
-    /// - JWT options must be configured in appsettings.json
+    /// - JWT options must be configured (use AddNuxtIdentityAuthentication with IConfiguration)
     /// 
     /// Example usage:
     /// <code>
     /// builder.Services.AddIdentity&lt;ApplicationUser, IdentityRole&gt;()
     ///     .AddEntityFrameworkStores&lt;ApplicationDbContext&gt;();
     /// 
-    /// builder.Services.Configure&lt;JwtOptions&gt;(
-    ///     builder.Configuration.GetSection(JwtOptions.SectionName));
-    /// 
     /// builder.Services.AddNuxtIdentity&lt;ApplicationUser&gt;();
-    /// builder.Services.AddNuxtIdentityAuthentication();
+    /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
     /// </code>
     /// </remarks>
     public static IServiceCollection AddNuxtIdentity<TUser>(

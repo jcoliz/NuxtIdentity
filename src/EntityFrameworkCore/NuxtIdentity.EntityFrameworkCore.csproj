@@ -8,7 +8,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
     <ProjectReference Include="..\Core\NuxtIdentity.Core.csproj" />
+    <ProjectReference Include="..\AspNetCore\NuxtIdentity.AspNetCore.csproj" />
   </ItemGroup>
 
 </Project>

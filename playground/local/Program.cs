@@ -65,7 +65,9 @@ builder.Services.AddOpenApiDocument(config =>
 });
 
 // Add application authorization
-builder.Services.AddApplicationAuthorization();
+//builder.Services.AddApplicationAuthorization();
+// TODO: I fear this is a build break. This file must
+// be sitting around locally on one of my machines!!
 
 var app = builder.Build();
 
