@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using NuxtIdentity.Core.Configuration;
 
 namespace NuxtIdentity.AspNetCore.Configuration;
@@ -49,12 +48,10 @@ public class JwtBearerOptionsSetup : IConfigureNamedOptions<JwtBearerOptions>
         if (name != JwtBearerDefaults.AuthenticationScheme)
             return;
 
-        var key = Encoding.UTF8.GetBytes(_jwtOptions.Key);
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
+            IssuerSigningKey = new SymmetricSecurityKey(_jwtOptions.Key),
             ValidateIssuer = true,
             ValidIssuer = _jwtOptions.Issuer,
             ValidateAudience = true,

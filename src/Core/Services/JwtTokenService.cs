@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -71,7 +70,7 @@ public partial class JwtTokenService<TUser>(
         // Optional: Add not-before claim
         allClaims.Add(new Claim("nbf", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
+        var securityKey = new SymmetricSecurityKey(_jwtOptions.Key);
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
@@ -112,12 +111,10 @@ public partial class JwtTokenService<TUser>(
     /// <inheritdoc/>
     public TokenValidationParameters GetTokenValidationParameters()
     {
-        var key = Encoding.UTF8.GetBytes(_jwtOptions.Key);
-
         return new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
+            IssuerSigningKey = new SymmetricSecurityKey(_jwtOptions.Key),
             ValidateIssuer = true,
             ValidIssuer = _jwtOptions.Issuer,
             ValidateAudience = true,

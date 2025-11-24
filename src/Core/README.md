@@ -51,13 +51,19 @@ In `appsettings.json`:
 ```json
 {
   "Jwt": {
-    "SecretKey": "your-secret-key-at-least-32-characters-long",
+    "Key": "<your_32_byte_base64_key>",
     "Issuer": "your-app-name",
     "Audience": "your-app-users",
-    "ExpirationMinutes": 60
+    "Lifespan": "01:00:00"
   }
 }
 ```
+
+> ![NOTE] The `Key` must be a Base64-encoded string representing at least 32 bytes (256 bits) for HMAC-SHA256.
+> Generate a secure key using:
+> - **PowerShell:** `[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`
+> - **Bash:** `openssl rand -base64 32`
+
 
 In `Program.cs`:
 
@@ -67,6 +73,7 @@ using NuxtIdentity.Core.Configuration;
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection(JwtOptions.SectionName));
 ```
+
 
 ### 2. Implement Claims Provider
 
