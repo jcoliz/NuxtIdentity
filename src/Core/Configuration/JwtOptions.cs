@@ -5,6 +5,10 @@ namespace NuxtIdentity.Core.Configuration;
 /// <summary>
 /// Configuration options for JWT token generation and validation.
 /// </summary>
+/// <remarks>
+/// All security-critical properties (Key, Issuer, Audience) are required and must be configured
+/// in appsettings.json. The application will fail to start if these are not properly set.
+/// </remarks>
 public class JwtOptions
 {
     /// <summary>
@@ -16,9 +20,10 @@ public class JwtOptions
     /// Gets or sets the secret key used for signing JWT tokens.
     /// </summary>
     /// <remarks>
-    /// Should be a cryptographically secure random key of at least 256 bits (32 bytes) for HMAC-SHA256.
-    /// When configuring via appsettings.json, provide a Base64-encoded string which will be automatically
-    /// decoded to bytes by the .NET configuration system.
+    /// <para><strong>REQUIRED.</strong> Must be a cryptographically secure random key of at least 256 bits (32 bytes) for HMAC-SHA256.</para>
+    /// 
+    /// <para>When configuring via appsettings.json, provide a Base64-encoded string which will be automatically
+    /// decoded to bytes by the .NET configuration system.</para>
     /// 
     /// <para><strong>Generating a secure key:</strong></para>
     /// 
@@ -40,17 +45,27 @@ public class JwtOptions
     /// openssl rand -base64 32
     /// </code>
     /// </remarks>
-    public byte[] Key { get; set; } = RandomNumberGenerator.GetBytes(32);
+    public byte[] Key { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the issuer of the JWT tokens.
     /// </summary>
-    public string Issuer { get; set; } = "nuxt-identity-playground";
+    /// <remarks>
+    /// <para><strong>REQUIRED.</strong> Identifies who issued the JWT token.</para>
+    /// <para>Should be unique to your application (e.g., "my-app-name" or "https://myapp.com").</para>
+    /// <para>Used for token validation - tokens with a different issuer will be rejected.</para>
+    /// </remarks>
+    public string Issuer { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the audience for the JWT tokens.
     /// </summary>
-    public string Audience { get; set; } = "nuxt-identity-playground";
+    /// <remarks>
+    /// <para><strong>REQUIRED.</strong> Identifies who the JWT token is intended for.</para>
+    /// <para>Should be unique to your application (e.g., "my-app-users" or "https://myapp.com/api").</para>
+    /// <para>Used for token validation - tokens with a different audience will be rejected.</para>
+    /// </remarks>
+    public string Audience { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the token lifespan.
@@ -58,6 +73,7 @@ public class JwtOptions
     /// <remarks>
     /// If not set (TimeSpan.Zero), falls back to <see cref="ExpirationHours"/>.
     /// Can be configured in appsettings.json as a timespan string (e.g., "01:00:00" for 1 hour, "1.00:00:00" for 1 day).
+    /// Default is 1 hour for security best practices.
     /// </remarks>
     public TimeSpan Lifespan { get; set; } = TimeSpan.FromHours(1);
 
