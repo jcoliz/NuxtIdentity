@@ -11,6 +11,7 @@ definePageMeta({
 })
 
 const { signIn, status } = useAuth()
+const route = useRoute()
 
 const username = ref('')
 const password = ref('')
@@ -34,12 +35,16 @@ const handleLogin = async () => {
 
   try {
     isLoading.value = true
+    
+    // Use the redirect query param if available, otherwise default to '/'
+    const callbackUrl = (route.query.redirect as string) || '/'
+    
     await signIn({ 
       username: username.value, 
       password: password.value 
     },{ 
       redirect: true, 
-      callbackUrl: '/' 
+      callbackUrl: callbackUrl
     })
   } catch (error: any) {
     console.error('*** Login error:')
