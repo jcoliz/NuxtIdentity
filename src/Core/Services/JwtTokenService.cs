@@ -78,7 +78,9 @@ public partial class JwtTokenService<TUser>(
             issuer: _jwtOptions.Issuer,
             audience: _jwtOptions.Audience,
             claims: allClaims,  // Use the enhanced claims list
-            expires: DateTime.UtcNow.AddHours(_jwtOptions.ExpirationHours),
+            expires: DateTime.UtcNow.Add(_jwtOptions.Lifespan != TimeSpan.Zero 
+                ? _jwtOptions.Lifespan 
+                : TimeSpan.FromHours(_jwtOptions.ExpirationHours)),
             signingCredentials: credentials
         );
 

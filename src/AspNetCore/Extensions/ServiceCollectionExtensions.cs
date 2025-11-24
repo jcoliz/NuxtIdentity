@@ -40,7 +40,8 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     ///     "Key": "your-secret-key-min-32-chars",
     ///     "Issuer": "your-app",
     ///     "Audience": "your-app-users",
-    ///     "ExpirationHours": 1
+    ///     "ExpirationHours": 1  // Deprecated: use Lifespan instead
+    ///     "Lifespan": "01:00:00"  // Preferred: 1 hour as TimeSpan
     ///   }
     /// }
     /// </code>
