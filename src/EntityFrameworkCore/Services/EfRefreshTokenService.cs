@@ -14,7 +14,7 @@ namespace NuxtIdentity.EntityFrameworkCore.Services;
 /// <remarks>
 /// This implementation stores refresh tokens in a database using Entity Framework Core.
 /// Tokens are hashed using SHA256 before storage for security.
-/// 
+///
 /// The DbContext must have a DbSet&lt;RefreshTokenEntity&gt; configured. You can add this
 /// to your context like:
 /// <code>
@@ -56,7 +56,9 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         _context.Set<RefreshTokenEntity>().Add(entity);
         await _context.SaveChangesAsync();
-        
+
+        LogTokenGenerated(userId, entity.ExpiresAt, token);
+
         return token;
     }
 
@@ -66,8 +68,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         var tokenHash = HashToken(token);
 
         var entity = await _context.Set<RefreshTokenEntity>()
-            .FirstOrDefaultAsync(t => 
-                t.TokenHash == tokenHash && 
+            .FirstOrDefaultAsync(t =>
+                t.TokenHash == tokenHash &&
                 t.UserId == userId);
 
         if (entity == null)
@@ -78,16 +80,17 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         if (entity.IsRevoked)
         {
-            LogTokenRevoked(userId,entity);
+            LogTokenRevoked(userId,token);
             return false;
         }
 
         if (entity.ExpiresAt < DateTime.UtcNow)
         {
-            LogTokenExpired(userId, entity.ExpiresAt);
+            LogTokenExpired(userId, token, entity.ExpiresAt);
             return false;
         }
 
+        LogTokenValid(userId, token);
         return true;
     }
 
@@ -98,7 +101,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         var entity = await _context.Set<RefreshTokenEntity>()
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
-        
+
         if (entity != null)
         {
             entity.IsRevoked = true;
@@ -114,7 +117,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     public async Task RevokeAllUserTokensAsync(string userId)
     {
         LogRevokingAllUserTokens(userId);
-        
+
         var userTokens = await _context.Set<RefreshTokenEntity>()
             .Where(t => t.UserId == userId)
             .ToListAsync();
@@ -125,7 +128,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         }
 
         await _context.SaveChangesAsync();
-        
+
         LogAllUserTokensRevoked(userId, userTokens.Count);
     }
 
@@ -166,14 +169,14 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, not found for user: {userId}")]
     private partial void LogTokenNotFound(string userId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, revoked for user {userId} token: {TokenEntity}")]
-    private partial void LogTokenRevoked(string userId, RefreshTokenEntity tokenEntity);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, revoked for user {userId} token: {token}")]
+    private partial void LogTokenRevoked(string userId, string token);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, expired for user: {userId} at {expiresAt}")]
-    private partial void LogTokenExpired(string userId, DateTime expiresAt);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, token {token} expired for user: {userId} at {expiresAt}")]
+    private partial void LogTokenExpired(string userId, string token,DateTime expiresAt);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token: Valid for user: {userId}")]
-    private partial void LogTokenValid(string userId);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token: Valid for user: {userId}, token: {token}")]
+    private partial void LogTokenValid(string userId, string token);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Revoking refresh token: {token}")]
     private partial void LogRevokingToken(string token);

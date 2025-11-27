@@ -18,26 +18,26 @@ namespace NuxtIdentity.Core.Services;
 /// <remarks>
 /// This is a generic implementation of IJwtTokenService that can work with any user type.
 /// The service is designed to be reusable across different applications and user models.
-/// 
+///
 /// Design Principles:
-/// 
+///
 /// 1. **Generic by Design**: The TUser type parameter allows this service to work with any
 ///    user model without requiring inheritance or interfaces on the user class itself.
-/// 
+///
 /// 2. **Dependency Injection**: The service relies on IUserClaimsProvider&lt;TUser&gt; to extract
 ///    claims from the user, allowing different implementations for different user types or
 ///    technologies (ASP.NET Identity, custom user stores, etc.).
-/// 
+///
 /// 3. **Configuration via Options Pattern**: JWT settings (key, issuer, audience, expiration)
 ///    are injected via IOptions&lt;JwtOptions&gt;, following ASP.NET Core best practices.
-/// 
+///
 /// 4. **Consistent Validation**: The GetTokenValidationParameters method ensures that the
 ///    ASP.NET Core authentication middleware validates tokens using the exact same parameters
 ///    as this service, preventing subtle bugs from configuration mismatches.
-/// 
+///
 /// 5. **Structured Logging**: Uses LoggerMessage source generators for high-performance logging
 ///    of token operations, marked as protected virtual to allow derived classes to customize.
-/// 
+///
 /// Library Packaging Strategy:
 /// - This class belongs in NuxtIdentity.Core (minimal dependencies)
 /// - Only requires System.IdentityModel.Tokens.Jwt and Microsoft.Extensions.Options
@@ -58,30 +58,34 @@ public partial class JwtTokenService<TUser>(
         var claims = claimsArrays.SelectMany(c => c).ToList();
 
         var username = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "unknown";
-        
+
         LogTokenGenerationStarted(username);
 
         // Add standard security claims
         var allClaims = claims.ToList();
-        
+
         // Add issued-at claim for replay attack prevention
         allClaims.Add(new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
-        
+
         // Optional: Add not-before claim
         allClaims.Add(new Claim("nbf", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
 
         var securityKey = new SymmetricSecurityKey(_jwtOptions.Key);
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
+        var expires = _jwtOptions.Lifespan != TimeSpan.Zero
+            ? DateTime.UtcNow.Add(_jwtOptions.Lifespan)
+            : DateTime.UtcNow.AddHours(_jwtOptions.ExpirationHours);
+
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
             audience: _jwtOptions.Audience,
             claims: allClaims,  // Use the enhanced claims list
-            expires: DateTime.UtcNow.Add(_jwtOptions.Lifespan != TimeSpan.Zero 
-                ? _jwtOptions.Lifespan 
-                : TimeSpan.FromHours(_jwtOptions.ExpirationHours)),
+            expires: expires,
             signingCredentials: credentials
         );
+
+        LogDebugTokenExpiration(expires);
 
         LogTokenGenerationCompleted(username);
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -131,6 +135,9 @@ public partial class JwtTokenService<TUser>(
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
     private partial void LogTokenGenerationCompleted(string username);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Token expiration set to: {expiresAt}")]
+    private partial void LogDebugTokenExpiration(DateTime expiresAt);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
     private partial void LogTokenValidationStarted();
