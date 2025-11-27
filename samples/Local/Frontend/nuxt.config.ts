@@ -23,7 +23,7 @@ export default defineNuxtConfig({
   sourcemap: {
     server: false,  // Disable server sourcemaps for faster startup
     client: true    // Keep client sourcemaps for debugging
-  },  
+  },
   css: [
     '~/assets/scss/custom.scss'
   ],
@@ -63,7 +63,7 @@ export default defineNuxtConfig({
       session: {
         dataType:  {
           id: 'string',
-          email: 'string', 
+          email: 'string',
           name: 'string',
           roles: 'string[]', // Updated to match your UserInfo model
           claims: '{ type:string, value:string }[]'
@@ -73,9 +73,9 @@ export default defineNuxtConfig({
     },
     sessionRefresh: {
       // Whether to refresh the session every time the browser window is refocused.
-      enableOnWindowFocus: true,
+      enableOnWindowFocus: true, // for testing
       // Whether to refresh the session every `X` milliseconds. Set this to `false` to turn it off. The session will only be refreshed if a session already exists.
-      enablePeriodically: 5000, // just for demo!!
+      enablePeriodically: 60000, // for testing, was 5000
       // Custom refresh handler - uncomment to use
       // handler: './config/AuthRefreshHandler'
     },
