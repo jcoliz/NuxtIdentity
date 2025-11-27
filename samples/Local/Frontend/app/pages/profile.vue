@@ -5,12 +5,17 @@ useHead({
   title: 'Profile',
 });
 
-const { token } = useAuth()
+const { token, refreshToken, refresh, status } = useAuth()
 
 // Computed properties to strip "Bearer " prefix from tokens
 const cleanToken = computed(() => {
   if (!token.value) return null
   return token.value.startsWith('Bearer ') ? token.value.substring(7) : token.value
+})
+
+const cleanRefreshToken = computed(() => {
+  if (!refreshToken.value) return null
+  return refreshToken.value
 })
 
 // Decode the JWT token payload
@@ -84,12 +89,30 @@ const copyToClipboard = async (text: string) => {
   }
 }
 
+// Refresh token handler
+const isRefreshing = ref(false)
+const refreshError = ref<string | null>(null)
+
+const handleRefresh = async () => {
+  isRefreshing.value = true
+  refreshError.value = null
+
+  try {
+    await refresh()
+  } catch (error) {
+    console.error('Failed to refresh token:', error)
+    refreshError.value = error instanceof Error ? error.message : 'Failed to refresh token'
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
 </script>
 
 <template>
   <div class="container mt-4">
     <h1 class="mb-3">Profile</h1>
-    
+
     <div v-if="!cleanToken" class="alert alert-warning">
       <FeatherIcon icon="alert-triangle" size="16" class="me-2" />
       No JWT token found. Please log in.
@@ -130,7 +153,7 @@ const copyToClipboard = async (text: string) => {
       </div>
 
       <!-- JWT Claims -->
-      <div class="card">
+      <div class="card mb-4">
         <div class="card-header bg-primary text-white">
           <h5 class="card-title mb-0 d-flex align-items-center">
             <FeatherIcon icon="list" size="20" class="me-2" />
@@ -180,6 +203,60 @@ const copyToClipboard = async (text: string) => {
         </div>
       </div>
 
+      <!-- Refresh Token Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="card-title mb-0 d-flex align-items-center justify-content-between">
+            <span class="d-flex align-items-center">
+              <FeatherIcon icon="refresh-cw" size="20" class="me-2" />
+              <span>Refresh Token</span>
+            </span>
+            <button
+              class="btn btn-sm btn-dark"
+              :disabled="isRefreshing || status === 'loading'"
+              @click="handleRefresh"
+            >
+              <FeatherIcon
+                icon="refresh-cw"
+                size="14"
+                :class="{ 'spin': isRefreshing }"
+                class="me-1"
+              />
+              {{ isRefreshing ? 'Refreshing...' : 'Refresh Tokens' }}
+            </button>
+          </h5>
+        </div>
+        <div class="card-body">
+          <div v-if="refreshError" class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <FeatherIcon icon="alert-circle" size="16" class="me-2" />
+            {{ refreshError }}
+            <button type="button" class="btn-close" @click="refreshError = null"></button>
+          </div>
+
+          <div v-if="cleanRefreshToken" class="input-group">
+            <textarea
+              class="form-control font-monospace"
+              :value="cleanRefreshToken"
+              readonly
+              rows="3"
+              style="resize: none;"
+            ></textarea>
+            <button
+              class="btn btn-outline-secondary"
+              type="button"
+              @click="copyToClipboard(cleanRefreshToken)"
+              title="Copy refresh token"
+            >
+              <FeatherIcon icon="copy" size="16" />
+            </button>
+          </div>
+          <div v-else class="text-muted">
+            <FeatherIcon icon="info" size="16" class="me-2" />
+            No refresh token available
+          </div>
+        </div>
+      </div>
+
       <!-- Raw Token Display -->
       <div class="card mt-4">
         <div class="card-header bg-secondary text-white">
@@ -190,15 +267,15 @@ const copyToClipboard = async (text: string) => {
         </div>
         <div class="card-body">
           <div class="input-group">
-            <textarea 
-              class="form-control font-monospace" 
-              :value="cleanToken" 
-              readonly 
+            <textarea
+              class="form-control font-monospace"
+              :value="cleanToken"
+              readonly
               rows="4"
               style="resize: none;"
             ></textarea>
-            <button 
-              class="btn btn-outline-secondary" 
+            <button
+              class="btn btn-outline-secondary"
               type="button"
               @click="copyToClipboard(cleanToken)"
               title="Copy token"
@@ -232,5 +309,18 @@ pre {
 
 .card {
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 </style>
