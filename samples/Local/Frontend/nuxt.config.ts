@@ -85,7 +85,6 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      authOrigin: 'http://localhost:3000'
     }
   }
 })
