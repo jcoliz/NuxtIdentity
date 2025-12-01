@@ -5,7 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.0.0" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.0.1" />
   </ItemGroup>
 
   <PropertyGroup>
