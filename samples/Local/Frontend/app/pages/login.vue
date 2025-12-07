@@ -20,7 +20,7 @@ const errors = ref<string[]>([])
 
 const handleLogin = async () => {
   errors.value = []
-  
+
   // Client-side validation
   if (!username.value) {
     errors.value.push('Username is required')
@@ -28,31 +28,31 @@ const handleLogin = async () => {
   if (!password.value) {
     errors.value.push('Password is required')
   }
-  
+
   if (errors.value.length > 0) {
     return
   }
 
   try {
     isLoading.value = true
-    
+
     // Use the redirect query param if available, otherwise default to '/'
     const callbackUrl = (route.query.redirect as string) || '/'
-    
-    await signIn({ 
-      username: username.value, 
-      password: password.value 
-    },{ 
-      redirect: true, 
+
+    await signIn({
+      username: username.value,
+      password: password.value
+    },{
+      redirect: true,
       callbackUrl: callbackUrl
     })
   } catch (error: any) {
     console.error('*** Login error:')
     console.log('- Status:', error.status)
-    console.log('- Message:', error.message) 
+    console.log('- Message:', error.message)
     console.log('- Data:', error.data)
     console.log('- Full error object:', error)
-    
+
     // Handle ProblemDetails format
     const title = error.data?.title ?? "Login failed"
     const detail = error.data?.detail ?? error.message ?? 'Please check your credentials'
@@ -72,7 +72,7 @@ const handleLogin = async () => {
         </div>
         <div class="card-body">
           <form @submit.prevent="handleLogin" data-test-id="LoginForm">
-            
+
             <!-- Error Display -->
             <div v-if="errors.length > 0" class="alert alert-danger" data-test-id="Errors">
               <ul class="mb-0">
@@ -128,7 +128,7 @@ const handleLogin = async () => {
             <!-- Registration Link -->
             <div class="text-center">
               <p class="mb-0">
-                Don't have an account? 
+                Don't have an account?
                 <NuxtLink to="/register" class="text-decoration-none">Create one here</NuxtLink>
               </p>
             </div>
