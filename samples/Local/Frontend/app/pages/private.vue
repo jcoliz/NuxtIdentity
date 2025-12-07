@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 /**
  * Private Page
  * This page is only accessible to authenticated users.
@@ -26,7 +26,6 @@
 useHead({
   title: 'Private',
 });
-
 </script>
 <template>
   <div>
@@ -35,3 +34,4 @@ useHead({
     <AuthStatus />
 </div>
 </template>
+
