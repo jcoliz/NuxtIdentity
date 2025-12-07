@@ -1,6 +1,16 @@
 <script setup lang="ts">
 const { token, refreshToken, data, status, lastRefreshedAt, signOut } = useAuth()
 
+// Define server check for use in template
+const isServer = import.meta.server
+
+// OR better yet, use a client-side check:
+const isClient = ref(false)
+
+onMounted(() => {
+  isClient.value = true
+})
+
 // Computed properties to strip "Bearer " prefix from tokens
 const cleanToken = computed(() => {
   if (!token.value) return null
@@ -76,17 +86,28 @@ const goToLogin = () => {
             <FeatherIcon icon="log-out" size="16" class="me-1" />
             Logout
           </button>
-
-          <button
-            v-else-if="status === 'unauthenticated'"
-            @click="goToLogin"
-            class="btn btn-outline-light btn-sm"
-            type="button"
-            title="Sign in"
-          >
-            <FeatherIcon icon="log-in" size="16" class="me-1" />
-            Login
-          </button>
+          <ClientOnly v-else-if="status === 'unauthenticated'">
+            <template #fallback>
+              <button
+                disabled
+                class="btn btn-outline-light btn-sm"
+                type="button"
+                title="Sign in"
+              >
+                <FeatherIcon icon="log-in" size="16" class="me-1" />
+                Login
+              </button>
+            </template>
+            <button
+              @click="goToLogin"
+              class="btn btn-outline-light btn-sm"
+              type="button"
+              title="Sign in"
+            >
+              <FeatherIcon icon="log-in" size="16" class="me-1" />
+              Login
+            </button>
+          </ClientOnly>
 
           <!-- Loading state - show spinner -->
           <div v-else class="btn btn-outline-light btn-sm disabled">
@@ -139,6 +160,18 @@ const goToLogin = () => {
         <div v-else class="alert alert-info mb-0">
           <FeatherIcon icon="info" size="16" class="me-1" />
           No session data present. Are you logged in?
+        </div>
+      </div>
+
+      <!-- Render Mode -->
+      <div class="mb-3">
+        <h6 class="text-muted mb-2">
+          <FeatherIcon icon="cpu" size="16" class="me-1" />
+          Render Mode
+        </h6>
+        <div class="bg-light p-3 rounded">
+          <span v-if="!isClient" class="text-secondary">Server-Side Rendering (SSR)</span>
+          <span v-else class="text-success">Client-Side Rendering (CSR)</span>
         </div>
       </div>
 
