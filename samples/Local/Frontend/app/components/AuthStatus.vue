@@ -43,7 +43,7 @@ const statusVariant = computed(() => {
 // Handle logout
 const handleLogout = async () => {
   try {
-    await signOut()
+    await signOut({ redirect: true, callbackUrl: '/login' })
   } catch (error) {
     console.error('Logout error:', error)
   }
@@ -63,10 +63,10 @@ const goToLogin = () => {
           <FeatherIcon icon="shield" size="20" class="me-2 icon-up-2" />
           <h5 class="card-title mb-0">Authentication Status</h5>
         </div>
-        
+
         <!-- Login/Logout Button -->
         <div>
-          <button 
+          <button
             v-if="status === 'authenticated'"
             @click="handleLogout"
             class="btn btn-outline-light btn-sm"
@@ -76,8 +76,8 @@ const goToLogin = () => {
             <FeatherIcon icon="log-out" size="16" class="me-1" />
             Logout
           </button>
-          
-          <button 
+
+          <button
             v-else-if="status === 'unauthenticated'"
             @click="goToLogin"
             class="btn btn-outline-light btn-sm"
@@ -87,7 +87,7 @@ const goToLogin = () => {
             <FeatherIcon icon="log-in" size="16" class="me-1" />
             Login
           </button>
-          
+
           <!-- Loading state - show spinner -->
           <div v-else class="btn btn-outline-light btn-sm disabled">
             <span class="spinner-border spinner-border-sm me-1" role="status">
@@ -98,7 +98,7 @@ const goToLogin = () => {
         </div>
       </div>
     </div>
-    
+
     <div class="card-body">
       <!-- Status Badge -->
       <div class="mb-3">
@@ -126,7 +126,7 @@ const goToLogin = () => {
               <strong>ID:</strong> {{ data.id || 'N/A' }}
             </div>
             <div class="col-sm-6">
-              <strong>Roles:</strong> 
+              <strong>Roles:</strong>
               <span v-if="data.roles && data.roles.length">
                 <span v-for="role in data.roles" :key="role" class="badge bg-info me-1 p-1">
                   {{ role }}
@@ -155,16 +155,16 @@ const goToLogin = () => {
               <span class="input-group-text bg-success text-white">
                 <FeatherIcon icon="lock" size="16" />
               </span>
-              <input 
-                type="text" 
-                class="form-control font-monospace" 
-                :value="truncateToken(cleanToken, 50)" 
+              <input
+                type="text"
+                class="form-control font-monospace"
+                :value="truncateToken(cleanToken, 50)"
                 readonly
                 :placeholder="token ? 'Access Token' : 'No access token present'"
               >
-              <button 
-                v-if="token" 
-                class="btn btn-outline-secondary" 
+              <button
+                v-if="token"
+                class="btn btn-outline-secondary"
                 type="button"
                 @click="copyToClipboard(cleanToken ?? '')"
                 title="Copy token"
@@ -181,16 +181,16 @@ const goToLogin = () => {
               <span class="input-group-text bg-warning text-dark">
                 <FeatherIcon icon="refresh-cw" size="16" />
               </span>
-              <input 
-                type="text" 
-                class="form-control font-monospace" 
-                :value="truncateToken(refreshToken, 50)" 
+              <input
+                type="text"
+                class="form-control font-monospace"
+                :value="truncateToken(refreshToken, 50)"
                 readonly
                 :placeholder="refreshToken ? 'Refresh Token' : 'No refresh token available'"
               >
-              <button 
-                v-if="refreshToken" 
-                class="btn btn-outline-secondary" 
+              <button
+                v-if="refreshToken"
+                class="btn btn-outline-secondary"
                 type="button"
                 @click="copyToClipboard(refreshToken)"
                 title="Copy token"
