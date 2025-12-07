@@ -5,10 +5,10 @@ var backend = builder.AddProject<Projects.NuxtIdentity_Samples_Local_Backend>("b
 
 builder.AddJavaScriptApp("frontend", "../Frontend")
     .WithPnpm()
-    .WithReference(backend)
     .WithHttpEndpoint(port: 3000, env: "PORT")
     .WithHttpHealthCheck("/health")
     .WithEnvironment("NUXT_LAZY", "false")  // Disable lazy loading
+    .WithEnvironment("NUXT_PUBLIC_API_BASE_URL", backend.GetEndpoint("http"))
     .WithExternalHttpEndpoints()
     .PublishAsDockerFile();
 

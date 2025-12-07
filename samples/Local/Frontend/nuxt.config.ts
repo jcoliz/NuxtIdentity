@@ -34,14 +34,14 @@ export default defineNuxtConfig({
   },
   modules: ['@sidebase/nuxt-auth'],
   auth: {
-    baseURL: 'http://localhost:5074/api/auth', // Update this to your backend URL
+    originEnvKey: 'NUXT_PUBLIC_API_BASE_URL',
     provider: {
       type: 'local',
       endpoints: {
-        signIn: { path: '/login', method: 'post' }, // ADD THIS LINE
-        signOut: { path: '/logout', method: 'post' },
-        getSession: { path: '/user' },
-        signUp: { path: '/signup', method: 'post' }
+        signIn: { path: '/api/auth/login', method: 'post' }, // ADD THIS LINE
+        signOut: { path: '/api/auth/logout', method: 'post' },
+        getSession: { path: '/api/auth/user' },
+        signUp: { path: '/api/auth/signup', method: 'post' }
       },
       // not 'pages'??
       pages: {
@@ -52,7 +52,7 @@ export default defineNuxtConfig({
       },
       refresh: {
         isEnabled: true,
-        endpoint: { path: '/refresh', method: 'post' },
+        endpoint: { path: '/api/auth/refresh', method: 'post' },
         refreshOnlyToken: false, //??
         token: {
           signInResponseRefreshTokenPointer: '/token/refreshToken',
@@ -85,6 +85,10 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
+      // This value is overwritten during the static generation step
+      // by the NUXT_PUBLIC_API_BASE_URL environment variable.
+      // Don't fill this in with a default value here, or it will cause problems!
+      apiBaseUrl: ``,
     }
   }
 })
