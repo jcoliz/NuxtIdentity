@@ -1,10 +1,7 @@
 <script setup lang="ts">
 const { token, refreshToken, data, status, lastRefreshedAt, signOut } = useAuth()
 
-// Define server check for use in template
-const isServer = import.meta.server
-
-// OR better yet, use a client-side check:
+// Define rendering mode check for use in template
 const isClient = ref(false)
 
 onMounted(() => {
@@ -86,28 +83,17 @@ const goToLogin = () => {
             <FeatherIcon icon="log-out" size="16" class="me-1" />
             Logout
           </button>
-          <ClientOnly v-else-if="status === 'unauthenticated'">
-            <template #fallback>
-              <button
-                disabled
-                class="btn btn-outline-light btn-sm"
-                type="button"
-                title="Sign in"
-              >
-                <FeatherIcon icon="log-in" size="16" class="me-1" />
-                Login
-              </button>
-            </template>
-            <button
-              @click="goToLogin"
-              class="btn btn-outline-light btn-sm"
-              type="button"
-              title="Sign in"
-            >
-              <FeatherIcon icon="log-in" size="16" class="me-1" />
-              Login
-            </button>
-          </ClientOnly>
+          <button
+            v-else-if="status === 'unauthenticated'"
+            :disabled="isClient === false"
+            @click="goToLogin"
+            class="btn btn-outline-light btn-sm"
+            type="button"
+            title="Sign in"
+          >
+            <FeatherIcon icon="log-in" size="16" class="me-1" />
+            Login
+          </button>
 
           <!-- Loading state - show spinner -->
           <div v-else class="btn btn-outline-light btn-sm disabled">
