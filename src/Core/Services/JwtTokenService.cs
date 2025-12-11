@@ -75,7 +75,9 @@ public partial class JwtTokenService<TUser>(
 
         var expires = _jwtOptions.Lifespan != TimeSpan.Zero
             ? DateTime.UtcNow.Add(_jwtOptions.Lifespan)
+#pragma warning disable CS0618 // Intentional use of obsolete property for backward compatibility
             : DateTime.UtcNow.AddHours(_jwtOptions.ExpirationHours);
+#pragma warning restore CS0618
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
