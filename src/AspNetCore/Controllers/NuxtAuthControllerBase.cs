@@ -22,7 +22,7 @@ namespace NuxtIdentity.AspNetCore.Controllers;
 /// - Refresh: Token refresh with rotation
 /// - Logout: Token revocation
 /// </para>
-/// 
+///
 /// <para><strong>Default Behavior:</strong></para>
 /// <para>
 /// All endpoints have sensible default implementations that work with standard IdentityUser.
@@ -32,7 +32,7 @@ namespace NuxtIdentity.AspNetCore.Controllers;
 /// - Role and claim extraction from Identity
 /// - Token generation and validation
 /// </para>
-/// 
+///
 /// <para><strong>Customization:</strong></para>
 /// <para>
 /// All endpoint methods are virtual and can be overridden for custom behavior.
@@ -43,7 +43,7 @@ namespace NuxtIdentity.AspNetCore.Controllers;
 /// - Multi-factor authentication
 /// - Custom response formats
 /// </para>
-/// 
+///
 /// <para><strong>User Information Mapping:</strong></para>
 /// <para>
 /// The controller automatically maps ASP.NET Core Identity data to the UserInfo model:
@@ -61,29 +61,29 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     IRefreshTokenService refreshTokenService,
     UserManager<TUser> userManager,
     SignInManager<TUser> signInManager,
-    ILogger logger) : ControllerBase 
+    ILogger logger) : ControllerBase
     where TUser : IdentityUser, new()
 {
     /// <summary>
     /// Gets the JWT token service for generating and validating tokens.
     /// </summary>
     protected IJwtTokenService<TUser> JwtTokenService { get; } = jwtTokenService;
-    
+
     /// <summary>
     /// Gets the refresh token service for managing refresh tokens.
     /// </summary>
     protected IRefreshTokenService RefreshTokenService { get; } = refreshTokenService;
-    
+
     /// <summary>
     /// Gets the user manager for Identity operations.
     /// </summary>
     protected UserManager<TUser> UserManager { get; } = userManager;
-    
+
     /// <summary>
     /// Gets the sign-in manager for authentication operations.
     /// </summary>
     protected SignInManager<TUser> SignInManager { get; } = signInManager;
-    
+
     #region Helper Methods
 
     /// <summary>
@@ -145,7 +145,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     {
         var roles = await UserManager.GetRolesAsync(user);
         var userClaims = await UserManager.GetClaimsAsync(user);
-        
+
         // Get role claims
         var roleClaims = new List<Claim>();
         foreach (var roleName in roles)
@@ -157,7 +157,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
                 roleClaims.AddRange(claims);
             }
         }
-        
+
         // Combine user claims and role claims, removing duplicates
         var allClaims = userClaims
             .Concat(roleClaims)
@@ -219,7 +219,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     public virtual async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         LogLoginAttempt(request.Username);
-        
+
         var user = await UserManager.FindByNameAsync(request.Username);
         if (user == null)
         {
@@ -236,7 +236,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         {
             LogLoginFailed(request.Username, "Invalid password");
             return Problem(
-                title: "Authentication Failed", 
+                title: "Authentication Failed",
                 detail: "Invalid credentials",
                 statusCode: StatusCodes.Status401Unauthorized
             );
@@ -258,28 +258,30 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     public virtual async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
     {
         LogSignupAttempt(request.Username);
-        
+
         var user = new TUser
         {
             UserName = request.Username,
             Email = request.Email
         };
-        
+
         var result = await UserManager.CreateAsync(user, request.Password);
-        
+
         if (!result.Succeeded)
         {
             LogSignupFailed(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
-            
+
             return Problem(
                 title: "Registration Failed",
                 detail: string.Join("; ", result.Errors.Select(e => e.Description)),
                 statusCode: StatusCodes.Status400BadRequest
             );
         }
-        
+
+        await OnUserCreatedAsync(user);
+
         LogSignupSuccess(request.Username);
-        
+
         var response = await CreateLoginResponseAsync(user);
         return Ok(response);
     }
@@ -319,7 +321,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
         var userInfo = await CreateUserInfoAsync(user);
         LogSessionSuccess(username);
-        
+
         return Ok(new SessionResponse
         {
             User = userInfo
@@ -339,7 +341,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     {
         var userId = GetCurrentUserId();
         var username = GetCurrentUsername();
-        
+
         if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
         {
             LogRefreshNoToken();
@@ -351,7 +353,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         }
 
         LogRefreshTokenChecking(username, request.RefreshToken);
-        
+
         // Validate the refresh token
         var isValid = await RefreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, userId);
         if (!isValid)
@@ -381,7 +383,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var response = await CreateRefreshResponseAsync(user, request.RefreshToken);
 
         LogRefreshTokenCreated(username, response.Token.RefreshToken);
-        
+
         return Ok(response);
     }
 
@@ -395,13 +397,27 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     public virtual async Task<IActionResult> Logout([FromBody] RefreshRequest request)
     {
         LogLogoutRequested();
-        
+
         if (!string.IsNullOrEmpty(request.RefreshToken))
         {
             await RefreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
         }
-        
+
         return Ok(new { success = true });
+    }
+
+    #endregion
+
+    #region Hooks
+
+    /// <summary>
+    /// Hook method called after a user is created. Can be overridden for custom logic.
+    /// </summary>
+    /// <param name="user"></param>
+    protected virtual Task OnUserCreatedAsync(TUser user)
+    {
+        // Hook for derived classes to implement custom logic after user creation
+        return Task.CompletedTask;
     }
 
     #endregion
