@@ -267,4 +267,182 @@ public class EfRefreshTokenServiceTests
         // And invalid for the first user
         (await _service.ValidateRefreshTokenAsync(user2Token, user1Id)).Should().BeFalse();
     }
+
+    #region Error Cases
+
+    [Test]
+    public async Task ValidateRefreshTokenAsync_ExpiredToken_ReturnsFalse()
+    {
+        // Given a user ID
+        var userId = "user123";
+
+        // And JWT options with a very short refresh token lifespan
+        var shortLifespanOptions = new JwtOptions
+        {
+            Key = _jwtOptions.Key,
+            Issuer = _jwtOptions.Issuer,
+            Audience = _jwtOptions.Audience,
+            Lifespan = _jwtOptions.Lifespan,
+            RefreshTokenLifespan = TimeSpan.FromMilliseconds(1) // 1ms - will expire immediately
+        };
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(shortLifespanOptions);
+        var loggerMock = new Mock<ILogger<EfRefreshTokenService<TestDbContext>>>();
+
+        var serviceWithShortLifespan = new EfRefreshTokenService<TestDbContext>(
+            _context,
+            loggerMock.Object,
+            optionsMock.Object);
+
+        // And a token generated with the short lifespan
+        var token = await serviceWithShortLifespan.GenerateRefreshTokenAsync(userId);
+
+        // And we wait for the token to expire
+        await Task.Delay(10); // Wait 10ms to ensure expiration
+
+        // When validating the expired token
+        var isValid = await serviceWithShortLifespan.ValidateRefreshTokenAsync(token, userId);
+
+        // Then validation should fail
+        isValid.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task RevokeRefreshTokenAsync_NonExistentToken_DoesNotThrow()
+    {
+        // Given a token that was never generated
+        var nonExistentToken = Convert.ToBase64String(new byte[64]);
+
+        // When revoking the non-existent token
+        Func<Task> act = async () => await _service.RevokeRefreshTokenAsync(nonExistentToken);
+
+        // Then no exception should be thrown
+        await act.Should().NotThrowAsync();
+
+        // And no tokens should exist in the database
+        var tokenCount = await _context.RefreshTokens.CountAsync();
+        tokenCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task GenerateRefreshTokenAsync_WithExpiredTokens_DeletesExpiredTokens()
+    {
+        // Given a user ID
+        var userId = "user123";
+
+        // And JWT options with a very short refresh token lifespan for expired tokens
+        var shortLifespanOptions = new JwtOptions
+        {
+            Key = _jwtOptions.Key,
+            Issuer = _jwtOptions.Issuer,
+            Audience = _jwtOptions.Audience,
+            Lifespan = _jwtOptions.Lifespan,
+            RefreshTokenLifespan = TimeSpan.FromMilliseconds(1) // 1ms - will expire immediately
+        };
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(shortLifespanOptions);
+        var loggerMock = new Mock<ILogger<EfRefreshTokenService<TestDbContext>>>();
+
+        var serviceWithShortLifespan = new EfRefreshTokenService<TestDbContext>(
+            _context,
+            loggerMock.Object,
+            optionsMock.Object);
+
+        // And expired tokens in the database
+        var expiredToken1 = await serviceWithShortLifespan.GenerateRefreshTokenAsync(userId);
+        var expiredToken2 = await serviceWithShortLifespan.GenerateRefreshTokenAsync(userId);
+
+        // Wait for tokens to expire
+        await Task.Delay(10);
+
+        // Verify tokens are expired (should be 2 in database)
+        var tokenCountBefore = await _context.RefreshTokens.CountAsync();
+        tokenCountBefore.Should().Be(2);
+
+        // When generating a new token (which triggers cleanup)
+        var newToken = await _service.GenerateRefreshTokenAsync(userId);
+
+        // Then expired tokens should be deleted
+        var tokensAfter = await _context.RefreshTokens.ToListAsync();
+
+        // The expired tokens should be gone, only the new one remains
+        tokensAfter.Should().HaveCount(1);
+        tokensAfter[0].UserId.Should().Be(userId);
+        tokensAfter[0].IsRevoked.Should().BeFalse();
+
+        // And the new token should be valid
+        (await _service.ValidateRefreshTokenAsync(newToken, userId)).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task RevokeRefreshTokenAsync_ExistingToken_UpdatesExpirationDate()
+    {
+        // Given a user ID
+        var userId = "user123";
+        // And a generated refresh token
+        var token = await _service.GenerateRefreshTokenAsync(userId);
+
+        // Get the original expiration
+        var tokenBefore = await _context.RefreshTokens.FirstAsync();
+        var originalExpiration = tokenBefore.ExpiresAt;
+
+        var beforeRevocation = DateTime.UtcNow;
+
+        // When revoking the token
+        await _service.RevokeRefreshTokenAsync(token);
+
+        var afterRevocation = DateTime.UtcNow;
+
+        // Then the expiration should be updated to 7 days from now
+        var tokenAfter = await _context.RefreshTokens.FirstAsync();
+        var expectedExpiration = beforeRevocation.AddDays(7);
+        var maxExpectedExpiration = afterRevocation.AddDays(7);
+
+        tokenAfter.ExpiresAt.Should().BeOnOrAfter(expectedExpiration);
+        tokenAfter.ExpiresAt.Should().BeOnOrBefore(maxExpectedExpiration);
+        tokenAfter.ExpiresAt.Should().BeAfter(originalExpiration);
+    }
+
+    [Test]
+    public async Task ValidateRefreshTokenAsync_RevokedToken_ReturnsFalse()
+    {
+        // Given a user ID
+        var userId = "user123";
+        // And a generated refresh token
+        var token = await _service.GenerateRefreshTokenAsync(userId);
+
+        // And the token is revoked
+        await _service.RevokeRefreshTokenAsync(token);
+
+        // When validating the revoked token
+        var isValid = await _service.ValidateRefreshTokenAsync(token, userId);
+
+        // Then validation should fail
+        isValid.Should().BeFalse();
+
+        // And the token should be marked as revoked in the database
+        var storedToken = await _context.RefreshTokens.FirstAsync();
+        storedToken.IsRevoked.Should().BeTrue();
+    }
+
+    [Test]
+    public async Task GenerateRefreshTokenAsync_StoresHashedTokenNotPlaintext()
+    {
+        // Given a user ID
+        var userId = "user123";
+
+        // When generating a refresh token
+        var plainTextToken = await _service.GenerateRefreshTokenAsync(userId);
+
+        // Then the stored token hash should not match the plaintext token
+        var storedToken = await _context.RefreshTokens.FirstAsync();
+        storedToken.TokenHash.Should().NotBe(plainTextToken);
+
+        // And the token hash should be base64 encoded (characteristic of SHA256)
+        storedToken.TokenHash.Should().MatchRegex("^[A-Za-z0-9+/=]+$");
+    }
+
+    #endregion
 }
