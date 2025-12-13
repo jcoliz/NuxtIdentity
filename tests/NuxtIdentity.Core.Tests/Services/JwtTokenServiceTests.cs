@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NUnit.Framework;
+using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Core.Services;
 using NuxtIdentity.Core.Tests.Helpers;
@@ -231,5 +232,223 @@ public class JwtTokenServiceTests
 
         jwt1.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value.Should().Be("user1");
         jwt2.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value.Should().Be("user2");
+    }
+
+    [Test]
+    public async Task ValidateTokenAsync_InvalidToken_ReturnsNull()
+    {
+        // Given an invalid token string
+        var invalidToken = "this.is.not.a.valid.jwt.token";
+
+        // When validating the invalid token
+        var principal = await _service.ValidateTokenAsync(invalidToken);
+
+        // Then validation should return null
+        principal.Should().BeNull();
+    }
+
+    [Test]
+    public async Task ValidateTokenAsync_ExpiredToken_ReturnsNull()
+    {
+        // Given a user
+        var user = new TestUser
+        {
+            Id = "user123",
+            Username = "testuser",
+            Email = "test@example.com"
+        };
+
+        // And JWT options with a very short lifespan
+        var shortLifespanOptions = TestJwtOptions.CreateShortLivedToken();
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(shortLifespanOptions);
+
+        var shortLivedService = new JwtTokenService<TestUser>(
+            optionsMock.Object,
+            new[] { _claimsProvider },
+            _loggerMock.Object
+        );
+
+        // And a token generated with short lifespan
+        var token = await shortLivedService.GenerateAccessTokenAsync(user);
+
+        // And we wait for the token to expire
+        await Task.Delay(150); // Wait longer than the 100ms lifespan
+
+        // When validating the expired token with the same service
+        var principal = await shortLivedService.ValidateTokenAsync(token);
+
+        // Then validation should return null
+        principal.Should().BeNull();
+    }
+
+    [Test]
+    public async Task ValidateTokenAsync_TokenWithWrongSigningKey_ReturnsNull()
+    {
+        // Given a user
+        var user = new TestUser
+        {
+            Id = "user123",
+            Username = "testuser",
+            Email = "test@example.com"
+        };
+
+        // And a token generated with one key
+        var token = await _service.GenerateAccessTokenAsync(user);
+
+        // And a service configured with a different key
+        var differentKeyOptions = TestJwtOptions.CreateWithDifferentKey();
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(differentKeyOptions);
+
+        var differentKeyService = new JwtTokenService<TestUser>(
+            optionsMock.Object,
+            new[] { _claimsProvider },
+            _loggerMock.Object
+        );
+
+        // When validating the token with the wrong key
+        var principal = await differentKeyService.ValidateTokenAsync(token);
+
+        // Then validation should return null
+        principal.Should().BeNull();
+    }
+
+    [Test]
+    public async Task GenerateAccessTokenAsync_UserWithNoNameClaim_UsesUnknownAsDefault()
+    {
+        // Given a user claims provider that doesn't include a name claim
+        var noNameProvider = new Mock<IUserClaimsProvider<TestUser>>();
+        noNameProvider.Setup(p => p.GetClaimsAsync(It.IsAny<TestUser>()))
+            .ReturnsAsync(new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, "user123"),
+                new Claim(ClaimTypes.Email, "test@example.com")
+            });
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
+
+        var serviceWithNoName = new JwtTokenService<TestUser>(
+            optionsMock.Object,
+            new[] { noNameProvider.Object },
+            _loggerMock.Object
+        );
+
+        // And a test user
+        var user = new TestUser
+        {
+            Id = "user123",
+            Username = "testuser",
+            Email = "test@example.com"
+        };
+
+        // When generating a token
+        var token = await serviceWithNoName.GenerateAccessTokenAsync(user);
+
+        // Then the token should be generated successfully
+        token.Should().NotBeNullOrEmpty();
+
+        // And the token should contain the other claims
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
+        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
+    }
+
+    [Test]
+    public async Task GenerateAccessTokenAsync_WithObsoleteExpirationHours_UsesExpirationHours()
+    {
+        // Given JWT options with Lifespan set to zero (to trigger fallback)
+        var optionsWithObsoleteProperty = new JwtOptions
+        {
+            Key = _jwtOptions.Key,
+            Issuer = _jwtOptions.Issuer,
+            Audience = _jwtOptions.Audience,
+            Lifespan = TimeSpan.Zero, // Trigger fallback to ExpirationHours
+#pragma warning disable CS0618 // Suppress obsolete warning for testing
+            ExpirationHours = 2
+#pragma warning restore CS0618
+        };
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(optionsWithObsoleteProperty);
+
+        var serviceWithObsoleteOption = new JwtTokenService<TestUser>(
+            optionsMock.Object,
+            new[] { _claimsProvider },
+            _loggerMock.Object
+        );
+
+        // And a test user
+        var user = new TestUser
+        {
+            Id = "user123",
+            Username = "testuser",
+            Email = "test@example.com"
+        };
+
+        // And the current time before generation
+        var beforeGeneration = DateTime.UtcNow;
+
+        // When generating a token
+        var token = await serviceWithObsoleteOption.GenerateAccessTokenAsync(user);
+
+        // Then the token should expire after 2 hours (from ExpirationHours)
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+
+        var expectedExpiration = beforeGeneration.AddHours(2);
+        jwtToken.ValidTo.Should().BeCloseTo(expectedExpiration, TimeSpan.FromSeconds(5));
+    }
+
+    [Test]
+    public async Task GenerateAccessTokenAsync_MultipleClaimsProviders_CombinesAllClaims()
+    {
+        // Given multiple claims providers
+        var provider1 = new Mock<IUserClaimsProvider<TestUser>>();
+        provider1.Setup(p => p.GetClaimsAsync(It.IsAny<TestUser>()))
+            .ReturnsAsync(new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, "user123"),
+                new Claim(ClaimTypes.Name, "testuser")
+            });
+
+        var provider2 = new Mock<IUserClaimsProvider<TestUser>>();
+        provider2.Setup(p => p.GetClaimsAsync(It.IsAny<TestUser>()))
+            .ReturnsAsync(new List<Claim>
+            {
+                new Claim(ClaimTypes.Email, "test@example.com"),
+                new Claim(ClaimTypes.Role, "Admin")
+            });
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
+
+        var serviceWithMultipleProviders = new JwtTokenService<TestUser>(
+            optionsMock.Object,
+            new[] { provider1.Object, provider2.Object },
+            _loggerMock.Object
+        );
+
+        // And a test user
+        var user = new TestUser
+        {
+            Id = "user123",
+            Username = "testuser",
+            Email = "test@example.com"
+        };
+
+        // When generating a token
+        var token = await serviceWithMultipleProviders.GenerateAccessTokenAsync(user);
+
+        // Then the token should contain claims from both providers
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+
+        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
+        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == "testuser");
+        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
+        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Admin");
     }
 }

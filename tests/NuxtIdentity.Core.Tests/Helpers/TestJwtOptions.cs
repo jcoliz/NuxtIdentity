@@ -34,6 +34,16 @@ public static class TestJwtOptions
     }
 
     /// <summary>
+    /// Creates JWT options with a short refresh token lifespan for expiration testing.
+    /// </summary>
+    public static JwtOptions CreateShortLivedRefreshToken()
+    {
+        var options = CreateDefault();
+        options.RefreshTokenLifespan = TimeSpan.FromMilliseconds(100);
+        return options;
+    }
+
+    /// <summary>
     /// Creates JWT options with a different key for tampering tests.
     /// </summary>
     public static JwtOptions CreateWithDifferentKey()

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <ExcludeByAttribute>GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <ExcludeByFile>
+            <!-- Exclude auto-generated files -->
+            <Exclude>**\*.g.cs</Exclude>
+            <Exclude>**\obj\**\*.cs</Exclude>
+            <Exclude>**\Microsoft.Extensions.Logging.Generators\**\*.cs</Exclude>
+          </ExcludeByFile>
+          <Exclude>
+            <!-- Exclude DTOs/Models - they have no logic -->
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.ClaimInfo,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.LoginRequest,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.LoginResponse,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.RefreshRequest,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.RefreshResponse,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.SessionResponse,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.SignUpRequest,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.TokenPair,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.UserInfo,
+            <!-- Exclude the generated logger partial class methods -->
+            [NuxtIdentity.Core]NuxtIdentity.Core.Services.JwtTokenService`1/*.cctor,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Services.JwtTokenService`1/*__*
+          </Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

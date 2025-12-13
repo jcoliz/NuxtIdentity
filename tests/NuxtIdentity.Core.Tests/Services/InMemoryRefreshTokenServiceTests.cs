@@ -136,6 +136,30 @@ public class InMemoryRefreshTokenServiceTests
     }
 
     [Test]
+    public async Task ValidateRefreshTokenAsync_ExpiredToken_ReturnsFalse()
+    {
+        // Given JWT options with a very short refresh token lifespan
+        var shortLivedOptions = TestJwtOptions.CreateShortLivedRefreshToken();
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(shortLivedOptions);
+        var shortLivedService = new InMemoryRefreshTokenService(optionsMock.Object);
+
+        // And a valid user ID
+        var userId = "user123";
+        // And a generated refresh token
+        var token = await shortLivedService.GenerateRefreshTokenAsync(userId);
+
+        // When waiting for the token to expire
+        await Task.Delay(150); // Wait longer than the 100ms lifespan
+
+        // And validating the expired token
+        var isValid = await shortLivedService.ValidateRefreshTokenAsync(token, userId);
+
+        // Then validation should fail
+        isValid.Should().BeFalse();
+    }
+
+    [Test]
     public async Task RevokeRefreshTokenAsync_ValidToken_TokenBecomesInvalid()
     {
         // Given a valid user ID
