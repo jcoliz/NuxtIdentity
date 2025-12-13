@@ -102,8 +102,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var accessToken = await JwtTokenService.GenerateAccessTokenAsync(user);
         var refreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(user.Id);
 
-        // Clear the change tracker to prevent DbContext concurrency issues
-        // when querying for roles and claims in CreateUserInfoAsync
+        // Clear the change tracker immediately before querying roles/claims
+        // Token generation may have tracked entities, so clear right before CreateUserInfoAsync
         DbContextCleaner.ClearChangeTracker();
 
         var userInfo = await CreateUserInfoAsync(user);
