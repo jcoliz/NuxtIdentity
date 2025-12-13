@@ -65,24 +65,20 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         _context.Set<RefreshTokenEntity>().Add(entity);
         await _context.SaveChangesAsync();
 
-        // Clear change tracker after saving to prevent concurrency issues
-        // when the same DbContext instance is used for subsequent operations
-        _context.ChangeTracker.Clear();
-
         LogTokenGenerated(userId, entity.ExpiresAt, token);
 
-        // Fire-and-forget cleanup of expired tokens
-        _ = Task.Run(async () =>
+        // Cleanup expired tokens synchronously to prevent DbContext concurrency issues
+        try
         {
-            try
-            {
-                await DeleteExpiredTokensAsync();
-            }
-            catch (Exception ex)
-            {
-                LogCleanupFailed(ex);
-            }
-        });
+            await DeleteExpiredTokensAsync();
+        }
+        catch (Exception ex)
+        {
+            LogCleanupFailed(ex);
+        }
+
+        // Clear change tracker after all operations complete
+        _context.ChangeTracker.Clear();
 
         return token;
     }
