@@ -1,76 +1,77 @@
 <#
 .SYNOPSIS
-Runs tests and collects code coverage metrics.
+Runs all tests and collects code coverage metrics.
 
 .DESCRIPTION
-This script executes tests with code coverage collection and generates an HTML report.
-It uses the XPlat Code Coverage collector and ReportGenerator to create a detailed
+This script executes all test projects with code coverage collection and generates a consolidated
+HTML report. It uses the XPlat Code Coverage collector and ReportGenerator to create a detailed
 coverage report that opens automatically in your browser.
-
-.PARAMETER Tests
-The test category to run. Default value is "Unit". Other possible values include "Functional".
 
 .EXAMPLE
 .\Collect-CodeCoverage.ps1
-Runs Unit tests and generates a code coverage report.
-
-.EXAMPLE
-.\Collect-CodeCoverage.ps1 -Tests "Functional"
-Runs Functional tests and generates a code coverage report.
+Runs all tests and generates a consolidated code coverage report.
 
 .NOTES
 Requires ReportGenerator to be installed globally:
     dotnet tool install -g dotnet-reportgenerator-globaltool
 
-The coverage report will be generated in .\bin\result\index.html and opened automatically.
+The coverage report will be generated in .\TestResults\CoverageReport\index.html and opened automatically.
 
 .LINK
 https://github.com/danielpalme/ReportGenerator
 #>
 
 [CmdletBinding()]
-param(
-    [Parameter()]
-    [ValidateSet("Core")]
-    [string]
-    $Tests="Core"
-)
+param()
 
 $ErrorActionPreference = "Stop"
 
 try {
-    $TestPath = "$PSScriptRoot/../tests/NuxtIdentity.$Tests.Tests"
+    $RootPath = "$PSScriptRoot/.."
+    $TestProjects = @(
+        "tests/NuxtIdentity.Core.Tests/NuxtIdentity.Core.Tests.csproj",
+        "tests/NuxtIdentity.EntityFrameworkCore.Tests/NuxtIdentity.EntityFrameworkCore.Tests.csproj"
+    )
 
-    if (-not (Test-Path $TestPath)) {
-        throw "Test directory not found: $TestPath"
-    }
-
-    Push-Location $TestPath
+    Push-Location $RootPath
 
     Write-Host "Cleaning up previous test results..." -ForegroundColor Cyan
     Remove-Item TestResults -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item bin\result -Recurse -Force -ErrorAction SilentlyContinue
 
-    Write-Host "Running $Tests tests with code coverage..." -ForegroundColor Cyan
-    dotnet clean --nologo --verbosity quiet
-    dotnet test --collect:"XPlat Code Coverage" --settings:coverlet.runsettings
-    if ($LASTEXITCODE -ne 0) {
-        throw "Test execution failed with exit code $LASTEXITCODE"
+    Write-Host "`nRunning all tests with code coverage..." -ForegroundColor Cyan
+    Write-Host "========================================`n" -ForegroundColor Cyan
+
+    foreach ($project in $TestProjects) {
+        $projectName = [System.IO.Path]::GetFileNameWithoutExtension($project)
+        Write-Host "Testing: $projectName" -ForegroundColor Yellow
+
+        dotnet test $project `
+            --collect:"XPlat Code Coverage" `
+            --results-directory ./TestResults `
+            --verbosity normal
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Test execution failed for $projectName with exit code $LASTEXITCODE"
+        }
+        Write-Host ""
     }
 
-    Write-Host "Generating coverage report..." -ForegroundColor Cyan
+    Write-Host "Generating consolidated coverage report..." -ForegroundColor Cyan
     reportgenerator `
-        -reports:.\TestResults\*\coverage.cobertura.xml `
-        -targetdir:.\bin\result `
+        -reports:./TestResults/**/coverage.cobertura.xml `
+        -targetdir:./TestResults/CoverageReport `
+        -reporttypes:Html `
         "-classfilters:-*.g.cs" `
-        "-filefilters:-*LoggerMessage.g.cs;-*\obj\*"
+        "-filefilters:-*LoggerMessage.g.cs;-*/obj/*"
+
     if ($LASTEXITCODE -ne 0) {
         throw "Report generation failed with exit code $LASTEXITCODE"
     }
 
-    Write-Host "Coverage report generated successfully" -ForegroundColor Green
-    Write-Host "Opening report in browser..." -ForegroundColor Cyan
-    Start-Process .\bin\result\index.html
+    Write-Host "`nCoverage report generated successfully!" -ForegroundColor Green
+    Write-Host "Location: .\TestResults\CoverageReport\index.html" -ForegroundColor Green
+    Write-Host "`nOpening report in browser..." -ForegroundColor Cyan
+    Start-Process .\TestResults\CoverageReport\index.html
 }
 catch {
     Write-Error "Failed to collect code coverage: $_"

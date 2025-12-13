@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[NuxtIdentity.EntityFrameworkCore]*,[NuxtIdentity.Core]*</Include>
+          <ExcludeByAttribute>GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <ExcludeByFile>
+            <Exclude>**\*.g.cs</Exclude>
+            <Exclude>**\obj\**\*.cs</Exclude>
+            <Exclude>**\Microsoft.Extensions.Logging.Generators\**\*.cs</Exclude>
+          </ExcludeByFile>
+          <Exclude>
+            <!-- Exclude DTO models (no logic to test) -->
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.ClaimInfo,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.LoginRequest,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.LoginResponse,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.RefreshRequest,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.RefreshResponse,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.SessionResponse,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.SignUpRequest,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.TokenPair,
+            [NuxtIdentity.Core]NuxtIdentity.Core.Models.UserInfo
+          </Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

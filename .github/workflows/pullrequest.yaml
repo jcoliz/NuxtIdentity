@@ -25,3 +25,19 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --no-restore
+    - name: Test Core
+      run: dotnet test tests/NuxtIdentity.Core.Tests/NuxtIdentity.Core.Tests.csproj --no-build --verbosity normal --settings tests/NuxtIdentity.Core.Tests/coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory ./TestResults/Core
+    - name: Test EF Core Integration
+      run: dotnet test tests/NuxtIdentity.EntityFrameworkCore.Tests/NuxtIdentity.EntityFrameworkCore.Tests.csproj --no-build --verbosity normal --settings tests/NuxtIdentity.EntityFrameworkCore.Tests/coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory ./TestResults/EFCore
+    - name: Generate Coverage Report
+      run: |
+        dotnet tool install -g dotnet-reportgenerator-globaltool
+        reportgenerator -reports:./TestResults/**/coverage.cobertura.xml -targetdir:./TestResults/CoverageReport -reporttypes:"Html;TextSummary;Badges" -classfilters:"-*.g.cs" -filefilters:"-*LoggerMessage.g.cs;-*/obj/*"
+    - name: Display Coverage Summary
+      run: cat ./TestResults/CoverageReport/Summary.txt
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: ./TestResults/CoverageReport
