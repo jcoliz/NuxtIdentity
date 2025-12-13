@@ -2,7 +2,9 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Core.Models;
 
 namespace NuxtIdentity.EntityFrameworkCore.Services;
@@ -26,17 +28,22 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 {
     private readonly TContext _context;
     private readonly ILogger<EfRefreshTokenService<TContext>> _logger;
-    private const int RefreshTokenExpirationDays = 30;
+    private readonly JwtOptions _jwtOptions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EfRefreshTokenService{TContext}"/> class.
     /// </summary>
     /// <param name="context">The database context.</param>
     /// <param name="logger">Logger instance.</param>
-    public EfRefreshTokenService(TContext context, ILogger<EfRefreshTokenService<TContext>> logger)
+    /// <param name="jwtOptions">JWT configuration options.</param>
+    public EfRefreshTokenService(
+        TContext context,
+        ILogger<EfRefreshTokenService<TContext>> logger,
+        IOptions<JwtOptions> jwtOptions)
     {
         _context = context;
         _logger = logger;
+        _jwtOptions = jwtOptions.Value;
     }
 
     /// <inheritdoc/>
@@ -49,7 +56,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         {
             TokenHash = tokenHash,
             UserId = userId,
-            ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenExpirationDays),
+            ExpiresAt = DateTime.UtcNow.Add(_jwtOptions.RefreshTokenLifespan),
             CreatedAt = DateTime.UtcNow,
             IsRevoked = false
         };

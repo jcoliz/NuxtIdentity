@@ -21,25 +21,25 @@ public class JwtOptions
     /// </summary>
     /// <remarks>
     /// <para><strong>REQUIRED.</strong> Must be a cryptographically secure random key of at least 256 bits (32 bytes) for HMAC-SHA256.</para>
-    /// 
+    ///
     /// <para>When configuring via appsettings.json, provide a Base64-encoded string which will be automatically
     /// decoded to bytes by the .NET configuration system.</para>
-    /// 
+    ///
     /// <para><strong>Generating a secure key:</strong></para>
-    /// 
+    ///
     /// <para>PowerShell:</para>
     /// <code>
     /// $bytes = [byte[]]::new(32)
     /// [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
     /// [Convert]::ToBase64String($bytes)
     /// </code>
-    /// 
+    ///
     /// <para>C#:</para>
     /// <code>
     /// var key = RandomNumberGenerator.GetBytes(32);
     /// var base64Key = Convert.ToBase64String(key);
     /// </code>
-    /// 
+    ///
     /// <para>Bash (Linux/macOS):</para>
     /// <code>
     /// openssl rand -base64 32
@@ -76,6 +76,16 @@ public class JwtOptions
     /// Default is 1 hour for security best practices.
     /// </remarks>
     public TimeSpan Lifespan { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Gets or sets the refresh token lifespan.
+    /// </summary>
+    /// <remarks>
+    /// <para>Defines how long a refresh token remains valid before it expires.</para>
+    /// <para>Can be configured in appsettings.json as a timespan string (e.g., "30.00:00:00" for 30 days).</para>
+    /// <para>Default is 30 days, which provides a balance between security and user convenience.</para>
+    /// </remarks>
+    public TimeSpan RefreshTokenLifespan { get; set; } = TimeSpan.FromDays(30);
 
     /// <summary>
     /// Gets or sets the token expiration time in hours.

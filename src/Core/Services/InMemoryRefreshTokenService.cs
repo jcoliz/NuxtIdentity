@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Options;
 using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.Core.Models;
 
 namespace NuxtIdentity.Core.Services;
@@ -12,8 +14,17 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
 {
     private readonly List<RefreshTokenEntity> _tokens = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly JwtOptions _jwtOptions;
     private int _nextId = 1;
-    private const int RefreshTokenExpirationDays = 30;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InMemoryRefreshTokenService"/> class.
+    /// </summary>
+    /// <param name="jwtOptions">JWT configuration options.</param>
+    public InMemoryRefreshTokenService(IOptions<JwtOptions> jwtOptions)
+    {
+        _jwtOptions = jwtOptions.Value;
+    }
 
     /// <inheritdoc/>
     public async Task<string> GenerateRefreshTokenAsync(string userId)
@@ -29,7 +40,7 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
                 Id = _nextId++,
                 TokenHash = tokenHash,
                 UserId = userId,
-                ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenExpirationDays),
+                ExpiresAt = DateTime.UtcNow.Add(_jwtOptions.RefreshTokenLifespan),
                 CreatedAt = DateTime.UtcNow,
                 IsRevoked = false
             };
@@ -51,8 +62,8 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
         await _lock.WaitAsync();
         try
         {
-            var entity = _tokens.FirstOrDefault(t => 
-                t.TokenHash == tokenHash && 
+            var entity = _tokens.FirstOrDefault(t =>
+                t.TokenHash == tokenHash &&
                 t.UserId == userId);
 
             if (entity == null)
