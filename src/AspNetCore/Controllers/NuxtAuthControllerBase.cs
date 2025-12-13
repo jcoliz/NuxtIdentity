@@ -61,7 +61,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     IRefreshTokenService refreshTokenService,
     UserManager<TUser> userManager,
     SignInManager<TUser> signInManager,
-    ILogger logger) : ControllerBase
+    ILogger logger,
+    IDbContextCleaner dbContextCleaner) : ControllerBase
     where TUser : IdentityUser, new()
 {
     /// <summary>
@@ -84,6 +85,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// </summary>
     protected SignInManager<TUser> SignInManager { get; } = signInManager;
 
+    /// <summary>
+    /// Gets the DbContext cleaner for preventing concurrency issues.
+    /// </summary>
+    protected IDbContextCleaner DbContextCleaner { get; } = dbContextCleaner;
+
     #region Helper Methods
 
     /// <summary>
@@ -95,6 +101,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     {
         var accessToken = await JwtTokenService.GenerateAccessTokenAsync(user);
         var refreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(user.Id);
+
+        // Clear the change tracker to prevent DbContext concurrency issues
+        // when querying for roles and claims in CreateUserInfoAsync
+        DbContextCleaner.ClearChangeTracker();
+
         var userInfo = await CreateUserInfoAsync(user);
 
         return new LoginResponse
@@ -318,6 +329,9 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
                 statusCode: StatusCodes.Status401Unauthorized
             );
         }
+
+        // Clear the change tracker to prevent DbContext concurrency issues
+        DbContextCleaner.ClearChangeTracker();
 
         var userInfo = await CreateUserInfoAsync(user);
         LogSessionSuccess(username);
