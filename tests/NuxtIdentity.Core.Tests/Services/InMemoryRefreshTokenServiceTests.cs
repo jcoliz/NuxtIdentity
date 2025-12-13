@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using NUnit.Framework;
 using NuxtIdentity.Core.Configuration;
@@ -13,16 +14,18 @@ namespace NuxtIdentity.Core.Tests.Services;
 public class InMemoryRefreshTokenServiceTests
 {
     private JwtOptions _jwtOptions = null!;
+    private FakeTimeProvider _timeProvider = null!;
     private InMemoryRefreshTokenService _service = null!;
 
     [SetUp]
     public void SetUp()
     {
         _jwtOptions = TestJwtOptions.CreateDefault();
+        _timeProvider = new FakeTimeProvider();
         var optionsMock = new Mock<IOptions<JwtOptions>>();
         optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
 
-        _service = new InMemoryRefreshTokenService(optionsMock.Object);
+        _service = new InMemoryRefreshTokenService(optionsMock.Object, _timeProvider);
     }
 
     [Test]
@@ -138,22 +141,22 @@ public class InMemoryRefreshTokenServiceTests
     [Test]
     public async Task ValidateRefreshTokenAsync_ExpiredToken_ReturnsFalse()
     {
-        // Given JWT options with a very short refresh token lifespan
-        var shortLivedOptions = TestJwtOptions.CreateShortLivedRefreshToken();
+        // Given a fake time provider
+        var fakeTime = new FakeTimeProvider();
         var optionsMock = new Mock<IOptions<JwtOptions>>();
-        optionsMock.Setup(o => o.Value).Returns(shortLivedOptions);
-        var shortLivedService = new InMemoryRefreshTokenService(optionsMock.Object);
+        optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
+        var serviceWithFakeTime = new InMemoryRefreshTokenService(optionsMock.Object, fakeTime);
 
         // And a valid user ID
         var userId = "user123";
-        // And a generated refresh token
-        var token = await shortLivedService.GenerateRefreshTokenAsync(userId);
+        // And a generated refresh token at the current fake time
+        var token = await serviceWithFakeTime.GenerateRefreshTokenAsync(userId);
 
-        // When waiting for the token to expire
-        await Task.Delay(150); // Wait longer than the 100ms lifespan
+        // When advancing time beyond the token's expiration
+        fakeTime.Advance(_jwtOptions.RefreshTokenLifespan.Add(TimeSpan.FromMinutes(1)));
 
         // And validating the expired token
-        var isValid = await shortLivedService.ValidateRefreshTokenAsync(token, userId);
+        var isValid = await serviceWithFakeTime.ValidateRefreshTokenAsync(token, userId);
 
         // Then validation should fail
         isValid.Should().BeFalse();

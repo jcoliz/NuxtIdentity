@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using NUnit.Framework;
 using NuxtIdentity.Core.Abstractions;
@@ -17,6 +18,7 @@ namespace NuxtIdentity.Core.Tests.Services;
 public class JwtTokenServiceTests
 {
     private Mock<ILogger<JwtTokenService<TestUser>>> _loggerMock = null!;
+    private FakeTimeProvider _timeProvider = null!;
     private JwtOptions _jwtOptions = null!;
     private TestUserClaimsProvider _claimsProvider = null!;
     private JwtTokenService<TestUser> _service = null!;
@@ -25,6 +27,8 @@ public class JwtTokenServiceTests
     public void SetUp()
     {
         _loggerMock = new Mock<ILogger<JwtTokenService<TestUser>>>();
+        // Use current real time as baseline so JWT validation (which uses DateTime.UtcNow) sees tokens as valid
+        _timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
         _jwtOptions = TestJwtOptions.CreateDefault();
         _claimsProvider = new TestUserClaimsProvider();
 
@@ -34,7 +38,8 @@ public class JwtTokenServiceTests
         _service = new JwtTokenService<TestUser>(
             optionsMock.Object,
             new[] { _claimsProvider },
-            _loggerMock.Object
+            _loggerMock.Object,
+            _timeProvider
         );
     }
 
@@ -124,19 +129,21 @@ public class JwtTokenServiceTests
             Username = "testuser",
             Email = "test@example.com"
         };
-        // And the current time before generation
-        var beforeGeneration = DateTime.UtcNow;
+        // And the current fake time
+        var currentTime = _timeProvider.GetUtcNow().DateTime;
 
         // When generating an access token
         var token = await _service.GenerateAccessTokenAsync(user);
 
         // Then the token should expire at the configured lifespan
-        var afterGeneration = DateTime.UtcNow;
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
 
-        var expectedExpiration = beforeGeneration.Add(_jwtOptions.Lifespan);
-        jwtToken.ValidTo.Should().BeCloseTo(expectedExpiration, TimeSpan.FromSeconds(5));
+        // Compare as Unix timestamps to avoid timezone conversion issues
+        var expectedExpiration = currentTime.Add(_jwtOptions.Lifespan);
+        var actualExpiration = new DateTimeOffset(jwtToken.ValidTo).ToUnixTimeSeconds();
+        var expectedTimestamp = new DateTimeOffset(expectedExpiration).ToUnixTimeSeconds();
+        actualExpiration.Should().Be(expectedTimestamp);
     }
 
     [Test]
@@ -258,25 +265,26 @@ public class JwtTokenServiceTests
             Email = "test@example.com"
         };
 
-        // And JWT options with a very short lifespan
-        var shortLifespanOptions = TestJwtOptions.CreateShortLivedToken();
+        // And a fake time provider (set to recent date for JWT validation)
+        var fakeTime = new FakeTimeProvider(new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var optionsMock = new Mock<IOptions<JwtOptions>>();
-        optionsMock.Setup(o => o.Value).Returns(shortLifespanOptions);
+        optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
 
-        var shortLivedService = new JwtTokenService<TestUser>(
+        var serviceWithFakeTime = new JwtTokenService<TestUser>(
             optionsMock.Object,
             new[] { _claimsProvider },
-            _loggerMock.Object
+            _loggerMock.Object,
+            fakeTime
         );
 
-        // And a token generated with short lifespan
-        var token = await shortLivedService.GenerateAccessTokenAsync(user);
+        // And a token generated at the current fake time
+        var token = await serviceWithFakeTime.GenerateAccessTokenAsync(user);
 
-        // And we wait for the token to expire
-        await Task.Delay(150); // Wait longer than the 100ms lifespan
+        // When advancing time beyond the token's expiration
+        fakeTime.Advance(_jwtOptions.Lifespan.Add(TimeSpan.FromMinutes(1)));
 
-        // When validating the expired token with the same service
-        var principal = await shortLivedService.ValidateTokenAsync(token);
+        // And validating the expired token
+        var principal = await serviceWithFakeTime.ValidateTokenAsync(token);
 
         // Then validation should return null
         principal.Should().BeNull();
@@ -304,7 +312,8 @@ public class JwtTokenServiceTests
         var differentKeyService = new JwtTokenService<TestUser>(
             optionsMock.Object,
             new[] { _claimsProvider },
-            _loggerMock.Object
+            _loggerMock.Object,
+            _timeProvider
         );
 
         // When validating the token with the wrong key
@@ -332,7 +341,8 @@ public class JwtTokenServiceTests
         var serviceWithNoName = new JwtTokenService<TestUser>(
             optionsMock.Object,
             new[] { noNameProvider.Object },
-            _loggerMock.Object
+            _loggerMock.Object,
+            _timeProvider
         );
 
         // And a test user
@@ -377,7 +387,8 @@ public class JwtTokenServiceTests
         var serviceWithObsoleteOption = new JwtTokenService<TestUser>(
             optionsMock.Object,
             new[] { _claimsProvider },
-            _loggerMock.Object
+            _loggerMock.Object,
+            _timeProvider
         );
 
         // And a test user
@@ -388,8 +399,8 @@ public class JwtTokenServiceTests
             Email = "test@example.com"
         };
 
-        // And the current time before generation
-        var beforeGeneration = DateTime.UtcNow;
+        // And the current fake time
+        var currentTime = _timeProvider.GetUtcNow().DateTime;
 
         // When generating a token
         var token = await serviceWithObsoleteOption.GenerateAccessTokenAsync(user);
@@ -398,8 +409,11 @@ public class JwtTokenServiceTests
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
 
-        var expectedExpiration = beforeGeneration.AddHours(2);
-        jwtToken.ValidTo.Should().BeCloseTo(expectedExpiration, TimeSpan.FromSeconds(5));
+        // Compare as Unix timestamps to avoid timezone conversion issues
+        var expectedExpiration = currentTime.AddHours(2);
+        var actualExpiration = new DateTimeOffset(jwtToken.ValidTo).ToUnixTimeSeconds();
+        var expectedTimestamp = new DateTimeOffset(expectedExpiration).ToUnixTimeSeconds();
+        actualExpiration.Should().Be(expectedTimestamp);
     }
 
     [Test]
@@ -428,7 +442,8 @@ public class JwtTokenServiceTests
         var serviceWithMultipleProviders = new JwtTokenService<TestUser>(
             optionsMock.Object,
             new[] { provider1.Object, provider2.Object },
-            _loggerMock.Object
+            _loggerMock.Object,
+            _timeProvider
         );
 
         // And a test user

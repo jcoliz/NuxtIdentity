@@ -15,15 +15,18 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
     private readonly List<RefreshTokenEntity> _tokens = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly JwtOptions _jwtOptions;
+    private readonly TimeProvider _timeProvider;
     private int _nextId = 1;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InMemoryRefreshTokenService"/> class.
     /// </summary>
     /// <param name="jwtOptions">JWT configuration options.</param>
-    public InMemoryRefreshTokenService(IOptions<JwtOptions> jwtOptions)
+    /// <param name="timeProvider">Time provider for testable time operations. Defaults to system time if not provided.</param>
+    public InMemoryRefreshTokenService(IOptions<JwtOptions> jwtOptions, TimeProvider? timeProvider = null)
     {
         _jwtOptions = jwtOptions.Value;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <inheritdoc/>
@@ -35,13 +38,14 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
         await _lock.WaitAsync();
         try
         {
+            var now = _timeProvider.GetUtcNow().DateTime;
             var entity = new RefreshTokenEntity
             {
                 Id = _nextId++,
                 TokenHash = tokenHash,
                 UserId = userId,
-                ExpiresAt = DateTime.UtcNow.Add(_jwtOptions.RefreshTokenLifespan),
-                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = now.Add(_jwtOptions.RefreshTokenLifespan),
+                CreatedAt = now,
                 IsRevoked = false
             };
 
@@ -72,7 +76,7 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
             if (entity.IsRevoked)
                 return false;
 
-            if (entity.ExpiresAt < DateTime.UtcNow)
+            if (entity.ExpiresAt < _timeProvider.GetUtcNow().DateTime)
                 return false;
 
             return true;

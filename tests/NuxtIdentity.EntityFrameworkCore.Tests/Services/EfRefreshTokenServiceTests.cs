@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.EntityFrameworkCore.Services;
@@ -14,6 +15,7 @@ namespace NuxtIdentity.EntityFrameworkCore.Tests.Services;
 public class EfRefreshTokenServiceTests
 {
     private TestDbContext _context = null!;
+    private FakeTimeProvider _timeProvider = null!;
     private EfRefreshTokenService<TestDbContext> _service = null!;
     private JwtOptions _jwtOptions = null!;
 
@@ -27,6 +29,9 @@ public class EfRefreshTokenServiceTests
 
         _context = new TestDbContext(options);
 
+        // And a fake time provider initialized to current time for deterministic control
+        _timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+
         // And JWT options configured for testing
         _jwtOptions = TestJwtOptions.CreateDefault();
         var optionsMock = new Mock<IOptions<JwtOptions>>();
@@ -38,7 +43,8 @@ public class EfRefreshTokenServiceTests
         _service = new EfRefreshTokenService<TestDbContext>(
             _context,
             loggerMock.Object,
-            optionsMock.Object);
+            optionsMock.Object,
+            _timeProvider);
     }
 
     [TearDown]
@@ -84,19 +90,16 @@ public class EfRefreshTokenServiceTests
     {
         // Given a valid user ID
         var userId = "user123";
-        var beforeGeneration = DateTime.UtcNow;
+        var currentTime = _timeProvider.GetUtcNow().DateTime;
 
         // When generating a refresh token
         var token = await _service.GenerateRefreshTokenAsync(userId);
-        var afterGeneration = DateTime.UtcNow;
 
-        // Then the stored token should have expiration within expected range
+        // Then the stored token should have the correct expiration
         var storedToken = await _context.RefreshTokens.FirstAsync();
-        var expectedExpiration = beforeGeneration.Add(_jwtOptions.RefreshTokenLifespan);
-        var maxExpectedExpiration = afterGeneration.Add(_jwtOptions.RefreshTokenLifespan);
+        var expectedExpiration = currentTime.Add(_jwtOptions.RefreshTokenLifespan);
 
-        storedToken.ExpiresAt.Should().BeOnOrAfter(expectedExpiration);
-        storedToken.ExpiresAt.Should().BeOnOrBefore(maxExpectedExpiration);
+        storedToken.ExpiresAt.Should().Be(expectedExpiration);
     }
 
     [Test]
@@ -228,9 +231,6 @@ public class EfRefreshTokenServiceTests
         var user1Token = await _service.GenerateRefreshTokenAsync(user1Id);
         var user2Token = await _service.GenerateRefreshTokenAsync(user2Id);
 
-        // Wait briefly for any background cleanup tasks to complete
-        await Task.Delay(50);
-
         // When revoking all tokens for the first user
         await _service.RevokeAllUserTokensAsync(user1Id);
 
@@ -276,33 +276,14 @@ public class EfRefreshTokenServiceTests
         // Given a user ID
         var userId = "user123";
 
-        // And JWT options with a very short refresh token lifespan
-        var shortLifespanOptions = new JwtOptions
-        {
-            Key = _jwtOptions.Key,
-            Issuer = _jwtOptions.Issuer,
-            Audience = _jwtOptions.Audience,
-            Lifespan = _jwtOptions.Lifespan,
-            RefreshTokenLifespan = TimeSpan.FromMilliseconds(1) // 1ms - will expire immediately
-        };
+        // And a token generated at the current fake time
+        var token = await _service.GenerateRefreshTokenAsync(userId);
 
-        var optionsMock = new Mock<IOptions<JwtOptions>>();
-        optionsMock.Setup(o => o.Value).Returns(shortLifespanOptions);
-        var loggerMock = new Mock<ILogger<EfRefreshTokenService<TestDbContext>>>();
+        // When advancing time beyond the token's expiration
+        _timeProvider.Advance(_jwtOptions.RefreshTokenLifespan.Add(TimeSpan.FromMinutes(1)));
 
-        var serviceWithShortLifespan = new EfRefreshTokenService<TestDbContext>(
-            _context,
-            loggerMock.Object,
-            optionsMock.Object);
-
-        // And a token generated with the short lifespan
-        var token = await serviceWithShortLifespan.GenerateRefreshTokenAsync(userId);
-
-        // And we wait for the token to expire
-        await Task.Delay(10); // Wait 10ms to ensure expiration
-
-        // When validating the expired token
-        var isValid = await serviceWithShortLifespan.ValidateRefreshTokenAsync(token, userId);
+        // And validating the expired token
+        var isValid = await _service.ValidateRefreshTokenAsync(token, userId);
 
         // Then validation should fail
         isValid.Should().BeFalse();
@@ -331,37 +312,18 @@ public class EfRefreshTokenServiceTests
         // Given a user ID
         var userId = "user123";
 
-        // And JWT options with a very short refresh token lifespan for expired tokens
-        var shortLifespanOptions = new JwtOptions
-        {
-            Key = _jwtOptions.Key,
-            Issuer = _jwtOptions.Issuer,
-            Audience = _jwtOptions.Audience,
-            Lifespan = _jwtOptions.Lifespan,
-            RefreshTokenLifespan = TimeSpan.FromMilliseconds(1) // 1ms - will expire immediately
-        };
+        // And two tokens generated at the current fake time
+        var expiredToken1 = await _service.GenerateRefreshTokenAsync(userId);
+        var expiredToken2 = await _service.GenerateRefreshTokenAsync(userId);
 
-        var optionsMock = new Mock<IOptions<JwtOptions>>();
-        optionsMock.Setup(o => o.Value).Returns(shortLifespanOptions);
-        var loggerMock = new Mock<ILogger<EfRefreshTokenService<TestDbContext>>>();
-
-        var serviceWithShortLifespan = new EfRefreshTokenService<TestDbContext>(
-            _context,
-            loggerMock.Object,
-            optionsMock.Object);
-
-        // And expired tokens in the database
-        var expiredToken1 = await serviceWithShortLifespan.GenerateRefreshTokenAsync(userId);
-        var expiredToken2 = await serviceWithShortLifespan.GenerateRefreshTokenAsync(userId);
-
-        // Wait for tokens to expire
-        await Task.Delay(10);
-
-        // Verify tokens are expired (should be 2 in database)
+        // Verify tokens are in database (should be 2)
         var tokenCountBefore = await _context.RefreshTokens.CountAsync();
         tokenCountBefore.Should().Be(2);
 
-        // When generating a new token (which triggers cleanup)
+        // When advancing time beyond the tokens' expiration
+        _timeProvider.Advance(_jwtOptions.RefreshTokenLifespan.Add(TimeSpan.FromMinutes(1)));
+
+        // And generating a new token (which triggers cleanup)
         var newToken = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then expired tokens should be deleted
@@ -388,21 +350,18 @@ public class EfRefreshTokenServiceTests
         var tokenBefore = await _context.RefreshTokens.FirstAsync();
         var originalExpiration = tokenBefore.ExpiresAt;
 
-        var beforeRevocation = DateTime.UtcNow;
+        var currentTime = _timeProvider.GetUtcNow().DateTime;
 
         // When revoking the token
         await _service.RevokeRefreshTokenAsync(token);
 
-        var afterRevocation = DateTime.UtcNow;
-
-        // Then the expiration should be updated to 7 days from now
+        // Then the expiration should be updated to 7 days from current time
         var tokenAfter = await _context.RefreshTokens.FirstAsync();
-        var expectedExpiration = beforeRevocation.AddDays(7);
-        var maxExpectedExpiration = afterRevocation.AddDays(7);
+        var expectedExpiration = currentTime.AddDays(7);
 
-        tokenAfter.ExpiresAt.Should().BeOnOrAfter(expectedExpiration);
-        tokenAfter.ExpiresAt.Should().BeOnOrBefore(maxExpectedExpiration);
-        tokenAfter.ExpiresAt.Should().BeAfter(originalExpiration);
+        tokenAfter.ExpiresAt.Should().Be(expectedExpiration);
+        // Use BeOnOrAfter since revocation happens at the same fake time
+        tokenAfter.ExpiresAt.Should().BeOnOrAfter(originalExpiration);
     }
 
     [Test]

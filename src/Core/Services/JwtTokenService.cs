@@ -46,9 +46,11 @@ namespace NuxtIdentity.Core.Services;
 public partial class JwtTokenService<TUser>(
     IOptions<JwtOptions> jwtOptions,
     IEnumerable<IUserClaimsProvider<TUser>> claimsProviders,
-    ILogger<JwtTokenService<TUser>> logger) : IJwtTokenService<TUser> where TUser : class
+    ILogger<JwtTokenService<TUser>> logger,
+    TimeProvider? timeProvider = null) : IJwtTokenService<TUser> where TUser : class
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     /// <inheritdoc/>
     public async Task<string> GenerateAccessTokenAsync(TUser user)
@@ -64,19 +66,21 @@ public partial class JwtTokenService<TUser>(
         // Add standard security claims
         var allClaims = claims.ToList();
 
+        var now = _timeProvider.GetUtcNow();
+
         // Add issued-at claim for replay attack prevention
-        allClaims.Add(new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+        allClaims.Add(new Claim("iat", now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
 
         // Optional: Add not-before claim
-        allClaims.Add(new Claim("nbf", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+        allClaims.Add(new Claim("nbf", now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
 
         var securityKey = new SymmetricSecurityKey(_jwtOptions.Key);
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var expires = _jwtOptions.Lifespan != TimeSpan.Zero
-            ? DateTime.UtcNow.Add(_jwtOptions.Lifespan)
+            ? _timeProvider.GetUtcNow().Add(_jwtOptions.Lifespan).DateTime
 #pragma warning disable CS0618 // Intentional use of obsolete property for backward compatibility
-            : DateTime.UtcNow.AddHours(_jwtOptions.ExpirationHours);
+            : _timeProvider.GetUtcNow().AddHours(_jwtOptions.ExpirationHours).DateTime;
 #pragma warning restore CS0618
 
         var token = new JwtSecurityToken(
