@@ -35,6 +35,10 @@ builder.Services.AddNuxtIdentity<IdentityUser>();
 builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
 builder.Services.AddNuxtIdentityAuthentication();
 
+// Register ApplicationDbContext as IDbContextCleaner
+builder.Services.AddScoped<NuxtIdentity.Core.Abstractions.IDbContextCleaner>(sp =>
+    sp.GetRequiredService<ApplicationDbContext>());
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
@@ -52,7 +56,7 @@ builder.Services.AddOpenApiDocument(config =>
 {
     config.Title = "NuxtIdentity Playground API";
     config.Version = "v1";
-    
+
     config.AddSecurity("Bearer", new NSwag.OpenApiSecurityScheme
     {
         Type = NSwag.OpenApiSecuritySchemeType.Http,
@@ -60,7 +64,7 @@ builder.Services.AddOpenApiDocument(config =>
         BearerFormat = "JWT",
         Description = "Enter your JWT token (without 'Bearer' prefix)"
     });
-    
+
     config.OperationProcessors.Add(new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("Bearer"));
 });
 

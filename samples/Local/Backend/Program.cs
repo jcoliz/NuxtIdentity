@@ -46,6 +46,10 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
 builder.Services.AddNuxtIdentityWithEntityFramework<IdentityUser, ApplicationDbContext>(
     builder.Configuration);
 
+// Register ApplicationDbContext as IDbContextCleaner
+builder.Services.AddScoped<NuxtIdentity.Core.Abstractions.IDbContextCleaner>(sp =>
+    sp.GetRequiredService<ApplicationDbContext>());
+
 // Add NSwag services
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -61,7 +65,7 @@ builder.Services.AddOpenApiDocument(config =>
         BearerFormat = "JWT",
         Description = "Enter your JWT token (without 'Bearer' prefix)"
     });
-    
+
     config.OperationProcessors.Add(new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("Bearer"));
 
 });

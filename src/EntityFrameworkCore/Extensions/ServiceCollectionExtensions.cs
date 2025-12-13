@@ -26,21 +26,21 @@ public static class NuxtIdentityServiceCollectionExtensions
     /// - NuxtIdentity core services (AddNuxtIdentity)
     /// - Entity Framework Core integration (AddNuxtIdentityEntityFramework)
     /// - JWT Bearer authentication with configuration (AddNuxtIdentityAuthentication)
-    /// 
+    ///
     /// Prerequisites:
     /// - ASP.NET Core Identity must be configured with AddIdentity&lt;TUser, TRole&gt;()
     /// - DbContext must have RefreshTokens DbSet and call modelBuilder.ConfigureNuxtIdentityRefreshTokens()
     /// - JWT options must be present in appsettings.json under "Jwt" section
-    /// 
+    ///
     /// Example usage:
     /// <code>
     /// builder.Services.AddIdentity&lt;IdentityUser, IdentityRole&gt;()
     ///     .AddEntityFrameworkStores&lt;ApplicationDbContext&gt;();
-    /// 
+    ///
     /// builder.Services.AddNuxtIdentityWithEntityFramework&lt;IdentityUser, ApplicationDbContext&gt;(
     ///     builder.Configuration);
     /// </code>
-    /// 
+    ///
     /// This replaces the following separate calls:
     /// <code>
     /// builder.Services.Configure&lt;JwtOptions&gt;(
@@ -77,10 +77,10 @@ public static class NuxtIdentityServiceCollectionExtensions
     /// <remarks>
     /// This registers:
     /// - <see cref="EfRefreshTokenService{TContext}"/> as <see cref="IRefreshTokenService"/>
-    /// 
+    ///
     /// Your DbContext must have a DbSet&lt;RefreshTokenEntity&gt; configured and should call
     /// modelBuilder.ConfigureNuxtIdentityRefreshTokens() in OnModelCreating.
-    /// 
+    ///
     /// Example usage:
     /// <code>
     /// services.AddDbContext&lt;ApplicationDbContext&gt;(options => ...);
@@ -92,7 +92,8 @@ public static class NuxtIdentityServiceCollectionExtensions
         where TContext : DbContext
     {
         services.AddScoped<IRefreshTokenService, EfRefreshTokenService<TContext>>();
-        
+        services.AddScoped<IDbContextCleaner, EfDbContextCleaner<TContext>>();
+
         return services;
     }
 }
