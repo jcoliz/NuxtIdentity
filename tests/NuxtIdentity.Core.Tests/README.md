@@ -29,6 +29,8 @@ Core Services:
 ### Breakdown by Class
 
 #### JwtTokenServiceTests (8 tests)
+Tests use **Gherkin-style comments** (Given/When/Then/And) for improved readability:
+
 - ✅ Token generation returns valid JWT
 - ✅ Token contains user claims (NameIdentifier, Name, Email)
 - ✅ Token contains standard claims (iat, nbf, issuer, audience)
@@ -39,6 +41,8 @@ Core Services:
 - ✅ Multiple users generate unique tokens
 
 #### InMemoryRefreshTokenServiceTests (13 tests)
+Tests use **Gherkin-style comments** (Given/When/Then/And) for improved readability:
+
 - ✅ Token generation returns non-empty token
 - ✅ Token generation returns valid Base64 string
 - ✅ Multiple calls return unique tokens
@@ -52,6 +56,33 @@ Core Services:
 - ✅ Revocation only affects specific user
 - ✅ Revoking for non-existent user doesn't throw
 - ✅ Different users' tokens are isolated
+
+### Test Structure Example
+
+All tests follow Gherkin-style comments for clarity:
+
+```csharp
+[Test]
+public async Task ValidateRefreshTokenAsync_ValidToken_ReturnsTrue()
+{
+    // Given a valid user ID
+    var userId = "user123";
+    // And a generated refresh token for that user
+    var token = await _service.GenerateRefreshTokenAsync(userId);
+
+    // When validating the token with the correct user ID
+    var isValid = await _service.ValidateRefreshTokenAsync(token, userId);
+
+    // Then validation should succeed
+    isValid.Should().BeTrue();
+}
+```
+
+This makes tests more readable and helps understand:
+- **Given**: The preconditions and setup
+- **When**: The action being tested
+- **Then**: The expected outcome
+- **And**: Additional context or assertions
 
 ## Running Tests
 

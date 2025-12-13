@@ -40,7 +40,7 @@ public class JwtTokenServiceTests
     [Test]
     public async Task GenerateAccessTokenAsync_ValidUser_ReturnsValidJwtToken()
     {
-        // Arrange
+        // Given a valid test user
         var user = new TestUser
         {
             Id = "user123",
@@ -48,12 +48,13 @@ public class JwtTokenServiceTests
             Email = "test@example.com"
         };
 
-        // Act
+        // When generating an access token
         var token = await _service.GenerateAccessTokenAsync(user);
 
-        // Assert
+        // Then the token should not be empty
         token.Should().NotBeNullOrEmpty();
 
+        // And it should be a valid JWT token
         var handler = new JwtSecurityTokenHandler();
         handler.CanReadToken(token).Should().BeTrue();
     }
@@ -61,7 +62,7 @@ public class JwtTokenServiceTests
     [Test]
     public async Task GenerateAccessTokenAsync_ValidUser_TokenContainsUserClaims()
     {
-        // Arrange
+        // Given a valid test user
         var user = new TestUser
         {
             Id = "user123",
@@ -69,22 +70,25 @@ public class JwtTokenServiceTests
             Email = "test@example.com"
         };
 
-        // Act
+        // When generating an access token
         var token = await _service.GenerateAccessTokenAsync(user);
 
-        // Assert
+        // Then the token should contain user claims
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
 
+        // And it should have the user ID claim
         jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
+        // And the username claim
         jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == user.Username);
+        // And the email claim
         jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == user.Email);
     }
 
     [Test]
     public async Task GenerateAccessTokenAsync_ValidUser_TokenContainsStandardClaims()
     {
-        // Arrange
+        // Given a valid test user
         var user = new TestUser
         {
             Id = "user123",
@@ -92,35 +96,40 @@ public class JwtTokenServiceTests
             Email = "test@example.com"
         };
 
-        // Act
+        // When generating an access token
         var token = await _service.GenerateAccessTokenAsync(user);
 
-        // Assert
+        // Then the token should contain standard JWT claims
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
 
-        jwtToken.Claims.Should().Contain(c => c.Type == "iat"); // Issued at
-        jwtToken.Claims.Should().Contain(c => c.Type == "nbf"); // Not before
+        // And it should have the issued-at claim
+        jwtToken.Claims.Should().Contain(c => c.Type == "iat");
+        // And the not-before claim
+        jwtToken.Claims.Should().Contain(c => c.Type == "nbf");
+        // And the correct issuer
         jwtToken.Issuer.Should().Be(_jwtOptions.Issuer);
+        // And the correct audience
         jwtToken.Audiences.Should().Contain(_jwtOptions.Audience);
     }
 
     [Test]
     public async Task GenerateAccessTokenAsync_ValidUser_TokenExpiresAtCorrectTime()
     {
-        // Arrange
+        // Given a valid test user
         var user = new TestUser
         {
             Id = "user123",
             Username = "testuser",
             Email = "test@example.com"
         };
+        // And the current time before generation
         var beforeGeneration = DateTime.UtcNow;
 
-        // Act
+        // When generating an access token
         var token = await _service.GenerateAccessTokenAsync(user);
 
-        // Assert
+        // Then the token should expire at the configured lifespan
         var afterGeneration = DateTime.UtcNow;
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
@@ -132,43 +141,48 @@ public class JwtTokenServiceTests
     [Test]
     public async Task ValidateTokenAsync_ValidToken_ReturnsClaimsPrincipal()
     {
-        // Arrange
+        // Given a valid test user
         var user = new TestUser
         {
             Id = "user123",
             Username = "testuser",
             Email = "test@example.com"
         };
+        // And a generated access token for that user
         var token = await _service.GenerateAccessTokenAsync(user);
 
-        // Act
+        // When validating the token
         var principal = await _service.ValidateTokenAsync(token);
 
-        // Assert
+        // Then the principal should not be null
         principal.Should().NotBeNull();
+        // And it should contain the user ID claim
         principal!.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
+        // And the username claim
         principal.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == user.Username);
     }
 
     [Test]
     public async Task ValidateTokenAsync_ValidToken_PrincipalContainsAllClaims()
     {
-        // Arrange
+        // Given a valid test user
         var user = new TestUser
         {
             Id = "user123",
             Username = "testuser",
             Email = "test@example.com"
         };
+        // And a generated access token for that user
         var token = await _service.GenerateAccessTokenAsync(user);
 
-        // Act
+        // When validating the token
         var principal = await _service.ValidateTokenAsync(token);
 
-        // Assert
+        // Then the principal should not be null
         principal.Should().NotBeNull();
         var claims = principal!.Claims.ToList();
 
+        // And it should contain all the user claims
         claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
         claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == "testuser");
         claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
@@ -177,34 +191,40 @@ public class JwtTokenServiceTests
     [Test]
     public void GetTokenValidationParameters_ReturnsCorrectConfiguration()
     {
-        // Act
+        // When getting token validation parameters
         var parameters = _service.GetTokenValidationParameters();
 
-        // Assert
+        // Then the parameters should not be null
         parameters.Should().NotBeNull();
+        // And issuer signing key validation should be enabled
         parameters.ValidateIssuerSigningKey.Should().BeTrue();
+        // And issuer validation should be enabled
         parameters.ValidateIssuer.Should().BeTrue();
         parameters.ValidIssuer.Should().Be(_jwtOptions.Issuer);
+        // And audience validation should be enabled
         parameters.ValidateAudience.Should().BeTrue();
         parameters.ValidAudience.Should().Be(_jwtOptions.Audience);
+        // And lifetime validation should be enabled
         parameters.ValidateLifetime.Should().BeTrue();
+        // And clock skew should be zero
         parameters.ClockSkew.Should().Be(TimeSpan.Zero);
     }
 
     [Test]
     public async Task GenerateAccessTokenAsync_MultipleUsers_GeneratesUniqueTokens()
     {
-        // Arrange
+        // Given two different users
         var user1 = new TestUser { Id = "user1", Username = "user1", Email = "user1@example.com" };
         var user2 = new TestUser { Id = "user2", Username = "user2", Email = "user2@example.com" };
 
-        // Act
+        // When generating tokens for both users
         var token1 = await _service.GenerateAccessTokenAsync(user1);
         var token2 = await _service.GenerateAccessTokenAsync(user2);
 
-        // Assert
+        // Then the tokens should be different
         token1.Should().NotBe(token2);
 
+        // And each token should contain the correct user ID
         var handler = new JwtSecurityTokenHandler();
         var jwt1 = handler.ReadJwtToken(token1);
         var jwt2 = handler.ReadJwtToken(token2);
