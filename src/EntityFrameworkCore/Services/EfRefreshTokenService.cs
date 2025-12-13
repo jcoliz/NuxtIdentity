@@ -29,6 +29,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     private readonly TContext _context;
     private readonly ILogger<EfRefreshTokenService<TContext>> _logger;
     private readonly JwtOptions _jwtOptions;
+    private readonly TimeSpan _revokedTokenLifespan = TimeSpan.FromDays(7);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EfRefreshTokenService{TContext}"/> class.
@@ -65,6 +66,19 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         await _context.SaveChangesAsync();
 
         LogTokenGenerated(userId, entity.ExpiresAt, token);
+
+        // Fire-and-forget cleanup of expired tokens
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await DeleteExpiredTokensAsync();
+            }
+            catch (Exception ex)
+            {
+                LogCleanupFailed(ex);
+            }
+        });
 
         return token;
     }
@@ -112,6 +126,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         if (entity != null)
         {
             entity.IsRevoked = true;
+            entity.ExpiresAt = DateTime.UtcNow.Add(_revokedTokenLifespan);
             await _context.SaveChangesAsync();
         }
         else
@@ -129,14 +144,43 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
+        var expirationDate = DateTime.UtcNow.Add(_revokedTokenLifespan);
         foreach (var token in userTokens)
         {
             token.IsRevoked = true;
+            token.ExpiresAt = expirationDate;
         }
 
         await _context.SaveChangesAsync();
 
         LogAllUserTokensRevoked(userId, userTokens.Count);
+    }
+
+    /// <summary>
+    /// Deletes all expired refresh tokens from the database.
+    /// </summary>
+    /// <remarks>
+    /// This method should be called periodically (e.g., via a background job) to clean up
+    /// expired tokens and maintain database hygiene. It removes tokens that are past their expiration date.
+    /// </remarks>
+    /// <returns>The number of tokens deleted.</returns>
+    private async Task<int> DeleteExpiredTokensAsync()
+    {
+        var now = DateTime.UtcNow;
+
+        var tokensToDelete = await _context.Set<RefreshTokenEntity>()
+            .Where(t => t.ExpiresAt < now)
+            .ToListAsync();
+
+        if (tokensToDelete.Count > 0)
+        {
+            _context.Set<RefreshTokenEntity>().RemoveRange(tokensToDelete);
+            await _context.SaveChangesAsync();
+
+            LogTokensDeleted(tokensToDelete.Count);
+        }
+
+        return tokensToDelete.Count;
     }
 
     /// <summary>
@@ -199,6 +243,12 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Revoked {count} tokens for user: {userId}")]
     private partial void LogAllUserTokensRevoked(string userId, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Deleted {count} expired and revoked tokens")]
+    private partial void LogTokensDeleted(int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to cleanup expired tokens")]
+    private partial void LogCleanupFailed(Exception ex);
 
     #endregion
 }
