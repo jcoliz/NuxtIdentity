@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
 using NuxtIdentity.Core.Configuration;
+using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.EntityFrameworkCore.Services;
 using NuxtIdentity.EntityFrameworkCore.Tests.Helpers;
 
@@ -431,6 +432,107 @@ public class EfRefreshTokenServiceTests
 
         // Then no exception should be thrown
         await act.Should().NotThrowAsync();
+    }
+
+    /// <summary>
+    /// Tests that token generation succeeds even when cleanup of expired tokens fails.
+    /// This test covers line 83 where cleanup failures are caught and logged.
+    ///
+    /// NOTE: This is a convoluted test that uses a custom FaultyDbContext to simulate
+    /// database failures during cleanup. If this test starts failing or becomes problematic,
+    /// feel free to disable it rather than spending significant time debugging.
+    /// </summary>
+    [Test]
+    public async Task GenerateRefreshTokenAsync_CleanupFails_StillReturnsToken()
+    {
+        // Given a userId
+        var userId = "user123";
+
+        // And a faulty DbContext that throws during the cleanup SaveChangesAsync
+        var faultyContext = new FaultyDbContext(new DbContextOptionsBuilder<FaultyDbContext>()
+            .UseInMemoryDatabase(databaseName: $"FaultyDb_{Guid.NewGuid()}")
+            .Options);
+
+        // And an expired token exists in the faulty context
+        var expiredToken = "old-token";
+        var pastTime = _timeProvider.GetUtcNow().AddDays(-_jwtOptions.RefreshTokenLifespan.TotalDays - 1);
+        faultyContext.RefreshTokens.Add(new Core.Models.RefreshTokenEntity
+        {
+            TokenHash = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(expiredToken))),
+            UserId = userId,
+            ExpiresAt = pastTime.DateTime,
+            CreatedAt = pastTime.DateTime,
+            IsRevoked = false
+        });
+        await faultyContext.SaveChangesAsync();
+
+        // Verify the expired token is in the database
+        var expiredCount = await faultyContext.RefreshTokens.CountAsync();
+        expiredCount.Should().Be(1, "we should have 1 expired token before generating a new one");
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
+
+        var loggerMock = new Mock<ILogger<EfRefreshTokenService<FaultyDbContext>>>();
+
+        var serviceWithFaultyContext = new EfRefreshTokenService<FaultyDbContext>(
+            faultyContext,
+            loggerMock.Object,
+            optionsMock.Object,
+            _timeProvider);
+
+        // When generating a refresh token (which triggers cleanup that will fail)
+        var token = await serviceWithFaultyContext.GenerateRefreshTokenAsync(userId);
+
+        // Then the token should still be generated successfully despite cleanup failure
+        token.Should().NotBeNullOrEmpty();
+
+        // And the new token should be stored in the database
+        var newTokenCount = await faultyContext.RefreshTokens.CountAsync();
+        newTokenCount.Should().Be(2, "new token should be saved even though cleanup failed");
+
+        // And the expired token should still exist (cleanup failed)
+        var expiredTokenEntity = await faultyContext.RefreshTokens
+            .FirstOrDefaultAsync(t => t.ExpiresAt < _timeProvider.GetUtcNow().DateTime);
+        expiredTokenEntity.Should().NotBeNull("expired token should still exist because cleanup failed");
+    }
+
+    #endregion
+
+    #region Helper Classes
+
+    /// <summary>
+    /// Faulty DbContext that throws during SaveChangesAsync in cleanup scenarios.
+    /// </summary>
+    public class FaultyDbContext : DbContext
+    {
+        public FaultyDbContext(DbContextOptions<FaultyDbContext> options) : base(options)
+        {
+        }
+
+        public DbSet<Core.Models.RefreshTokenEntity> RefreshTokens => Set<Core.Models.RefreshTokenEntity>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            // Apply the same configuration as TestDbContext
+            modelBuilder.ConfigureNuxtIdentityRefreshTokens();
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Check if we're removing entities (cleanup phase)
+            var entriesToRemove = ChangeTracker.Entries<Core.Models.RefreshTokenEntity>()
+                .Where(e => e.State == EntityState.Deleted)
+                .ToList();
+
+            // If we're deleting tokens, this is the cleanup phase - throw exception
+            if (entriesToRemove.Any())
+            {
+                throw new InvalidOperationException("Simulated database failure during cleanup");
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
     }
 
     #endregion
