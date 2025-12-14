@@ -403,5 +403,35 @@ public class EfRefreshTokenServiceTests
         storedToken.TokenHash.Should().MatchRegex("^[A-Za-z0-9+/=]+$");
     }
 
+    [Test]
+    public async Task GenerateRefreshTokenAsync_ValidUserId_ReturnsBase64String()
+    {
+        // Given a valid user ID
+        var userId = "user123";
+
+        // When generating a refresh token
+        var token = await _service.GenerateRefreshTokenAsync(userId);
+
+        // Then the token should not be empty
+        token.Should().NotBeNullOrEmpty();
+
+        // And it should be a valid base64 string
+        Action act = () => Convert.FromBase64String(token);
+        act.Should().NotThrow();
+    }
+
+    [Test]
+    public async Task RevokeAllUserTokensAsync_NonExistentUser_DoesNotThrow()
+    {
+        // Given a user ID that has no tokens
+        var nonExistentUserId = "nonexistent";
+
+        // When attempting to revoke all tokens for that user
+        Func<Task> act = async () => await _service.RevokeAllUserTokensAsync(nonExistentUserId);
+
+        // Then no exception should be thrown
+        await act.Should().NotThrowAsync();
+    }
+
     #endregion
 }

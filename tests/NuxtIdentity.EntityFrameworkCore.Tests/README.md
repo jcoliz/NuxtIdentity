@@ -4,16 +4,18 @@ Integration tests for the NuxtIdentity.EntityFrameworkCore library.
 
 ## Overview
 
-This test project contains Phase 2 happy path integration tests for the EF Core implementation:
+This test project contains comprehensive integration tests for the EF Core implementation:
 - [`EfRefreshTokenService<TContext>`](../../src/EntityFrameworkCore/Services/EfRefreshTokenService.cs) - Database-backed refresh token management
+- [`ModelBuilderExtensions`](../../src/EntityFrameworkCore/Extensions/ModelBuilderExtensions.cs) - Entity configuration
+- [`ServiceCollectionExtensions`](../../src/EntityFrameworkCore/Extensions/ServiceCollectionExtensions.cs) - Dependency injection setup
 
 ## Test Coverage
 
-### Current Coverage (Phase 2 - Happy Paths)
+### Current Coverage
 
-**11 integration tests** covering database persistence scenarios:
+**40 integration tests** covering database persistence, configuration, and service registration:
 
-#### EfRefreshTokenServiceTests (11 tests)
+#### EfRefreshTokenServiceTests (15 tests)
 Tests use **Gherkin-style comments** (Given/When/Then/And) for improved readability and an **in-memory database** for isolation:
 
 **Token Generation:**
@@ -32,6 +34,46 @@ Tests use **Gherkin-style comments** (Given/When/Then/And) for improved readabil
 - ✅ Revoked token becomes invalid
 - ✅ Revoking all user tokens invalidates all tokens for that user
 - ✅ Revocation only affects specific user's tokens
+
+**Error Cases:**
+- ✅ Expired tokens are rejected
+- ✅ Non-existent token revocation doesn't throw
+- ✅ Expired tokens are automatically cleaned up
+- ✅ Revoked tokens update expiration date
+- ✅ Token hash is stored (not plaintext)
+- ✅ Base64 token format validation
+
+#### ModelBuilderExtensionsTests (12 tests)
+Tests verify Entity Framework configuration:
+
+**Entity Configuration:**
+- ✅ Entity can be queried
+- ✅ Supports basic CRUD operations
+- ✅ TokenHash index allows fast lookup
+- ✅ UserId index allows fast user lookup
+- ✅ Required properties are enforced (TokenHash, UserId)
+- ✅ Primary key auto-generation works
+- ✅ Multiple entities get unique IDs
+- ✅ Update operations work correctly
+- ✅ Delete operations work correctly
+
+#### ServiceCollectionExtensionsTests (13 tests)
+Tests verify dependency injection registration:
+
+**Service Registration:**
+- ✅ Registers IRefreshTokenService
+- ✅ Service is scoped
+- ✅ Returns same service collection for chaining
+- ✅ Can be called multiple times
+- ✅ Can resolve service in scope
+- ✅ Service can perform operations
+- ✅ Registers correct implementation for specific context
+
+**Full Stack Registration:**
+- ✅ AddNuxtIdentityWithEntityFramework registers all required services
+- ✅ Configures JWT options from configuration
+- ✅ Configures authentication services
+- ✅ Returns same service collection for chaining
 
 ## Test Infrastructure
 
@@ -100,18 +142,12 @@ public async Task ValidateRefreshTokenAsync_ValidToken_ReturnsTrue()
 |--------|-----------|---------------|
 | **Scope** | Unit tests | Integration tests |
 | **Storage** | In-memory collection | In-memory EF Core database |
-| **Focus** | Business logic | Database persistence |
+| **Focus** | Business logic | Database persistence & configuration |
 | **Dependencies** | Mocked | Real DbContext |
-| **Test Count** | 28 tests | 11 tests |
-| **Coverage Target** | 100% code coverage | Happy path scenarios |
+| **Test Count** | 14 tests | 40 tests |
+| **Coverage Target** | 100% code coverage | Database operations & DI setup |
 
 ## Next Steps (Future Phases)
-
-### Phase 2 Remaining (Error Cases)
-- Database constraint violations
-- Concurrent access scenarios
-- Transaction rollback handling
-- Connection failure scenarios
 
 ### Phase 3 (API Controllers)
 - Endpoint integration tests
