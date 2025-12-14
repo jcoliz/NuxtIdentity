@@ -146,21 +146,9 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var roles = await UserManager.GetRolesAsync(user);
         var userClaims = await UserManager.GetClaimsAsync(user);
 
-        // Get role claims
-        var roleClaims = new List<Claim>();
-        foreach (var roleName in roles)
-        {
-            var role = await UserManager.FindByNameAsync(roleName);
-            if (role != null)
-            {
-                var claims = await UserManager.GetClaimsAsync(user);
-                roleClaims.AddRange(claims);
-            }
-        }
-
-        // Combine user claims and role claims, removing duplicates
+        // Note: Role claims are not included here as they are already included in JWT tokens
+        // via the IdentityUserClaimsProvider. This method focuses on user-specific data.
         var allClaims = userClaims
-            .Concat(roleClaims)
             .GroupBy(c => new { c.Type, c.Value })
             .Select(g => g.First())
             .Select(c => new ClaimInfo { Type = c.Type, Value = c.Value })
