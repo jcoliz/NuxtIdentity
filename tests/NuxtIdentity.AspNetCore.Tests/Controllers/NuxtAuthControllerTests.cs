@@ -298,19 +298,57 @@ public class NuxtAuthControllerTests
     [Test]
     public async Task GetSession_WithTokenMissingUsername_ReturnsUnauthorized()
     {
-        // This test simulates a malformed token that doesn't contain a username claim
-        // In practice, this would require a custom token, but we can use an invalid token
-        // to trigger the null username path
+        // This test covers the edge case where a token passes authentication
+        // but is missing the username claim (lines 289-296 in controller)
+        // We need to test this at the unit level by directly calling the controller
+        // with a mock user that has no Name in the Identity
 
-        // Arrange - Use a minimal/malformed JWT token that might not have username
-        _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", "malformed.token.value");
+        // Arrange - Get services to create a controller instance
+        var scope = _factory.Services.CreateScope();
+        var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
+        var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
+
+        var controller = new TestAuthController(
+            jwtTokenService,
+            refreshTokenService,
+            _userManager,
+            scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
+            logger
+        );
+
+        // Create a ClaimsPrincipal with an authenticated identity but no Name
+        var emptyIdentity = new System.Security.Claims.ClaimsIdentity(
+            authenticationType: "TestAuth" // Must be authenticated
+        );
+        // Add a NameIdentifier claim but no Name claim to simulate the edge case
+        emptyIdentity.AddClaim(new System.Security.Claims.Claim(
+            System.Security.Claims.ClaimTypes.NameIdentifier,
+            "test-user-id"
+        ));
+        var principal = new System.Security.Claims.ClaimsPrincipal(emptyIdentity);
+
+        // Set the controller's User to this principal
+        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = principal
+            }
+        };
 
         // Act
-        var response = await _client.GetAsync("/api/auth/user");
+        var result = await controller.GetSession();
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        result.Should().BeOfType<Microsoft.AspNetCore.Mvc.ObjectResult>();
+        var objectResult = result as Microsoft.AspNetCore.Mvc.ObjectResult;
+        objectResult!.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+
+        var problemDetails = objectResult.Value as Microsoft.AspNetCore.Mvc.ProblemDetails;
+        problemDetails.Should().NotBeNull();
+        problemDetails!.Title.Should().Be("Authentication Required");
+        problemDetails.Detail.Should().Be("No valid authentication token provided");
     }
 
     [Test]
