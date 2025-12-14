@@ -30,7 +30,8 @@ try {
     $RootPath = "$PSScriptRoot/.."
     $TestProjects = @(
         "tests/NuxtIdentity.Core.Tests/NuxtIdentity.Core.Tests.csproj",
-        "tests/NuxtIdentity.EntityFrameworkCore.Tests/NuxtIdentity.EntityFrameworkCore.Tests.csproj"
+        "tests/NuxtIdentity.EntityFrameworkCore.Tests/NuxtIdentity.EntityFrameworkCore.Tests.csproj",
+        "tests/NuxtIdentity.AspNetCore.Tests/NuxtIdentity.AspNetCore.Tests.csproj"
     )
 
     Push-Location $RootPath
