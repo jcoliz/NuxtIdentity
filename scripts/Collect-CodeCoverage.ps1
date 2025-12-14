@@ -46,8 +46,16 @@ try {
         $projectName = [System.IO.Path]::GetFileNameWithoutExtension($project)
         Write-Host "Testing: $projectName" -ForegroundColor Yellow
 
+        $projectDir = [System.IO.Path]::GetDirectoryName($project)
+        $runSettings = Join-Path $projectDir "coverlet.runsettings"
+
+        if (-not (Test-Path $runSettings)) {
+            throw "Missing coverlet.runsettings for $projectName at $runSettings"
+        }
+
         dotnet test $project `
             --collect:"XPlat Code Coverage" `
+            --settings $runSettings `
             --results-directory ./TestResults `
             --verbosity normal
 
