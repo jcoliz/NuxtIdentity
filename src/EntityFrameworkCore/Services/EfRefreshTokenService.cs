@@ -72,7 +72,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         LogTokenGenerated(userId, entity.ExpiresAt, token);
 
-        // Synchronous cleanup of expired tokens (for testing reliability)
+        // Await cleanup of expired tokens to ensure completion before returning
+        // We must await to avoid concurrency problems
         try
         {
             await DeleteExpiredTokensAsync();
