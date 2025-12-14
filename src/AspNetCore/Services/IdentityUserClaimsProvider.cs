@@ -14,9 +14,9 @@ namespace NuxtIdentity.AspNetCore.Services;
 /// This is an ASP.NET Core Identity-specific implementation of IUserClaimsProvider.
 /// It integrates the generic JWT token service with ASP.NET Core Identity by extracting
 /// user information, roles, and claims from the Identity system.
-/// 
+///
 /// <para><strong>Design Rationale:</strong></para>
-/// 
+///
 /// <list type="number">
 ///   <item>
 ///     <term>Standard Claims</term>
@@ -87,62 +87,83 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
         var roles = await _userManager.GetRolesAsync(user);
         var userClaims = await _userManager.GetClaimsAsync(user);
 
-        // Use a HashSet to track unique claim type/value pairs
-        var claimSet = new HashSet<(string Type, string Value)>();
-        var claims = new List<Claim>();
+        var claimBuilder = new ClaimBuilder();
 
-        // Helper to add claim if not duplicate
-        void AddClaim(Claim claim)
-        {
-            if (claimSet.Add((claim.Type, claim.Value)))
-            {
-                claims.Add(claim);
-            }
-        }
+        AddStandardClaims(claimBuilder, user);
+        AddRoleClaims(claimBuilder, roles);
+        AddUserClaims(claimBuilder, userClaims);
+        var roleClaimCount = await AddRoleClaimsAsync(claimBuilder, roles);
 
-        // Add standard claims
-        AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id));
-        AddClaim(new Claim(ClaimTypes.Name, user.UserName ?? ""));
-        AddClaim(new Claim(ClaimTypes.Email, user.Email ?? ""));
-        AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.UserName ?? ""));
-        AddClaim(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
-
-        // Add all roles as claims
-        foreach (var role in roles)
-        {
-            AddClaim(new Claim(ClaimTypes.Role, role));
-        }
-        
-        // Add ALL user claims from Identity (these take precedence)
-        foreach (var claim in userClaims)
-        {
-            AddClaim(claim);
-        }
-
-        // Add role claims
-        var roleClaimCount = 0;
-        foreach (var roleName in roles)
-        {
-            var role = await _roleManager.FindByNameAsync(roleName);
-            if (role != null)
-            {
-                var roleClaims = await _roleManager.GetClaimsAsync(role);
-                foreach (var claim in roleClaims)
-                {
-                    // HashSet ensures no duplicates; user claims added first take precedence
-                    var initialCount = claims.Count;
-                    AddClaim(claim);
-                    if (claims.Count > initialCount)
-                    {
-                        roleClaimCount++;
-                    }
-                }
-            }
-        }
-
+        var claims = claimBuilder.GetClaims();
         LogClaimsGenerated(user.Id, claims.Count, roles.Count, userClaims.Count, roleClaimCount);
 
         return claims;
+    }
+
+    /// <summary>
+    /// Adds standard JWT claims for the user.
+    /// </summary>
+    private static void AddStandardClaims(ClaimBuilder builder, TUser user)
+    {
+        builder.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id));
+        builder.AddClaim(new Claim(ClaimTypes.Name, user.UserName ?? ""));
+        builder.AddClaim(new Claim(ClaimTypes.Email, user.Email ?? ""));
+        builder.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.UserName ?? ""));
+        builder.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+    }
+
+    /// <summary>
+    /// Adds role claims for each role the user belongs to.
+    /// </summary>
+    private static void AddRoleClaims(ClaimBuilder builder, IList<string> roles)
+    {
+        foreach (var role in roles)
+        {
+            builder.AddClaim(new Claim(ClaimTypes.Role, role));
+        }
+    }
+
+    /// <summary>
+    /// Adds all user-specific claims from Identity.
+    /// </summary>
+    private static void AddUserClaims(ClaimBuilder builder, IList<Claim> userClaims)
+    {
+        foreach (var claim in userClaims)
+        {
+            builder.AddClaim(claim);
+        }
+    }
+
+    /// <summary>
+    /// Adds claims from all roles the user belongs to.
+    /// </summary>
+    /// <returns>The count of role claims added (excluding duplicates).</returns>
+    private async Task<int> AddRoleClaimsAsync(ClaimBuilder builder, IList<string> roles)
+    {
+        var roleClaimCount = 0;
+
+        foreach (var roleName in roles)
+        {
+            roleClaimCount += await AddClaimsForRoleAsync(builder, roleName);
+        }
+
+        return roleClaimCount;
+    }
+
+    /// <summary>
+    /// Adds claims for a specific role.
+    /// </summary>
+    /// <returns>The count of claims added for this role (excluding duplicates).</returns>
+    private async Task<int> AddClaimsForRoleAsync(ClaimBuilder builder, string roleName)
+    {
+        var role = await _roleManager.FindByNameAsync(roleName);
+        if (role == null)
+        {
+            return 0;
+        }
+
+        var roleClaims = await _roleManager.GetClaimsAsync(role);
+        return builder.AddClaimsWithCount(roleClaims);
     }
 
     #region Logger Messages
@@ -154,4 +175,48 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
     private partial void LogClaimsGenerated(string userId, int claimCount, int roleCount, int userClaimCount, int roleClaimCount);
 
     #endregion
+
+    /// <summary>
+    /// Helper class to build a deduplicated collection of claims.
+    /// </summary>
+    private class ClaimBuilder
+    {
+        private readonly HashSet<(string Type, string Value)> _claimSet = new();
+        private readonly List<Claim> _claims = new();
+
+        /// <summary>
+        /// Adds a claim if it's not a duplicate.
+        /// </summary>
+        /// <returns>True if the claim was added, false if it was a duplicate.</returns>
+        public bool AddClaim(Claim claim)
+        {
+            if (_claimSet.Add((claim.Type, claim.Value)))
+            {
+                _claims.Add(claim);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Adds multiple claims and returns the count of claims actually added (excluding duplicates).
+        /// </summary>
+        public int AddClaimsWithCount(IEnumerable<Claim> claims)
+        {
+            var count = 0;
+            foreach (var claim in claims)
+            {
+                if (AddClaim(claim))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Gets the final list of claims.
+        /// </summary>
+        public List<Claim> GetClaims() => _claims;
+    }
 }
