@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     /// <inheritdoc/>
     public async Task<string> GenerateRefreshTokenAsync(string userId)
     {
+        LogStartingUserId(userId);
+
         var token = GenerateSecureToken();
         var tokenHash = HashToken(token);
 
@@ -70,8 +73,6 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         _context.Set<RefreshTokenEntity>().Add(entity);
         await _context.SaveChangesAsync();
 
-        LogTokenGenerated(userId, entity.ExpiresAt, token);
-
         // Await cleanup of expired tokens to ensure completion before returning
         // We must await to avoid concurrency problems
         try
@@ -83,12 +84,15 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             LogCleanupFailed(ex);
         }
 
+        LogOkUserId(userId);
         return token;
     }
 
     /// <inheritdoc/>
     public async Task<bool> ValidateRefreshTokenAsync(string token, string userId)
     {
+        LogStartingUserId(userId);
+
         var tokenHash = HashToken(token);
 
         var entity = await _context.Set<RefreshTokenEntity>()
@@ -104,23 +108,25 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         if (entity.IsRevoked)
         {
-            LogTokenRevoked(userId,token);
+            LogTokenRevoked(userId);
             return false;
         }
 
         if (entity.ExpiresAt < _timeProvider.GetUtcNow().DateTime)
         {
-            LogTokenExpired(userId, token, entity.ExpiresAt);
+            LogTokenExpired(userId, entity.ExpiresAt);
             return false;
         }
 
-        LogTokenValid(userId, token);
+        LogOkUserId(userId);
         return true;
     }
 
     /// <inheritdoc/>
     public async Task RevokeRefreshTokenAsync(string token)
     {
+        LogStarting();
+
         var tokenHash = HashToken(token);
 
         var entity = await _context.Set<RefreshTokenEntity>()
@@ -131,6 +137,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             entity.IsRevoked = true;
             entity.ExpiresAt = _timeProvider.GetUtcNow().DateTime.Add(_revokedTokenLifespan);
             await _context.SaveChangesAsync();
+            LogOk();
         }
         else
         {
@@ -141,7 +148,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     /// <inheritdoc/>
     public async Task RevokeAllUserTokensAsync(string userId)
     {
-        LogRevokingAllUserTokens(userId);
+        LogStartingUserId(userId);
 
         var userTokens = await _context.Set<RefreshTokenEntity>()
             .Where(t => t.UserId == userId)
@@ -156,7 +163,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         await _context.SaveChangesAsync();
 
-        LogAllUserTokensRevoked(userId, userTokens.Count);
+        LogOkUserIdCount(userId, userTokens.Count);
     }
 
     /// <summary>
@@ -169,6 +176,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     /// <returns>The number of tokens deleted.</returns>
     private async Task<int> DeleteExpiredTokensAsync()
     {
+        LogStarting();
+
         var now = _timeProvider.GetUtcNow().DateTime;
 
         var tokensToDelete = await _context.Set<RefreshTokenEntity>()
@@ -180,7 +189,11 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             _context.Set<RefreshTokenEntity>().RemoveRange(tokensToDelete);
             await _context.SaveChangesAsync();
 
-            LogTokensDeleted(tokensToDelete.Count);
+            LogOkCount(tokensToDelete.Count);
+        }
+        else
+        {
+            LogOk();
         }
 
         return tokensToDelete.Count;
@@ -211,47 +224,38 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
     #region Logger Messages
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Generating refresh token for user: {userId}")]
-    private partial void LogGeneratingToken(string userId);
+    [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
+    private partial void LogStarting([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token generated for user: {userId}, expires: {expiresAt}, token: {token}")]
-    private partial void LogTokenGenerated(string userId, DateTime expiresAt, string token);
+    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting {UserId}")]
+    private partial void LogStartingUserId(string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Validating refresh token for user: {userId} token: {token}")]
-    private partial void LogValidatingToken(string userId, string token);
+    [LoggerMessage(3, LogLevel.Information, "{Location}: OK")]
+    private partial void LogOk([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, not found for user: {userId}")]
-    private partial void LogTokenNotFound(string userId);
+    [LoggerMessage(4, LogLevel.Information, "{Location}: OK {UserId}")]
+    private partial void LogOkUserId(string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, revoked for user {userId} token: {token}")]
-    private partial void LogTokenRevoked(string userId, string token);
+    [LoggerMessage(5, LogLevel.Information, "{Location}: OK {UserId} {Count}")]
+    private partial void LogOkUserIdCount(string userId, int count, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Validation failed, token {token} expired for user: {userId} at {expiresAt}")]
-    private partial void LogTokenExpired(string userId, string token,DateTime expiresAt);
+    [LoggerMessage(6, LogLevel.Information, "{Location}: OK {Count}")]
+    private partial void LogOkCount(int count, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh token: Valid for user: {userId}, token: {token}")]
-    private partial void LogTokenValid(string userId, string token);
+    [LoggerMessage(7, LogLevel.Warning, "{Location}: Token not found {UserId}")]
+    private partial void LogTokenNotFound(string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Revoking refresh token: {token}")]
-    private partial void LogRevokingToken(string token);
+    [LoggerMessage(8, LogLevel.Warning, "{Location}: Token revoked {UserId}")]
+    private partial void LogTokenRevoked(string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token revoked for user: {userId}")]
-    private partial void LogTokenRevokedForUser(string userId);
+    [LoggerMessage(9, LogLevel.Warning, "{Location}: Token expired {UserId} {ExpiresAt}")]
+    private partial void LogTokenExpired(string userId, DateTime expiresAt, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token not found for revocation")]
-    private partial void LogTokenNotFoundForRevocation();
+    [LoggerMessage(10, LogLevel.Warning, "{Location}: Token not found for revocation")]
+    private partial void LogTokenNotFoundForRevocation([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Revoking all refresh tokens for user: {userId}")]
-    private partial void LogRevokingAllUserTokens(string userId);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Revoked {count} tokens for user: {userId}")]
-    private partial void LogAllUserTokensRevoked(string userId, int count);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Deleted {count} expired and revoked tokens")]
-    private partial void LogTokensDeleted(int count);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to cleanup expired tokens")]
-    private partial void LogCleanupFailed(Exception ex);
+    [LoggerMessage(11, LogLevel.Warning, "{Location}: Cleanup failed")]
+    private partial void LogCleanupFailed(Exception ex, [CallerMemberName] string? location = null);
 
     #endregion
 }

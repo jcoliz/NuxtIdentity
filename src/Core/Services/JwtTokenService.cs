@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -61,7 +62,7 @@ public partial class JwtTokenService<TUser>(
 
         var username = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "unknown";
 
-        LogTokenGenerationStarted(username);
+        LogStartingUsername(username);
 
         // Add standard security claims
         var allClaims = claims.ToList();
@@ -91,16 +92,14 @@ public partial class JwtTokenService<TUser>(
             signingCredentials: credentials
         );
 
-        LogDebugTokenExpiration(expires);
-
-        LogTokenGenerationCompleted(username);
+        LogOkUsername(username);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     /// <inheritdoc/>
     public Task<ClaimsPrincipal?> ValidateTokenAsync(string token)
     {
-        LogTokenValidationStarted();
+        LogStarting();
 
         try
         {
@@ -108,12 +107,12 @@ public partial class JwtTokenService<TUser>(
             var validationParameters = GetTokenValidationParameters();
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-            LogTokenValidationCompleted();
+            LogOk();
             return Task.FromResult<ClaimsPrincipal?>(principal);
         }
         catch (Exception ex)
         {
-            LogTokenValidationFailed(ex);
+            LogValidationFailed(ex);
             return Task.FromResult<ClaimsPrincipal?>(null);
         }
     }
@@ -136,23 +135,20 @@ public partial class JwtTokenService<TUser>(
 
     #region Logger Messages
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation started for user: {username}")]
-    private partial void LogTokenGenerationStarted(string username);
+    [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
+    private partial void LogStarting([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token generation completed for user: {username}")]
-    private partial void LogTokenGenerationCompleted(string username);
+    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting {Username}")]
+    private partial void LogStartingUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token expiration set to: {expiresAt}")]
-    private partial void LogDebugTokenExpiration(DateTime expiresAt);
+    [LoggerMessage(3, LogLevel.Information, "{Location}: OK")]
+    private partial void LogOk([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation started")]
-    private partial void LogTokenValidationStarted();
+    [LoggerMessage(4, LogLevel.Information, "{Location}: OK {Username}")]
+    private partial void LogOkUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Token validation completed")]
-    private partial void LogTokenValidationCompleted();
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Token validation failed")]
-    private partial void LogTokenValidationFailed(Exception ex);
+    [LoggerMessage(5, LogLevel.Warning, "{Location}: Validation failed")]
+    private partial void LogValidationFailed(Exception ex, [CallerMemberName] string? location = null);
 
     #endregion
 }

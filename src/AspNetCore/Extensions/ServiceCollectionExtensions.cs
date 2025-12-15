@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -26,14 +27,14 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// <remarks>
     /// This configures JWT Bearer authentication as the default authentication scheme
     /// and automatically configures JWT options from the "Jwt" section in appsettings.json.
-    /// 
+    ///
     /// Features included:
     /// - JWT options configuration from appsettings.json
     /// - JWT options validation at startup (validates Key, Issuer, Audience)
     /// - JWT Bearer authentication configuration
     /// - Enhanced logging for authentication failures and successes
     /// - Detailed error logging in development environments
-    /// 
+    ///
     /// Example appsettings.json:
     /// <code>
     /// {
@@ -45,7 +46,7 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     ///   }
     /// }
     /// </code>
-    /// 
+    ///
     /// Example usage:
     /// <code>
     /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
@@ -58,12 +59,12 @@ public static partial class NuxtIdentityServiceCollectionExtensions
         // Configure JWT options from configuration with validation
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
-            .Validate(options => 
+            .Validate(options =>
             {
                 return options.Key != null && options.Key.Length > 0;
             }, "JWT signing key is required. Configure Jwt:Key in appsettings.json with a Base64-encoded 32-byte value. " +
                "Generate one using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))")
-            .Validate(options => 
+            .Validate(options =>
             {
                 return options.Key == null || options.Key.Length >= 32;
             }, "JWT signing key must be at least 32 bytes (256 bits) for HMAC-SHA256 security. " +
@@ -85,7 +86,7 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
     /// This configures JWT Bearer authentication as the default authentication scheme.
-    /// 
+    ///
     /// Note: When using this overload, you must manually configure JWT options before calling this method:
     /// <code>
     /// builder.Services.AddOptions&lt;JwtOptions&gt;()
@@ -99,12 +100,12 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     ///     .ValidateOnStart();
     /// builder.Services.AddNuxtIdentityAuthentication();
     /// </code>
-    /// 
+    ///
     /// For convenience, consider using the overload that takes IConfiguration:
     /// <code>
     /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
     /// </code>
-    /// 
+    ///
     /// Features included:
     /// - JWT Bearer authentication configuration
     /// - Enhanced logging for authentication failures and successes
@@ -119,9 +120,9 @@ public static partial class NuxtIdentityServiceCollectionExtensions
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         })
         .AddJwtBearer();
-        
+
         services.ConfigureOptions<JwtBearerOptionsSetup>();
-        
+
         // Add enhanced JWT Bearer events for logging
         services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
         {
@@ -131,37 +132,37 @@ public static partial class NuxtIdentityServiceCollectionExtensions
                 {
                     var logger = context.HttpContext.RequestServices
                         .GetRequiredService<ILogger<JwtBearerEvents>>();
-                    
-                    LogJwtAuthenticationFailed(logger, context.Exception, 
+
+                    LogJwtAuthenticationFailed(logger, context.Exception,
                         context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
-                    
+
                     return Task.CompletedTask;
                 },
-                
+
                 OnChallenge = context =>
                 {
                     var logger = context.HttpContext.RequestServices
                         .GetRequiredService<ILogger<JwtBearerEvents>>();
-                        
-                    LogJwtChallenge(logger, context.Error ?? "unknown", 
+
+                    LogJwtChallenge(logger, context.Error ?? "unknown",
                         context.ErrorDescription ?? "unknown", context.Request.Path);
-                        
+
                     return Task.CompletedTask;
                 },
-                
+
                 OnTokenValidated = context =>
                 {
                     var logger = context.HttpContext.RequestServices
                         .GetRequiredService<ILogger<JwtBearerEvents>>();
-                        
+
                     var username = context.Principal?.Identity?.Name ?? "unknown";
                     LogJwtTokenValidated(logger, username);
-                    
+
                     return Task.CompletedTask;
                 }
             };
         });
-        
+
         return services;
     }
 
@@ -175,17 +176,17 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// This registers:
     /// - <see cref="IJwtTokenService{TUser}"/> - JWT token generation and validation
     /// - <see cref="IUserClaimsProvider{TUser}"/> - Claims extraction from Identity users
-    /// 
+    ///
     /// Prerequisites:
     /// - ASP.NET Core Identity must be configured with AddIdentity&lt;TUser, TRole&gt;()
     /// - UserManager&lt;TUser&gt; must be available in DI
     /// - JWT options must be configured (use AddNuxtIdentityAuthentication with IConfiguration)
-    /// 
+    ///
     /// Example usage:
     /// <code>
     /// builder.Services.AddIdentity&lt;ApplicationUser, IdentityRole&gt;()
     ///     .AddEntityFrameworkStores&lt;ApplicationDbContext&gt;();
-    /// 
+    ///
     /// builder.Services.AddNuxtIdentity&lt;ApplicationUser&gt;();
     /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
     /// </code>
@@ -196,20 +197,20 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     {
         services.AddScoped<IUserClaimsProvider<TUser>, IdentityUserClaimsProvider<TUser>>();
         services.AddScoped<IJwtTokenService<TUser>, JwtTokenService<TUser>>();
-        
+
         return services;
     }
 
     #region Logger Messages
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "JWT Authentication failed for token from {remoteIp}")]
-    private static partial void LogJwtAuthenticationFailed(ILogger logger, Exception exception, string remoteIp);
+    [LoggerMessage(1, LogLevel.Warning, "{Location}: Authentication failed {RemoteIp}")]
+    private static partial void LogJwtAuthenticationFailed(ILogger logger, Exception exception, string remoteIp, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "JWT Challenge triggered: {error} {errorDescription} for path {path}")]
-    private static partial void LogJwtChallenge(ILogger logger, string error, string errorDescription, string path);
+    [LoggerMessage(2, LogLevel.Information, "{Location}: Challenge {Error} {ErrorDescription} {Path}")]
+    private static partial void LogJwtChallenge(ILogger logger, string error, string errorDescription, string path, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "JWT token validated successfully for user: {username}")]
-    private static partial void LogJwtTokenValidated(ILogger logger, string username);
+    [LoggerMessage(3, LogLevel.Debug, "{Location}: Token validated {Username}")]
+    private static partial void LogJwtTokenValidated(ILogger logger, string username, [CallerMemberName] string? location = null);
 
     #endregion
 }

@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -82,7 +83,7 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
     /// <inheritdoc/>
     public async Task<IEnumerable<Claim>> GetClaimsAsync(TUser user)
     {
-        LogGeneratingClaims(user.Id);
+        LogStartingUserId(user.Id);
 
         var roles = await _userManager.GetRolesAsync(user);
         var userClaims = await _userManager.GetClaimsAsync(user);
@@ -95,7 +96,7 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
         var roleClaimCount = await AddRoleClaimsAsync(claimBuilder, roles);
 
         var claims = claimBuilder.GetClaims();
-        LogClaimsGenerated(user.Id, claims.Count, roles.Count, userClaims.Count, roleClaimCount);
+        LogOkUserIdCount(user.Id, claims.Count);
 
         return claims;
     }
@@ -168,11 +169,11 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
 
     #region Logger Messages
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Generating claims for user: {userId}")]
-    private partial void LogGeneratingClaims(string userId);
+    [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting {UserId}")]
+    private partial void LogStartingUserId(string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Generated {claimCount} claims for user: {userId}, including {roleCount} roles, {userClaimCount} user claims, and {roleClaimCount} role claims")]
-    private partial void LogClaimsGenerated(string userId, int claimCount, int roleCount, int userClaimCount, int roleClaimCount);
+    [LoggerMessage(2, LogLevel.Information, "{Location}: OK {UserId} {Count}")]
+    private partial void LogOkUserIdCount(string userId, int count, [CallerMemberName] string? location = null);
 
     #endregion
 

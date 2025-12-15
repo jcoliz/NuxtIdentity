@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -5,7 +7,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
-using System.Security.Claims;
 
 namespace NuxtIdentity.AspNetCore.Controllers;
 
@@ -118,13 +119,15 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         TUser user,
         string oldRefreshToken)
     {
-        LogRefreshTokenRevoking(user.UserName ?? "unknown", oldRefreshToken);
+        LogStartingUsername(user.UserName ?? "unknown");
 
         // Revoke old token (token rotation)
         await RefreshTokenService.RevokeRefreshTokenAsync(oldRefreshToken);
 
         var newAccessToken = await JwtTokenService.GenerateAccessTokenAsync(user);
         var newRefreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(user.Id);
+
+        LogOkUsername(user.UserName ?? "unknown");
 
         return new RefreshResponse
         {
@@ -206,12 +209,12 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        LogLoginAttempt(request.Username);
+        LogStartingUsername(request.Username);
 
         var user = await UserManager.FindByNameAsync(request.Username);
         if (user == null)
         {
-            LogLoginFailed(request.Username, "User not found");
+            LogLoginFailedUsername(request.Username, "User not found");
             return Problem(
                 title: "Authentication Failed",
                 detail: "Invalid credentials",
@@ -222,7 +225,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var result = await SignInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
         if (!result.Succeeded)
         {
-            LogLoginFailed(request.Username, "Invalid password");
+            LogLoginFailedUsername(request.Username, "Invalid password");
             return Problem(
                 title: "Authentication Failed",
                 detail: "Invalid credentials",
@@ -231,7 +234,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         }
 
         var response = await CreateLoginResponseAsync(user);
-        LogLoginSuccess(request.Username);
+        LogOkUsername(request.Username);
         return Ok(response);
     }
 
@@ -245,7 +248,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public virtual async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
     {
-        LogSignupAttempt(request.Username);
+        LogStartingUsername(request.Username);
 
         var user = new TUser
         {
@@ -257,7 +260,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
         if (!result.Succeeded)
         {
-            LogSignupFailed(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
+            LogSignupFailedUsername(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
 
             return Problem(
                 title: "Registration Failed",
@@ -268,9 +271,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
         await OnUserCreatedAsync(user);
 
-        LogSignupSuccess(request.Username);
-
         var response = await CreateLoginResponseAsync(user);
+        LogOkUsername(request.Username);
         return Ok(response);
     }
 
@@ -285,6 +287,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> GetSession()
     {
+        LogStarting();
+
         var username = GetCurrentUsername();
         if (username == null)
         {
@@ -299,7 +303,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var user = await UserManager.FindByNameAsync(username);
         if (user == null)
         {
-            LogSessionUnauthorized($"User not found: {username}");
+            LogSessionUnauthorizedUsername($"User not found: {username}");
             return Problem(
                 title: "User Not Found",
                 detail: "The authenticated user no longer exists",
@@ -308,7 +312,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         }
 
         var userInfo = await CreateUserInfoAsync(user);
-        LogSessionSuccess(username);
+        LogOkUsername(username);
 
         return Ok(new SessionResponse
         {
@@ -327,6 +331,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> RefreshTokens([FromBody] RefreshRequest request)
     {
+        LogStarting();
+
         var userId = GetCurrentUserId();
         var username = GetCurrentUsername();
 
@@ -340,13 +346,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             );
         }
 
-        LogRefreshTokenChecking(username, request.RefreshToken);
-
         // Validate the refresh token
         var isValid = await RefreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, userId);
         if (!isValid)
         {
-            LogRefreshTokenInvalid(username, request.RefreshToken);
+            LogRefreshTokenInvalidUsername(username);
             return Problem(
                 title: "Token Refresh Failed",
                 detail: "Invalid or expired refresh token",
@@ -358,7 +362,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var user = await GetUserByIdAsync(userId);
         if (user == null)
         {
-            LogRefreshTokenNoUser(username, request.RefreshToken);
+            LogRefreshTokenNoUserUsername(username);
             return Problem(
                 title: "User Not Found",
                 detail: "The authenticated user no longer exists",
@@ -366,11 +370,9 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             );
         }
 
-        LogRefreshTokenOk(username, request.RefreshToken);
-
         var response = await CreateRefreshResponseAsync(user, request.RefreshToken);
 
-        LogRefreshTokenCreated(username, response.Token.RefreshToken);
+        LogOkUsername(username);
 
         return Ok(response);
     }
@@ -384,13 +386,14 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public virtual async Task<IActionResult> Logout([FromBody] RefreshRequest request)
     {
-        LogLogoutRequested();
+        LogStarting();
 
         if (!string.IsNullOrEmpty(request.RefreshToken))
         {
             await RefreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
         }
 
+        LogOk();
         return Ok(new { success = true });
     }
 
@@ -412,53 +415,38 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
     #region Logger Messages
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Login attempt for user: {username}")]
-    private partial void LogLoginAttempt(string username);
+    [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
+    private partial void LogStarting([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Login successful for user: {username}")]
-    private partial void LogLoginSuccess(string username);
+    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting {Username}")]
+    private partial void LogStartingUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Login failed for user: {username}. Reason: {reason}")]
-    private partial void LogLoginFailed(string username, string reason);
+    [LoggerMessage(3, LogLevel.Information, "{Location}: OK")]
+    private partial void LogOk([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Signup attempt for user: {username}")]
-    private partial void LogSignupAttempt(string username);
+    [LoggerMessage(4, LogLevel.Information, "{Location}: OK {Username}")]
+    private partial void LogOkUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Signup successful for user: {username}")]
-    private partial void LogSignupSuccess(string username);
+    [LoggerMessage(5, LogLevel.Warning, "{Location}: Login failed {Username} {Reason}")]
+    private partial void LogLoginFailedUsername(string username, string reason, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Signup failed for user: {username}. Errors: {errors}")]
-    private partial void LogSignupFailed(string username, string errors);
+    [LoggerMessage(6, LogLevel.Warning, "{Location}: Signup failed {Username} {Errors}")]
+    private partial void LogSignupFailedUsername(string username, string errors, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Session request for user: {username}")]
-    private partial void LogSessionSuccess(string username);
+    [LoggerMessage(7, LogLevel.Warning, "{Location}: Unauthorized {Reason}")]
+    private partial void LogSessionUnauthorized(string reason, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Session request unauthorized: {reason}")]
-    private partial void LogSessionUnauthorized(string reason);
+    [LoggerMessage(8, LogLevel.Warning, "{Location}: Unauthorized {Username}")]
+    private partial void LogSessionUnauthorizedUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Logout requested")]
-    private partial void LogLogoutRequested();
+    [LoggerMessage(9, LogLevel.Warning, "{Location}: No token")]
+    private partial void LogRefreshNoToken([CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh token: Not provided")]
-    private partial void LogRefreshNoToken();
+    [LoggerMessage(10, LogLevel.Warning, "{Location}: Invalid token {Username}")]
+    private partial void LogRefreshTokenInvalidUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh Token: Checking {UserName} {RefreshToken} ")]
-    private partial void LogRefreshTokenChecking(string userName, string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh Token: Invalid {UserName} {RefreshToken} ")]
-    private partial void LogRefreshTokenInvalid(string userName, string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh Token: Ok {UserName} {RefreshToken} ")]
-    private partial void LogRefreshTokenOk(string userName, string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Refresh Token: Revoking {UserName} {RefreshToken} ")]
-    private partial void LogRefreshTokenRevoking(string userName, string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Refresh Token: No such user {UserName} {RefreshToken} ")]
-    private partial void LogRefreshTokenNoUser(string userName, string refreshToken);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh Token: Created {UserName} {RefreshToken} ")]
-    private partial void LogRefreshTokenCreated(string userName, string refreshToken);
+    [LoggerMessage(11, LogLevel.Warning, "{Location}: No such user {Username}")]
+    private partial void LogRefreshTokenNoUserUsername(string username, [CallerMemberName] string? location = null);
 
     #endregion
 }
