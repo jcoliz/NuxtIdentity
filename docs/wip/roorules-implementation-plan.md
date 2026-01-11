@@ -1,0 +1,738 @@
+---
+status: Ready for Implementation
+created: 2026-01-11
+purpose: Guide implementation of project rules from Gherkin.Generator
+---
+
+# Project Rules Implementation Plan
+
+## Overview
+
+This document contains the plan for bringing general-purpose project rules from the Gherkin.Generator project into NuxtIdentity. The rules have been reviewed, domain-specific content has been scrubbed, and examples have been adapted for the NuxtIdentity context.
+
+## Files to Create
+
+### 1. `.roorules` (Root of repository)
+
+**Purpose:** Define project-wide patterns and conventions for AI coding assistants.
+
+**Content:** Contains 8 patterns adapted from Gherkin.Generator:
+1. Test Documentation Pattern (Given/When/Then/And style)
+2. Regex Pattern (source-generated regexes)
+3. Test Execution Pattern (run tests after changes)
+4. Library Project Change Pattern (update tests with code changes)
+5. XML Documentation Comments Pattern (comprehensive docs)
+6. PowerShell Script Pattern (script conventions)
+7. Documentation and Planning Pattern (use docs/wip/)
+8. Commit Message Pattern (reference COMMIT-CONVENTIONS.md)
+
+**Key Adaptations:**
+- Examples use NuxtIdentity types (LoginRequest, SignUpRequest, TestUser, etc.)
+- Project references updated (src/Core, tests/NuxtIdentity.AspNetCore.Tests, etc.)
+- Removed Gherkin-specific terminology
+- Test framework references match NuxtIdentity (NUnit + FluentAssertions)
+
+**Full content:** See attached `.roorules` content below.
+
+### 2. `docs/COMMIT-CONVENTIONS.md`
+
+**Purpose:** Define commit message format and conventions.
+
+**Content:** Conventional commits specification adapted for NuxtIdentity.
+
+**Key Adaptations:**
+- Scopes updated for NuxtIdentity project structure:
+  - `core`: NuxtIdentity.Core library
+  - `aspnetcore`: NuxtIdentity.AspNetCore library
+  - `efcore`: NuxtIdentity.EntityFrameworkCore library
+  - `samples`: Sample applications
+  - `playground`: Playground applications
+  - `tests(core)`: Core unit tests
+  - `tests(aspnetcore)`: ASP.NET Core tests
+  - `tests(efcore)`: Entity Framework Core tests
+  - `scripts`: PowerShell automation scripts
+  - `ci`: CI/CD configuration
+  - `docs`: Documentation changes
+
+- Examples updated to use NuxtIdentity terminology
+- Removed Gherkin.Generator-specific references
+
+**Full content:** See attached `COMMIT-CONVENTIONS.md` content below.
+
+## Implementation Steps
+
+1. **Create `.roorules` file** in repository root
+2. **Create `docs/COMMIT-CONVENTIONS.md`** file
+3. **Update existing tests** to follow Given/When/Then pattern (separate task, not urgent)
+4. **Communicate changes** to team about new conventions
+
+## Current State Analysis
+
+### What NuxtIdentity Already Does Well ✓
+
+- **XML Documentation:** Comprehensive XML docs already present in source code
+- **PowerShell Scripts:** Scripts already follow similar patterns (see `scripts/Collect-CodeCoverage.ps1`)
+- **Project Structure:** Already uses `docs/wip/` for work-in-progress docs
+- **Test Coverage:** Good test coverage across projects
+
+### What Needs Adjustment ⚠️
+
+- **Test Documentation Style:** Current tests use Arrange/Act/Assert comments with FluentAssertions
+  - **Note:** This is not urgent. New tests should follow Given/When/Then, but existing tests can be updated gradually
+  - Example current style:
+    ```csharp
+    // Arrange
+    var user = new TestUser("testuser");
+    // Act
+    var result = await service.DoSomething(user);
+    // Assert
+    result.Should().BeTrue();
+    ```
+  - Desired style:
+    ```csharp
+    // Given: A valid user exists
+    var user = new TestUser("testuser");
+
+    // When: Service performs operation
+    var result = await service.DoSomething(user);
+
+    // Then: Result should be successful
+    result.Should().BeTrue();
+    ```
+
+- **Commit Messages:** No formal conventions documented yet
+- **Regex Usage:** Should verify any regexes use source generation in production code
+
+## Benefits
+
+1. **Consistency:** Establishes clear patterns across the codebase
+2. **Onboarding:** New contributors have clear guidelines
+3. **Quality:** Enforces best practices (test execution, documentation, etc.)
+4. **AI Assistance:** Provides context for AI coding assistants
+5. **Maintainability:** Clear conventions make code easier to maintain
+
+## Notes
+
+- The `.roorules` file will be read by AI coding assistants (like Roo) to understand project conventions
+- The commit conventions follow the widely-adopted Conventional Commits specification
+- These patterns are already proven in the Gherkin.Generator project
+- Implementation should be done in Code mode since Architect mode can only edit Markdown files
+
+## Next Steps
+
+1. Switch to Code mode to implement the files
+2. Review the generated files with the team
+3. Begin applying conventions to new code (no need to update all existing code immediately)
+4. Consider adding pre-commit hooks in the future to enforce commit conventions
+
+---
+
+## Attachment: `.roorules` File Content
+
+```
+# Project Rules for NuxtIdentity
+
+## Test Documentation Pattern
+
+**Always use Gherkin-style comments (Given/When/Then/And) to document test scenarios. DO NOT use the traditional Arrange/Act/Assert pattern.**
+
+1. **Gherkin-style structure** - All tests (unit, integration, functional) must use Given/When/Then/And comments to describe the test flow.
+
+2. **Comment format** - Each step should be a single-line comment starting with the Gherkin keyword followed by a colon and descriptive text:
+   - `// Given:` - Describes the initial context or preconditions
+   - `// When:` - Describes the action being tested
+   - `// Then:` - Describes the expected outcome
+   - `// And:` - Continues or adds to the previous step type
+
+3. **Descriptive text** - Keep descriptions clear and focused on business/functional behavior rather than implementation details.
+
+4. **Blank lines** - Use blank lines between Gherkin steps to improve readability.
+
+### Example Pattern: Error Case with Invalid Input
+
+```csharp
+[Test]
+public async Task Login_InvalidUsername_ReturnsUnauthorized()
+{
+    // Given: A request with an invalid username (user does not exist)
+
+    // When: User attempts to log in with invalid username
+    var request = new LoginRequest { Username = "nonexistent", Password = "password" };
+    var response = await _client.PostAsJsonAsync("/api/auth/login", request);
+
+    // Then: 401 Unauthorized should be returned
+    Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+
+    // And: Response should contain error message
+    var content = await response.Content.ReadAsStringAsync();
+    Assert.That(content, Does.Contain("Authentication Failed"));
+}
+```
+
+### Example Pattern: Success Case with Data Setup
+
+```csharp
+[Test]
+public async Task SignUp_ValidData_ReturnsTokenAndUser()
+{
+    // Given: Valid registration data is prepared
+    var request = new SignUpRequest
+    {
+        Username = "newuser",
+        Email = "newuser@test.com",
+        Password = "Test123!"
+    };
+
+    // When: User registers with valid data
+    var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
+
+    // Then: 200 OK should be returned
+    response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+    // And: Response should contain access token
+    var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+    loginResponse.Should().NotBeNull();
+    loginResponse!.Token.AccessToken.Should().NotBeNullOrEmpty();
+
+    // And: User should be created in database
+    var user = await _userManager.FindByNameAsync(request.Username);
+    user.Should().NotBeNull();
+}
+```
+
+### Example Pattern: Unit Test with Multiple Assertions
+
+```csharp
+[Test]
+public async Task GenerateAccessToken_ValidUser_ReturnsValidToken()
+{
+    // Given: A valid user with roles and claims
+    var user = new TestUser("testuser");
+    await _userManager.CreateAsync(user);
+    await _userManager.AddToRoleAsync(user, "Admin");
+    await _userManager.AddClaimAsync(user, new Claim("department", "engineering"));
+
+    // When: Access token is generated
+    var token = await _jwtTokenService.GenerateAccessTokenAsync(user);
+
+    // Then: Token should not be empty
+    token.Should().NotBeNullOrEmpty();
+
+    // And: Token should be valid JWT format
+    var handler = new JwtSecurityTokenHandler();
+    handler.CanReadToken(token).Should().BeTrue();
+
+    // And: Token should contain user claims
+    var jwtToken = handler.ReadJwtToken(token);
+    jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == "testuser");
+    jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Admin");
+}
+```
+
+### Common Patterns
+
+- **Given** - Use for setup, preconditions, test data creation
+- **When** - Use for the single primary action being tested
+- **Then** - Use for the primary expected outcome
+- **And** - Use to chain multiple assertions or setups within the same category
+
+### Benefits Over Arrange/Act/Assert
+
+- More readable and business-focused
+- Better describes the scenario being tested
+- Aligns with behavior-driven development (BDD) practices
+- Makes test intent clearer to non-technical stakeholders
+- Natural progression through test flow
+
+## Regex Pattern
+
+**Use source-generated regexes in production code for better performance.**
+
+1. **Source-generated regexes** - Use the `[GeneratedRegex]` attribute with partial methods to generate regex code at compile time:
+   ```csharp
+   using System.Text.RegularExpressions;
+
+   public partial class MyClass
+   {
+       [GeneratedRegex(@"\d{4}-\d{2}-\d{2}")]
+       private static partial Regex DatePattern();
+   }
+   ```
+
+2. **Test code exception** - Regexes in test code (unit, integration, functional) don't require source generation for simplicity and readability. Use whichever pattern is most convenient.
+
+3. **Performance rationale** - Source-generated regexes have zero runtime compilation cost and significantly better runtime performance for repeated use. Since production code regexes are typically reused many times, source generation is worthwhile.
+
+### Benefits
+
+- Zero runtime compilation cost, best performance
+- Compile-time validation of regex patterns
+- Generated code is optimized and cached for reuse
+
+## Test Execution Pattern
+
+**Always run tests after creating or modifying them to verify they pass.**
+
+1. **Automatic test execution** - Whenever you add new tests or modify existing tests, you must run the relevant test suite to verify all tests pass before completing the task. This applies to unit tests, integration tests, but NOT functional tests (which require special setup).
+
+2. **Fix failures immediately** - If tests fail, you must analyze the failure, fix the issue, and re-run the tests until they all pass. Do not wait for user direction to fix test failures.
+
+3. **Iterate until green** - Continue the fix-test-verify cycle until all tests pass successfully.
+
+4. **Explicit attribute for intentionally skipped tests** - Use the `[Explicit]` attribute (NOT `[Ignore]`) for tests that should not run by default but can be run manually. Include a clear reason string explaining why the test is explicit. Common reasons include:
+   - Tests requiring special infrastructure setup
+   - Tests that depend on external services
+   - Tests that require manual verification
+   - Tests that expose limitations in the test infrastructure
+
+   Example:
+   ```csharp
+   [Test]
+   [Explicit("Requires test infrastructure enhancement to support truly unauthenticated requests.")]
+   public async Task GetResource_Unauthenticated_Returns401()
+   {
+       // Test implementation
+   }
+   ```
+
+### Example Workflow
+
+When adding new tests to `NuxtAuthControllerTests.cs`:
+1. Create or modify the test methods
+2. Run `dotnet test tests/NuxtIdentity.AspNetCore.Tests` to verify tests pass
+3. If failures occur, analyze the error messages
+4. Fix the issues in the test code or implementation
+5. Re-run the test command
+6. Repeat steps 3-5 until all tests pass
+7. Only then complete the task
+
+This ensures code quality and prevents introducing broken tests into the codebase.
+
+## Library Project Change Pattern
+
+**Always review and update unit tests when making changes to library projects.**
+
+1. **Review unit tests** - Whenever you modify code in the `src/` projects, you must check if corresponding unit tests in `tests/` need to be updated.
+
+2. **Maintain code coverage** - When adding new code to library projects, you must add comprehensive unit tests to maintain code coverage at or near 100%. Every new method, validation rule, or code path should have corresponding test coverage.
+
+3. **Common scenarios requiring test updates**:
+   - Changing method signatures (return types, parameters)
+   - Adding or removing methods
+   - Modifying validation logic
+   - Changing DTOs or data structures
+   - Altering business logic behavior
+
+4. **Update and verify** - After updating unit tests:
+   - Run the unit test suite to verify changes: `dotnet test tests/`
+   - Fix any failures before completing the task
+   - Ensure test coverage remains comprehensive
+
+### Example
+
+When changing `JwtTokenService.GenerateAccessTokenAsync()` to support custom claims:
+1. Identify affected tests (search for `GenerateAccessTokenAsync` in unit tests)
+2. Update tests to capture and verify the new claim behavior
+3. Add tests for custom claim scenarios
+4. Run `dotnet test tests/NuxtIdentity.Core.Tests` to verify all tests pass
+5. Only then mark the task as complete
+
+This ensures unit tests accurately reflect the current implementation and maintain comprehensive test coverage.
+
+## XML Documentation Comments Pattern
+
+**Always add comprehensive XML documentation comments to all new code.**
+
+1. **Always add class comments** - When creating new classes, always include XML documentation with a `<summary>` and, when appropriate, a `<remarks>` section.
+
+2. **Primary constructor parameters** - For classes using primary constructor syntax, include `<param>` tags directly on the class documentation to describe each constructor parameter.
+
+3. **Method documentation** - Document all public and internal methods with at minimum a `<summary>`. Include `<param>` tags for all parameters.
+
+4. **Test method exception** - Individual test methods in test fixture classes (methods with `[Test]` attribute) do NOT require XML documentation comments. The test method names and Given/When/Then comments provide sufficient documentation. However, test fixture classes themselves still require class-level documentation, and test helper classes and methods still require full XML documentation.
+
+5. **Returns documentation** - Do NOT include `<returns>` tags when a method returns ONLY `Task` or ONLY `Task<IActionResult>`. For other return types, document them with a `<returns>` tag.
+
+6. **Exception documentation** - Always document exceptions that are thrown directly by the method using `<exception>` tags.
+
+7. **Record types and DTOs** - All record types must have class-level XML comments. For records that declare properties in the primary constructor, the properties themselves do not need separate comments.
+
+8. **Standard parameter descriptions** - Use standard descriptions for common parameters:
+   - Logger parameters: "Logger for diagnostic output"
+   - Service parameters: "Service for [capability] operations"
+   - Options parameters: "Configuration options for [feature]"
+
+9. **Private methods** - LoggerMessage methods do not need comments. Other private methods should be documented if they are doing anything non-obvious.
+
+10. **"Create class comments" directive** - When asked to "create class comments" for a file, this means provide comprehensive documentation including:
+    - Class-level XML comments (with `<summary>`, `<remarks>`, and `<param>` for primary constructors)
+    - Method-level XML comments for ALL public and internal methods (with `<summary>`, `<param>`, `<returns>` where appropriate, and `<exception>` tags)
+    - This is NOT just adding comments to the class declaration itself, but full in-depth documentation as described in this pattern
+
+### Example: Class with Primary Constructor
+
+```csharp
+/// <summary>
+/// Service for generating and validating JWT tokens.
+/// </summary>
+/// <typeparam name="TUser">The type of user this service works with.</typeparam>
+/// <param name="jwtOptions">JWT configuration options including key, issuer, audience, and expiration settings.</param>
+/// <param name="claimsProviders">Collection of claims providers to extract user claims for token generation.</param>
+/// <param name="logger">Logger for diagnostic output.</param>
+/// <remarks>
+/// This service implements JWT token generation with security best practices including
+/// token rotation, claim-based authorization, and configurable expiration.
+/// </remarks>
+public partial class JwtTokenService<TUser>(
+    IOptions<JwtOptions> jwtOptions,
+    IEnumerable<IUserClaimsProvider<TUser>> claimsProviders,
+    ILogger<JwtTokenService<TUser>> logger) : IJwtTokenService<TUser> where TUser : class
+{
+    /// <summary>
+    /// Generates a JWT access token for the specified user.
+    /// </summary>
+    /// <param name="user">The user to generate a token for.</param>
+    /// <returns>A JWT token string containing user claims and authentication data.</returns>
+    public async Task<string> GenerateAccessTokenAsync(TUser user)
+    {
+        // Implementation
+    }
+}
+```
+
+### Example: Record Type
+
+```csharp
+/// <summary>
+/// Data transfer object for user login requests.
+/// </summary>
+/// <param name="Username">The username for authentication.</param>
+/// <param name="Password">The password for authentication.</param>
+public record LoginRequest(string Username, string Password);
+```
+
+### Example: Method with Exception
+
+```csharp
+/// <summary>
+/// Validates a refresh token for the specified user.
+/// </summary>
+/// <param name="refreshToken">The refresh token to validate.</param>
+/// <param name="userId">The user ID the token should be associated with.</param>
+/// <returns>True if the token is valid; otherwise, false.</returns>
+/// <exception cref="ArgumentNullException">Thrown when refreshToken or userId is null or empty.</exception>
+public async Task<bool> ValidateRefreshTokenAsync(string refreshToken, string userId)
+{
+    // Implementation
+}
+```
+
+**Note:** The `[ProducesResponseType]` attributes on controller methods provide sufficient documentation for HTTP response codes, so no additional `<remarks>` are needed to describe them.
+
+## PowerShell Script Pattern
+
+**Follow these conventions when creating PowerShell scripts for this project.**
+
+1. **Comment-Based Help** - All scripts must include comprehensive comment-based help at the top with the following sections:
+   - `.SYNOPSIS` - Brief one-line description of what the script does
+   - `.DESCRIPTION` - Detailed explanation of the script's functionality and purpose
+   - `.PARAMETER` - Document each parameter with its purpose (if the script has parameters)
+   - `.EXAMPLE` - Provide at least one usage example; include multiple examples for complex scripts
+   - `.NOTES` - Include any prerequisites, dependencies, or important information
+   - `.LINK` - Include relevant documentation links (optional but recommended)
+
+2. **CmdletBinding** - Always use `[CmdletBinding()]` to enable cmdlet features and better error handling.
+
+3. **Parameter Validation** - Use PowerShell validation attributes for parameters:
+   - `[ValidateSet()]` for enumerated values
+   - `[Parameter()]` to mark parameters as required or optional
+   - Provide sensible defaults where appropriate
+
+4. **Error Handling** - Set `$ErrorActionPreference = "Stop"` at the script start and wrap main logic in try/catch/finally:
+   ```powershell
+   $ErrorActionPreference = "Stop"
+
+   try {
+       # Main script logic
+   }
+   catch {
+       Write-Error "Failed to [action]: $_"
+       Write-Error $_.ScriptStackTrace
+       exit 1
+   }
+   finally {
+       # Cleanup (e.g., Pop-Location)
+   }
+   ```
+
+5. **PSScriptRoot for Path Resolution** - Always use `$PSScriptRoot` for path resolution to allow scripts to run from any directory:
+   - Use `$PSScriptRoot/..` to reference the repository root
+   - Use `$PSScriptRoot/../src` to reference source files
+   - Use `$PSScriptRoot/../tests` to reference test files
+   - Store the repository root in a variable if used multiple times: `$repoRoot = Split-Path $PSScriptRoot -Parent`
+
+6. **Location Management** - Use `Push-Location`/`Pop-Location` for directory changes:
+   - Always use `try/finally` to ensure `Pop-Location` is called even on errors
+   - Prefer `Push-Location` over `cd` or `Set-Location` for proper cleanup
+
+7. **Colored Output** - Use Write-Host with colors for better user experience:
+   - **Cyan** (`-ForegroundColor Cyan`) - For informational messages and section headers
+   - **Green** (`-ForegroundColor Green`) - For success messages (e.g., "OK Build succeeded")
+   - **Yellow** (`-ForegroundColor Yellow`) - For warnings (e.g., "WARNING Some tests failed")
+   - **Red** (`-ForegroundColor Red`) - For errors (only via Write-Error, which is already red)
+
+8. **Exit Code Handling** - Check `$LASTEXITCODE` after external commands and throw errors on failure:
+   ```powershell
+   dotnet build
+   if ($LASTEXITCODE -ne 0) {
+       throw "Build failed with exit code $LASTEXITCODE"
+   }
+   ```
+
+9. **Naming Convention** - Use PascalCase with verb-noun format for script names:
+   - Use approved PowerShell verbs: Get-, Set-, New-, Remove-, Start-, Stop-, Build-, Run-, etc.
+   - Examples: `Build-Container.ps1`, `Run-Tests.ps1`, `Start-LocalDev.ps1`
+
+10. **Helper Functions** - Define reusable helper functions within scripts when needed:
+    - Use PascalCase for function names with verb-noun format
+    - Place helper functions before the main script logic
+    - Document functions with comment-based help if they're complex
+
+11. **Script Organization** - Structure scripts in this order:
+    1. Comment-based help block
+    2. `[CmdletBinding()]` and parameters
+    3. `$ErrorActionPreference = "Stop"`
+    4. Helper functions (if any)
+    5. Main logic in try/catch/finally
+
+12. **Update README** - When creating a new script, always add it to the [`scripts/README.md`](scripts/README.md) with a description of what it does and how to use it.
+
+### Example: Minimal Script Pattern
+
+```powershell
+<#
+.SYNOPSIS
+Builds the solution and runs all tests.
+
+.DESCRIPTION
+This script performs a clean build of the solution and executes all tests
+to verify code quality. It's useful for quick verification during development.
+
+.EXAMPLE
+.\Build-AndTest.ps1
+Builds the solution and runs all tests.
+
+.NOTES
+Requires .NET SDK to be installed and available in PATH.
+#>
+
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+
+try {
+    $repoRoot = Split-Path $PSScriptRoot -Parent
+    Push-Location $repoRoot
+
+    Write-Host "Building solution..." -ForegroundColor Cyan
+    dotnet build
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed with exit code $LASTEXITCODE"
+    }
+    Write-Host "OK Build succeeded" -ForegroundColor Green
+
+    Write-Host "Running tests..." -ForegroundColor Cyan
+    dotnet test --no-build
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tests failed with exit code $LASTEXITCODE"
+    }
+    Write-Host "OK All tests passed" -ForegroundColor Green
+}
+catch {
+    Write-Error "Failed to build and test: $_"
+    Write-Error $_.ScriptStackTrace
+    exit 1
+}
+finally {
+    Pop-Location
+}
+```
+
+### Example: Script with Parameters and Validation
+
+```powershell
+<#
+.SYNOPSIS
+Runs tests for a specific test category.
+
+.DESCRIPTION
+This script executes tests from the specified test category with optional
+code coverage collection. Supports unit, integration, and functional tests.
+
+.PARAMETER Category
+The test category to run. Valid values: Core, AspNetCore, EntityFrameworkCore.
+
+.PARAMETER Coverage
+When specified, collects code coverage metrics during test execution.
+
+.EXAMPLE
+.\Run-TestCategory.ps1 -Category Core
+Runs core tests without code coverage.
+
+.EXAMPLE
+.\Run-TestCategory.ps1 -Category AspNetCore -Coverage
+Runs ASP.NET Core tests with code coverage collection.
+#>
+
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory=$true)]
+    [ValidateSet("Core", "AspNetCore", "EntityFrameworkCore")]
+    [string]
+    $Category,
+
+    [Parameter()]
+    [switch]
+    $Coverage
+)
+
+$ErrorActionPreference = "Stop"
+
+try {
+    $TestPath = "$PSScriptRoot/../tests/NuxtIdentity.$Category.Tests"
+
+    if (-not (Test-Path $TestPath)) {
+        throw "Test directory not found: $TestPath"
+    }
+
+    Push-Location $TestPath
+
+    Write-Host "Running $Category tests..." -ForegroundColor Cyan
+
+    if ($Coverage) {
+        dotnet test --collect:"XPlat Code Coverage"
+    }
+    else {
+        dotnet test
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tests failed with exit code $LASTEXITCODE"
+    }
+
+    Write-Host "OK All tests passed" -ForegroundColor Green
+}
+catch {
+    Write-Error "Failed to run tests: $_"
+    Write-Error $_.ScriptStackTrace
+    exit 1
+}
+finally {
+    Pop-Location
+}
+```
+
+### Key Benefits
+
+- **Consistency** - All scripts follow the same structure and conventions
+- **Portability** - Scripts run from any directory using `$PSScriptRoot`
+- **Reliability** - Comprehensive error handling with proper cleanup
+- **Usability** - Clear help documentation and colored output for better UX
+- **Maintainability** - Well-organized code with proper documentation
+
+**Reference Examples:** See scripts in the [`scripts/`](scripts/) directory for production implementations.
+
+## Documentation and Planning Pattern
+
+**Always place planning documents and work-in-progress documentation in the correct location.**
+
+1. **Planning documents location** - All architecture plans, design documents, and work-in-progress documentation MUST be placed in the `docs/wip/` directory, NOT in a top-level `plans/` directory or any other location.
+
+2. **Never create top-level directories without asking** - Do not create new top-level directories in the solution (at the same level as `src/`, `docs/`, `tests/`) without explicitly asking the user first. This includes directories like `plans/`, `design/`, or similar.
+
+3. **Work-in-progress documents** - Documents that are still being refined, proposals, and analysis work should go in `docs/wip/`:
+   - Architecture proposals
+   - Refactoring plans
+   - Design analysis documents
+   - TODO lists for complex features
+   - Investigation notes
+
+4. **Established documentation** - Once a document is finalized and represents the current state of the system, it should be moved to the appropriate location:
+   - `docs/` - For general project documentation
+   - `docs/adr/` - For Architecture Decision Records (if that directory exists)
+   - Project-specific README files in relevant directories
+
+5. **YAML frontmatter for metadata** - All documents (design documents, analysis documents, etc.) SHOULD use YAML frontmatter for metadata. Document metadata (status, dates, authors, links) belongs in YAML frontmatter at the top of the document, NOT as explicit text in the document body:
+   ```yaml
+   ---
+   status: Draft # Draft | In Review | Approved | Implemented
+   created: 2024-01-15
+   updated: 2024-01-20
+   ---
+   ```
+   - Use YAML frontmatter for machine-readable metadata tracking
+   - Keep document body focused on content, not metadata
+   - Metadata fields can vary by document type
+
+### Examples
+
+**Correct locations:**
+- `docs/wip/multi-tenancy-design.md` - Planning document
+- `docs/wip/external-auth-providers.md` - Work in progress
+- `docs/ARCHITECTURE.md` - Established documentation
+- `docs/adr/0001-jwt-token-rotation.md` - Architecture decision record (if adr/ exists)
+
+**Incorrect locations:**
+- `plans/multi-tenancy.md` - ❌ Wrong directory
+- `design/auth-design.md` - ❌ Unauthorized top-level directory
+- `multi-tenancy-plan.md` - ❌ Wrong location (solution root)
+
+### Benefits
+
+- **Consistent organization** - Everyone knows where to find planning documents
+- **Clear distinction** - Separates work-in-progress from established documentation
+- **No clutter** - Prevents proliferation of top-level directories
+- **Standard structure** - Follows established project conventions
+
+## Commit Message Pattern
+
+**Keep commit messages concise and under 100 words. Always follow the project's commit conventions documented in [`docs/COMMIT-CONVENTIONS.md`](docs/COMMIT-CONVENTIONS.md).**
+
+Aim for 50 words, but **always** under 100 words.
+
+1. **Review conventions** - Before creating a commit message, review [`docs/COMMIT-CONVENTIONS.md`](docs/COMMIT-CONVENTIONS.md) for the complete format, types, scopes, and examples.
+
+2. **Length limit** - Commit messages should be under 100 words total, including the subject line and body.
+
+3. **Subject line** - Use conventional commits format: `type(scope): subject`
+   - Use approved types (feat, fix, docs, refactor, test, build, ci)
+   - Use established scopes (see COMMIT-CONVENTIONS.md for project-specific scopes)
+   - Keep subject line under 72 characters
+   - Use imperative mood, lowercase, no period ("add feature" not "Added feature.")
+
+4. **Body** - Optional but recommended for complex changes:
+   - Explain what and why, not how
+   - Use bullet points for multiple items
+   - Wrap lines at 72 characters
+   - Keep concise - focus on essential information
+
+### Example
+
+```
+feat(core): add token refresh with rotation support
+
+Implement automatic refresh token rotation for enhanced security.
+Tokens are invalidated after single use to prevent replay attacks.
+
+- Add RefreshTokenService with in-memory and EF Core implementations
+- Implement token rotation in NuxtAuthControllerBase
+- Add comprehensive tests for token lifecycle
+```
+```
+
+---
+
+## Attachment: `docs/COMMIT-CONVENTIONS.md` File Content
+
+See next section for full content...
