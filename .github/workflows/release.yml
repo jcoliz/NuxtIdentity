@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '10.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build solution
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Run tests
+      run: dotnet test --no-build --configuration Release --verbosity normal
+      
+    - name: Extract version from tag
+      id: get_version
+      run: |
+        # Extract version from tag (e.g., refs/tags/1.0.0 -> 1.0.0)
+        # Also handles v-prefixed tags if present (e.g., v1.0.0 -> 1.0.0)
+        VERSION=${GITHUB_REF#refs/tags/}
+        VERSION=${VERSION#v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Publishing version: $VERSION"
+      
+    - name: Pack NuxtIdentity.Core
+      run: dotnet pack src/Core/NuxtIdentity.Core.csproj --no-build --configuration Release -p:Version=${{ steps.get_version.outputs.version }} -p:PackageReleaseNotes="\"$RELEASE_NOTES\"" --output ./artifacts
+      env:
+        RELEASE_NOTES: ${{ github.event.release.body }}
+      
+    - name: Pack NuxtIdentity.AspNetCore
+      run: dotnet pack src/AspNetCore/NuxtIdentity.AspNetCore.csproj --no-build --configuration Release -p:Version=${{ steps.get_version.outputs.version }} -p:PackageReleaseNotes="\"$RELEASE_NOTES\"" --output ./artifacts
+      env:
+        RELEASE_NOTES: ${{ github.event.release.body }}
+      
+    - name: Pack NuxtIdentity.EntityFrameworkCore
+      run: dotnet pack src/EntityFrameworkCore/NuxtIdentity.EntityFrameworkCore.csproj --no-build --configuration Release -p:Version=${{ steps.get_version.outputs.version }} -p:PackageReleaseNotes="\"$RELEASE_NOTES\"" --output ./artifacts
+      env:
+        RELEASE_NOTES: ${{ github.event.release.body }}
+      
+    - name: Publish to NuGet
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages
+        path: ./artifacts/*.nupkg
