@@ -16,6 +16,7 @@ namespace NuxtIdentity.Core.Services;
 /// <param name="jwtOptions">JWT configuration options including key, issuer, audience, and expiration settings.</param>
 /// <param name="claimsProviders">Collection of claims providers to extract user claims for token generation. Application may provide a custom provider for application-specific claim logic</param>
 /// <param name="logger">Logger instance for structured logging of token operations.</param>
+/// <param name="timeProvider">Optional time provider for testing time-dependent behavior. Defaults to system time if not provided.</param>
 /// <remarks>
 /// This is a generic implementation of IJwtTokenService that can work with any user type.
 /// The service is designed to be reusable across different applications and user models.
