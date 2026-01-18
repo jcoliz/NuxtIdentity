@@ -1,0 +1,48 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Common build settings -->
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <!-- Package metadata -->
+    <Authors>James Coliz</Authors>
+    <Company>James Coliz</Company>
+    <Product>Nuxt Identity</Product>
+    <Description>ASP.NET Core Identity integration for Nuxt applications with @sidebase/nuxt-auth support</Description>
+    <Copyright>Copyright (c) 2026 James Coliz</Copyright>
+    <PackageProjectUrl>https://github.com/jcoliz/NuxtIdentity</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jcoliz/NuxtIdentity</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>nuxt;authentication;jwt;identity;aspnetcore;refresh-tokens</PackageTags>
+    
+    <!-- Version information -->
+    <Version>0.1.0-alpha</Version>
+    
+    <!-- Build output settings -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    
+    <!-- Source Link -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- Include README in all packages -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Source Link support -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>
