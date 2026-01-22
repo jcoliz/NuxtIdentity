@@ -1,0 +1,24 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/playground/local/">
+    <Project Path="playground/local/NuxtIdentity.Playground.Local.csproj" />
+  </Folder>
+  <Folder Name="/samples/Local/">
+    <Project Path="samples/Local/AppHost/NuxtIdentity.Samples.Local.AppHost.csproj" />
+    <Project Path="samples/Local/Backend/NuxtIdentity.Samples.Local.Backend.csproj" />
+    <Project Path="samples/Local/ServiceDefaults/NuxtIdentity.Samples.Local.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/AspNetCore/NuxtIdentity.AspNetCore.csproj" />
+    <Project Path="src/Core/NuxtIdentity.Core.csproj" />
+    <Project Path="src/EntityFrameworkCore/NuxtIdentity.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NuxtIdentity.Core.Tests/NuxtIdentity.Core.Tests.csproj" />
+    <Project Path="tests/NuxtIdentity.EntityFrameworkCore.Tests/NuxtIdentity.EntityFrameworkCore.Tests.csproj" />
+  </Folder>
+</Solution>
