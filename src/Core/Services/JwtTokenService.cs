@@ -57,6 +57,8 @@ public partial class JwtTokenService<TUser>(
     /// <inheritdoc/>
     public async Task<string> GenerateAccessTokenAsync(TUser user)
     {
+        // NOTE: User identity claims are provided by IdenityUserClaimsProvider in ASP.NET Identity scenarios.
+
         var claimsTasks = claimsProviders.Select(provider => provider.GetClaimsAsync(user));
         var claimsArrays = await Task.WhenAll(claimsTasks);
         var claims = claimsArrays.SelectMany(c => c).ToList();
