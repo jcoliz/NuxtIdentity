@@ -79,6 +79,7 @@ Create a new file `Data/ApplicationDbContext.cs`:
 ```csharp
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using NuxtIdentity.Core.Models;
 using NuxtIdentity.EntityFrameworkCore;
 
 namespace MyApp.Data;
@@ -90,7 +91,7 @@ public class ApplicationDbContext : IdentityDbContext
     {
     }
 
-    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -122,7 +123,8 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddDefaultTokenProviders();
 
 // ⭐ Add NuxtIdentity services (JWT tokens, refresh tokens, authentication)
-builder.Services.AddNuxtIdentity<ApplicationDbContext>(builder.Configuration);
+builder.Services.AddNuxtIdentityWithEntityFramework<IdentityUser, ApplicationDbContext>(
+    builder.Configuration);
 
 builder.Services.AddControllers();
 
