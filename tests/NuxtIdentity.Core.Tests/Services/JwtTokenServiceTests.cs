@@ -466,4 +466,74 @@ public class JwtTokenServiceTests
         jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
         jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Admin");
     }
+
+    [Test]
+    public async Task GenerateAccessTokenAsync_MultipleClaimsProviders_ExecutesSequentially()
+    {
+        // Given: Multiple claims providers that track execution order
+        var executionLog = new List<string>();
+        var activeProviders = 0;
+        var overlapsDetected = 0;
+
+        var provider1 = new Mock<IUserClaimsProvider<TestUser>>();
+        provider1.Setup(p => p.GetClaimsAsync(It.IsAny<TestUser>()))
+            .Returns(async () =>
+            {
+                var currentActive = Interlocked.Increment(ref activeProviders);
+                if (currentActive > 1)
+                    Interlocked.Increment(ref overlapsDetected);
+
+                executionLog.Add("provider1-start");
+                await Task.Delay(50); // Simulate async work
+                executionLog.Add("provider1-end");
+
+                Interlocked.Decrement(ref activeProviders);
+                return new List<Claim> { new Claim(ClaimTypes.Name, "testuser") };
+            });
+
+        var provider2 = new Mock<IUserClaimsProvider<TestUser>>();
+        provider2.Setup(p => p.GetClaimsAsync(It.IsAny<TestUser>()))
+            .Returns(async () =>
+            {
+                var currentActive = Interlocked.Increment(ref activeProviders);
+                if (currentActive > 1)
+                    Interlocked.Increment(ref overlapsDetected);
+
+                executionLog.Add("provider2-start");
+                await Task.Delay(50); // Simulate async work
+                executionLog.Add("provider2-end");
+
+                Interlocked.Decrement(ref activeProviders);
+                return new List<Claim> { new Claim(ClaimTypes.Email, "test@example.com") };
+            });
+
+        var optionsMock = new Mock<IOptions<JwtOptions>>();
+        optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
+
+        var serviceWithMultipleProviders = new JwtTokenService<TestUser>(
+            optionsMock.Object,
+            new[] { provider1.Object, provider2.Object },
+            _loggerMock.Object,
+            _timeProvider
+        );
+
+        // And: A test user
+        var user = new TestUser
+        {
+            Id = "user123",
+            Username = "testuser",
+            Email = "test@example.com"
+        };
+
+        // When: Generating a token
+        await serviceWithMultipleProviders.GenerateAccessTokenAsync(user);
+
+        // Then: No overlapping execution should have occurred
+        overlapsDetected.Should().Be(0, "claims providers should not execute in parallel");
+
+        // And: Provider 1 should complete before provider 2 starts
+        executionLog.Should().Equal(
+            "provider1-start", "provider1-end",
+            "provider2-start", "provider2-end");
+    }
 }

@@ -59,9 +59,13 @@ public partial class JwtTokenService<TUser>(
     {
         // NOTE: User identity claims are provided by IdenityUserClaimsProvider in ASP.NET Identity scenarios.
 
-        var claimsTasks = claimsProviders.Select(provider => provider.GetClaimsAsync(user));
-        var claimsArrays = await Task.WhenAll(claimsTasks);
-        var claims = claimsArrays.SelectMany(c => c).ToList();
+        // Sequential execution - multiple operations on the same DbContext instance cannot run in parallel
+        var claims = new List<Claim>();
+        foreach (var provider in claimsProviders)
+        {
+            var providerClaims = await provider.GetClaimsAsync(user);
+            claims.AddRange(providerClaims);
+        }
 
         var username = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "unknown";
 
