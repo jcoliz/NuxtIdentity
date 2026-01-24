@@ -35,10 +35,12 @@ In `appsettings.json`, add JWT configuration:
 
 ```json
 {
-  "JwtOptions": {
+  "Jwt": {
+    "Key": "your-base64-secret-key-min-32-bytes-long-change-in-production==",
     "Issuer": "https://localhost:5001",
     "Audience": "https://localhost:5001",
-    "SecretKey": "your-base64-secret-key-min-32-characters-long-change-in-production=="
+    "Lifespan": "01:00:00",
+    "RefreshTokenLifespan": "30.00:00:00"
   },
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=app.db"
@@ -46,7 +48,29 @@ In `appsettings.json`, add JWT configuration:
 }
 ```
 
-**Important:** Generate a strong secret key for production use and store it securely (e.g., in Azure Key Vault or user secrets).
+### JWT Configuration Options
+
+- **`Key`** (required): Base64-encoded secret key for signing tokens. Must be at least 32 bytes (256 bits) for HMAC-SHA256 security.
+- **`Issuer`** (required): Identifies who issued the token (e.g., your app name or URL).
+- **`Audience`** (required): Identifies who the token is intended for (e.g., your API URL).
+- **`Lifespan`** (optional): How long access tokens remain valid. Format: "HH:MM:SS" or "D.HH:MM:SS". Default: 1 hour.
+- **`RefreshTokenLifespan`** (optional): How long refresh tokens remain valid. Format: "D.HH:MM:SS". Default: 30 days.
+
+### Generating a Secure Key
+
+**PowerShell:**
+```powershell
+$bytes = [byte[]]::new(32)
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+**Bash (Linux/macOS):**
+```bash
+openssl rand -base64 32
+```
+
+**Important:** Never commit secrets to source control. Use user secrets for development and secure vaults (Azure Key Vault, AWS Secrets Manager) for production.
 
 ## Step 4: Create your Application DbContext
 
@@ -76,9 +100,9 @@ public class ApplicationDbContext : IdentityDbContext
 }
 ```
 
-## Step 5: Set up ASP.NET Core Identity and JWT Authentication
+## Step 5: Configure NuxtIdentity in Program.cs
 
-In `Program.cs`, configure services:
+Add these NuxtIdentity-specific configuration lines to your `Program.cs`:
 
 ```csharp
 using Microsoft.AspNetCore.Identity;
@@ -92,42 +116,31 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Configure Identity
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
-{
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = true;
-    options.Password.RequiredLength = 8;
-})
-.AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders();
+// Configure ASP.NET Core Identity
+builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
 
-// Add NuxtIdentity services
+// ⭐ Add NuxtIdentity services (JWT tokens, refresh tokens, authentication)
 builder.Services.AddNuxtIdentity<ApplicationDbContext>(builder.Configuration);
 
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-
+// ⭐ Add authentication middleware (must come before authorization)
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();
 ```
+
+The `AddNuxtIdentity` extension method automatically configures:
+- JWT token generation and validation
+- Refresh token storage and rotation
+- JWT Bearer authentication
+- User claims providers
 
 ## Step 6: Implement your Auth Controller
 
