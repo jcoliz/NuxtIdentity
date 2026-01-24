@@ -60,7 +60,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         var token = GenerateSecureToken();
         var tokenHash = HashToken(token);
 
-        var now = _timeProvider.GetUtcNow().DateTime;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = new RefreshTokenEntity
         {
             TokenHash = tokenHash,
@@ -112,7 +112,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             return false;
         }
 
-        if (entity.ExpiresAt < _timeProvider.GetUtcNow().DateTime)
+        if (entity.ExpiresAt < _timeProvider.GetUtcNow().UtcDateTime)
         {
             LogTokenExpired(userId, entity.ExpiresAt);
             return false;
@@ -135,7 +135,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         if (entity != null)
         {
             entity.IsRevoked = true;
-            entity.ExpiresAt = _timeProvider.GetUtcNow().DateTime.Add(_revokedTokenLifespan);
+            entity.ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.Add(_revokedTokenLifespan);
             await _context.SaveChangesAsync();
             LogOk();
         }
@@ -154,7 +154,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
-        var expirationDate = _timeProvider.GetUtcNow().DateTime.Add(_revokedTokenLifespan);
+        var expirationDate = _timeProvider.GetUtcNow().UtcDateTime.Add(_revokedTokenLifespan);
         foreach (var token in userTokens)
         {
             token.IsRevoked = true;
@@ -178,7 +178,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     {
         LogStarting();
 
-        var now = _timeProvider.GetUtcNow().DateTime;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var tokensToDelete = await _context.Set<RefreshTokenEntity>()
             .Where(t => t.ExpiresAt < now)
