@@ -1,4 +1,5 @@
 using NuxtIdentity.Core.Abstractions;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace NuxtIdentity.Core.Tests.Helpers;
@@ -12,9 +13,9 @@ public class TestUserClaimsProvider : IUserClaimsProvider<TestUser>
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Email, user.Email)
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(JwtRegisteredClaimNames.Name, user.Username),
         };
 
         return Task.FromResult<IEnumerable<Claim>>(claims);

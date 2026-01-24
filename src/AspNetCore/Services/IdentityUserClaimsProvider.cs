@@ -106,11 +106,12 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
     /// </summary>
     private static void AddStandardClaims(ClaimBuilder builder, TUser user)
     {
-        builder.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id));
-        builder.AddClaim(new Claim(ClaimTypes.Name, user.UserName ?? ""));
-        builder.AddClaim(new Claim(ClaimTypes.Email, user.Email ?? ""));
-        builder.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.UserName ?? ""));
-        builder.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+        var _ = builder.AddClaimsWithCount([
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(JwtRegisteredClaimNames.Name, user.UserName ?? string.Empty),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        ]);
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -67,7 +68,7 @@ public partial class JwtTokenService<TUser>(
             claims.AddRange(providerClaims);
         }
 
-        var username = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "unknown";
+        var username = claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value ?? "unknown";
 
         LogStartingUsername(username);
 
@@ -114,6 +115,12 @@ public partial class JwtTokenService<TUser>(
             var validationParameters = GetTokenValidationParameters();
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
+            if (principal == null)
+            {
+                LogNoPrincipal();
+                return Task.FromResult<ClaimsPrincipal?>(null);
+            }
+            LogPrincipal(JsonSerializer.Serialize(principal.Identity));
             LogOk();
             return Task.FromResult<ClaimsPrincipal?>(principal);
         }
@@ -156,6 +163,12 @@ public partial class JwtTokenService<TUser>(
 
     [LoggerMessage(5, LogLevel.Warning, "{Location}: Validation failed")]
     private partial void LogValidationFailed(Exception ex, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(6, LogLevel.Debug, "{Location}: Principal {Principal}")]
+    private partial void LogPrincipal(string principal, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(7, LogLevel.Warning, "{Location}: No principal extracted from token")]
+    private partial void LogNoPrincipal([CallerMemberName] string? location = null);
 
     #endregion
 }

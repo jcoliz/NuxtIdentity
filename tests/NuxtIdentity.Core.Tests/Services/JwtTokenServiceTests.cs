@@ -84,11 +84,11 @@ public class JwtTokenServiceTests
         var jwtToken = handler.ReadJwtToken(token);
 
         // And it should have the user ID claim
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
+        jwtToken.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.Id);
         // And the username claim
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == user.Username);
+        jwtToken.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.Username);
         // And the email claim
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == user.Email);
+        jwtToken.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email);
     }
 
     [Test]
@@ -167,7 +167,7 @@ public class JwtTokenServiceTests
         // And it should contain the user ID claim
         principal!.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
         // And the username claim
-        principal.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == user.Username);
+        principal.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.Username);
     }
 
     [Test]
@@ -192,7 +192,7 @@ public class JwtTokenServiceTests
 
         // And it should contain all the user claims
         claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
-        claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == "testuser");
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == "testuser");
         claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
     }
 
@@ -237,8 +237,8 @@ public class JwtTokenServiceTests
         var jwt1 = handler.ReadJwtToken(token1);
         var jwt2 = handler.ReadJwtToken(token2);
 
-        jwt1.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value.Should().Be("user1");
-        jwt2.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value.Should().Be("user2");
+        jwt1.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value.Should().Be("user1");
+        jwt2.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value.Should().Be("user2");
     }
 
     [Test]
