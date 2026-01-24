@@ -326,7 +326,6 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <param name="request">The refresh token request.</param>
     /// <returns>New token pair if successful; otherwise, unauthorized.</returns>
     [HttpPost("refresh")]
-    [Authorize]
     [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> RefreshTokens([FromBody] RefreshRequest request)
