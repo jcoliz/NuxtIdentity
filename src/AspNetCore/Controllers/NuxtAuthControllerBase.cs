@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace NuxtIdentity.AspNetCore.Controllers;
 
@@ -59,6 +60,7 @@ namespace NuxtIdentity.AspNetCore.Controllers;
 [Route("api/auth")]
 public abstract partial class NuxtAuthControllerBase<TUser>(
     IJwtTokenService<TUser> jwtTokenService,
+    IEnumerable<IUserClaimsProvider<TUser>> claimsProviders,
     IRefreshTokenService refreshTokenService,
     UserManager<TUser> userManager,
     SignInManager<TUser> signInManager,
@@ -149,12 +151,26 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var roles = await UserManager.GetRolesAsync(user);
         var userClaims = await UserManager.GetClaimsAsync(user);
 
-        // Note: Role claims are not included here as they are already included in JWT tokens
-        // via the IdentityUserClaimsProvider. This method focuses on user-specific data.
+        var providedClaims = new List<Claim>();
+        foreach (var provider in claimsProviders)
+        {
+            if (provider is Services.IdentityUserClaimsProvider<TUser> identityProvider)
+            {
+                // Only get the stored claims, not the identity claims
+                var identityClaims = await identityProvider.GetStoredClaimsAsync(user);
+                providedClaims.AddRange(identityClaims);
+            }
+            else
+            {
+                var providerClaims = await provider.GetClaimsAsync(user);
+                providedClaims.AddRange(providerClaims);                                
+            }
+        }
+
         var allClaims = userClaims
-            .GroupBy(c => new { c.Type, c.Value })
-            .Select(g => g.First())
+            .Concat(providedClaims)
             .Select(c => new ClaimInfo { Type = c.Type, Value = c.Value })
+            .Distinct()
             .ToArray();
 
         return new UserInfo

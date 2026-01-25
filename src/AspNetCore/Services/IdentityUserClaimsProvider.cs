@@ -102,6 +102,31 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
     }
 
     /// <summary>
+    /// Retrieves claims stored in Identity for the user, including user and role claims.
+    /// </summary>
+    /// <remarks>
+    /// Does not include standard JWT claims like sub, jti, etc., as well as claims for
+    /// role membership. Does include stored user claims and claims from roles.
+    /// </remarks>
+    /// <param name="user"></param>
+    /// <returns></returns>
+    internal async Task<IEnumerable<Claim>> GetStoredClaimsAsync(TUser user)
+    {
+        LogStartingUserId(user.Id);
+    
+        var roles = await _userManager.GetRolesAsync(user);
+        var userClaims = await _userManager.GetClaimsAsync(user);
+        var claimBuilder = new ClaimBuilder();
+        AddUserClaims(claimBuilder, userClaims);
+        await AddRoleClaimsAsync(claimBuilder, roles);
+
+        var claims = claimBuilder.GetClaims();
+        LogOkUserIdCount(user.Id, claims.Count);
+
+        return claims;
+    }
+
+    /// <summary>
     /// Adds standard JWT claims for the user.
     /// </summary>
     private static void AddStandardClaims(ClaimBuilder builder, TUser user)
