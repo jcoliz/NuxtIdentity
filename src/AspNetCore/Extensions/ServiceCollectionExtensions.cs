@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -119,7 +120,11 @@ public static partial class NuxtIdentityServiceCollectionExtensions
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         })
-        .AddJwtBearer();
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
+            options.SaveToken = true;
+        });
 
         services.ConfigureOptions<JwtBearerOptionsSetup>();
 
