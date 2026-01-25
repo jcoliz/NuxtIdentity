@@ -120,11 +120,7 @@ public static partial class NuxtIdentityServiceCollectionExtensions
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         })
-        .AddJwtBearer(options =>
-        {
-            options.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
-            options.SaveToken = true;
-        });
+        .AddJwtBearer();
 
         services.ConfigureOptions<JwtBearerOptionsSetup>();
 
