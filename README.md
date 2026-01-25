@@ -1,5 +1,10 @@
 # Nuxt Identity
 
+[![Build](https://github.com/jcoliz/NuxtIdentity/actions/workflows/build.yaml/badge.svg)](https://github.com/jcoliz/NuxtIdentity/actions/workflows/build.yaml)
+[![NuGet](https://img.shields.io/nuget/v/NuxtIdentity.AspNetCore.svg)](https://www.nuget.org/packages/NuxtIdentity.AspNetCore/)
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 The **Nuxt Identity** project aims to be the .NET developer's companion to [@sidebase/nuxt-auth](https://auth.sidebase.io/). If you're developing a web application with a Nuxt frontend, and a .NET backend, the **Nuxt Identity** project will provide .NET libraries you can add to your application to get started quickly. Built on ASP.NET Core Identity, this project bridges the gap between .NET and Nuxt for auth and identity. 
 
 ## Why?
