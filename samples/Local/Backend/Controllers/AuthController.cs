@@ -26,12 +26,14 @@ namespace NuxtIdentity.Samples.Local.Backend.Controllers;
 /// </remarks>
 public class AuthController(
     IJwtTokenService<IdentityUser> jwtTokenService,
+    IEnumerable<IUserClaimsProvider<IdentityUser>> userClaimsProviders,
     IRefreshTokenService refreshTokenService,
     UserManager<IdentityUser> userManager,
     SignInManager<IdentityUser> signInManager,
     ILogger<AuthController> logger) 
     : NuxtAuthControllerBase<IdentityUser>(
         jwtTokenService, 
+        userClaimsProviders,
         refreshTokenService, 
         userManager,
         signInManager,
