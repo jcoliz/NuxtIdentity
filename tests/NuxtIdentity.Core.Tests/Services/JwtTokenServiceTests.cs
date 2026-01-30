@@ -141,8 +141,8 @@ public class JwtTokenServiceTests
 
         // Compare as Unix timestamps to avoid timezone conversion issues
         var expectedExpiration = currentTime.Add(_jwtOptions.Lifespan);
-        var actualExpiration = new DateTimeOffset(jwtToken.ValidTo).ToUnixTimeSeconds();
-        var expectedTimestamp = new DateTimeOffset(expectedExpiration).ToUnixTimeSeconds();
+        var actualExpiration = new DateTimeOffset(jwtToken.ValidTo, TimeSpan.Zero).ToUnixTimeSeconds();
+        var expectedTimestamp = new DateTimeOffset(expectedExpiration, TimeSpan.Zero).ToUnixTimeSeconds();
         actualExpiration.Should().Be(expectedTimestamp);
     }
 
@@ -411,8 +411,8 @@ public class JwtTokenServiceTests
 
         // Compare as Unix timestamps to avoid timezone conversion issues
         var expectedExpiration = currentTime.AddHours(2);
-        var actualExpiration = new DateTimeOffset(jwtToken.ValidTo).ToUnixTimeSeconds();
-        var expectedTimestamp = new DateTimeOffset(expectedExpiration).ToUnixTimeSeconds();
+        var actualExpiration = new DateTimeOffset(jwtToken.ValidTo, TimeSpan.Zero).ToUnixTimeSeconds();
+        var expectedTimestamp = new DateTimeOffset(expectedExpiration, TimeSpan.Zero).ToUnixTimeSeconds();
         actualExpiration.Should().Be(expectedTimestamp);
     }
 

@@ -89,37 +89,35 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     }
 
     /// <inheritdoc/>
-    public async Task<bool> ValidateRefreshTokenAsync(string token, string userId)
+    public async Task<string?> ValidateRefreshTokenAsync(string token)
     {
-        LogStartingUserId(userId);
+        LogStarting();
 
         var tokenHash = HashToken(token);
 
         var entity = await _context.Set<RefreshTokenEntity>()
-            .FirstOrDefaultAsync(t =>
-                t.TokenHash == tokenHash &&
-                t.UserId == userId);
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
 
         if (entity == null)
         {
-            LogTokenNotFound(userId);
-            return false;
+            LogTokenNotFoundForValidation();
+            return null;
         }
 
         if (entity.IsRevoked)
         {
-            LogTokenRevoked(userId);
-            return false;
+            LogTokenRevoked(entity.UserId);
+            return null;
         }
 
         if (entity.ExpiresAt < _timeProvider.GetUtcNow().UtcDateTime)
         {
-            LogTokenExpired(userId, entity.ExpiresAt);
-            return false;
+            LogTokenExpired(entity.UserId, entity.ExpiresAt);
+            return null;
         }
 
-        LogOkUserId(userId);
-        return true;
+        LogOkUserId(entity.UserId);
+        return entity.UserId;
     }
 
     /// <inheritdoc/>
@@ -256,6 +254,9 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
     [LoggerMessage(11, LogLevel.Warning, "{Location}: Cleanup failed")]
     private partial void LogCleanupFailed(Exception ex, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(12, LogLevel.Warning, "{Location}: Token not found for validation")]
+    private partial void LogTokenNotFoundForValidation([CallerMemberName] string? location = null);
 
     #endregion
 }

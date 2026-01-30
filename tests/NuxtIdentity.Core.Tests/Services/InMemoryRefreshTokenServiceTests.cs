@@ -76,53 +76,35 @@ public class InMemoryRefreshTokenServiceTests
     }
 
     [Test]
-    public async Task ValidateRefreshTokenAsync_ValidToken_ReturnsTrue()
+    public async Task ValidateRefreshTokenAsync_ValidToken_ReturnsUserId()
     {
         // Given a valid user ID
         var userId = "user123";
         // And a generated refresh token for that user
         var token = await _service.GenerateRefreshTokenAsync(userId);
 
-        // When validating the token with the correct user ID
-        var isValid = await _service.ValidateRefreshTokenAsync(token, userId);
+        // When validating the token
+        var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
-        // Then validation should succeed
-        isValid.Should().BeTrue();
+        // Then validation should return the user ID
+        returnedUserId.Should().Be(userId);
     }
 
     [Test]
-    public async Task ValidateRefreshTokenAsync_NonExistentToken_ReturnsFalse()
+    public async Task ValidateRefreshTokenAsync_NonExistentToken_ReturnsNull()
     {
-        // Given a valid user ID
-        var userId = "user123";
-        // And a token that was never generated
+        // Given a token that was never generated
         var nonExistentToken = Convert.ToBase64String(new byte[64]);
 
         // When validating the non-existent token
-        var isValid = await _service.ValidateRefreshTokenAsync(nonExistentToken, userId);
+        var returnedUserId = await _service.ValidateRefreshTokenAsync(nonExistentToken);
 
-        // Then validation should fail
-        isValid.Should().BeFalse();
+        // Then validation should return null
+        returnedUserId.Should().BeNull();
     }
 
     [Test]
-    public async Task ValidateRefreshTokenAsync_WrongUserId_ReturnsFalse()
-    {
-        // Given two different user IDs
-        var userId1 = "user123";
-        var userId2 = "user456";
-        // And a token generated for the first user
-        var token = await _service.GenerateRefreshTokenAsync(userId1);
-
-        // When validating the token with the wrong user ID
-        var isValid = await _service.ValidateRefreshTokenAsync(token, userId2);
-
-        // Then validation should fail
-        isValid.Should().BeFalse();
-    }
-
-    [Test]
-    public async Task ValidateRefreshTokenAsync_RevokedToken_ReturnsFalse()
+    public async Task ValidateRefreshTokenAsync_RevokedToken_ReturnsNull()
     {
         // Given a valid user ID
         var userId = "user123";
@@ -132,14 +114,14 @@ public class InMemoryRefreshTokenServiceTests
         await _service.RevokeRefreshTokenAsync(token);
 
         // When validating the revoked token
-        var isValid = await _service.ValidateRefreshTokenAsync(token, userId);
+        var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
-        // Then validation should fail
-        isValid.Should().BeFalse();
+        // Then validation should return null
+        returnedUserId.Should().BeNull();
     }
 
     [Test]
-    public async Task ValidateRefreshTokenAsync_ExpiredToken_ReturnsFalse()
+    public async Task ValidateRefreshTokenAsync_ExpiredToken_ReturnsNull()
     {
         // Given a fake time provider
         var fakeTime = new FakeTimeProvider();
@@ -156,10 +138,10 @@ public class InMemoryRefreshTokenServiceTests
         fakeTime.Advance(_jwtOptions.RefreshTokenLifespan.Add(TimeSpan.FromMinutes(1)));
 
         // And validating the expired token
-        var isValid = await serviceWithFakeTime.ValidateRefreshTokenAsync(token, userId);
+        var returnedUserId = await serviceWithFakeTime.ValidateRefreshTokenAsync(token);
 
-        // Then validation should fail
-        isValid.Should().BeFalse();
+        // Then validation should return null
+        returnedUserId.Should().BeNull();
     }
 
     [Test]
@@ -171,15 +153,15 @@ public class InMemoryRefreshTokenServiceTests
         var token = await _service.GenerateRefreshTokenAsync(userId);
 
         // And the token is valid before revocation
-        var isValidBefore = await _service.ValidateRefreshTokenAsync(token, userId);
-        isValidBefore.Should().BeTrue();
+        var userIdBefore = await _service.ValidateRefreshTokenAsync(token);
+        userIdBefore.Should().Be(userId);
 
         // When revoking the token
         await _service.RevokeRefreshTokenAsync(token);
 
         // Then the token should become invalid
-        var isValidAfter = await _service.ValidateRefreshTokenAsync(token, userId);
-        isValidAfter.Should().BeFalse();
+        var userIdAfter = await _service.ValidateRefreshTokenAsync(token);
+        userIdAfter.Should().BeNull();
     }
 
     [Test]
@@ -206,17 +188,17 @@ public class InMemoryRefreshTokenServiceTests
         var token3 = await _service.GenerateRefreshTokenAsync(userId);
 
         // And all tokens are valid before revocation
-        (await _service.ValidateRefreshTokenAsync(token1, userId)).Should().BeTrue();
-        (await _service.ValidateRefreshTokenAsync(token2, userId)).Should().BeTrue();
-        (await _service.ValidateRefreshTokenAsync(token3, userId)).Should().BeTrue();
+        (await _service.ValidateRefreshTokenAsync(token1)).Should().Be(userId);
+        (await _service.ValidateRefreshTokenAsync(token2)).Should().Be(userId);
+        (await _service.ValidateRefreshTokenAsync(token3)).Should().Be(userId);
 
         // When revoking all tokens for the user
         await _service.RevokeAllUserTokensAsync(userId);
 
         // Then all tokens should become invalid
-        (await _service.ValidateRefreshTokenAsync(token1, userId)).Should().BeFalse();
-        (await _service.ValidateRefreshTokenAsync(token2, userId)).Should().BeFalse();
-        (await _service.ValidateRefreshTokenAsync(token3, userId)).Should().BeFalse();
+        (await _service.ValidateRefreshTokenAsync(token1)).Should().BeNull();
+        (await _service.ValidateRefreshTokenAsync(token2)).Should().BeNull();
+        (await _service.ValidateRefreshTokenAsync(token3)).Should().BeNull();
     }
 
     [Test]
@@ -233,9 +215,9 @@ public class InMemoryRefreshTokenServiceTests
         await _service.RevokeAllUserTokensAsync(user1Id);
 
         // Then the first user's token should be invalid
-        (await _service.ValidateRefreshTokenAsync(user1Token, user1Id)).Should().BeFalse();
+        (await _service.ValidateRefreshTokenAsync(user1Token)).Should().BeNull();
         // And the second user's token should still be valid
-        (await _service.ValidateRefreshTokenAsync(user2Token, user2Id)).Should().BeTrue();
+        (await _service.ValidateRefreshTokenAsync(user2Token)).Should().Be(user2Id);
     }
 
     [Test]
@@ -252,7 +234,7 @@ public class InMemoryRefreshTokenServiceTests
     }
 
     [Test]
-    public async Task GenerateRefreshTokenAsync_DifferentUsers_TokensAreIsolated()
+    public async Task GenerateRefreshTokenAsync_DifferentUsers_TokensReturnCorrectUserId()
     {
         // Given two different user IDs
         var user1Id = "user123";
@@ -261,14 +243,9 @@ public class InMemoryRefreshTokenServiceTests
         var user1Token = await _service.GenerateRefreshTokenAsync(user1Id);
         var user2Token = await _service.GenerateRefreshTokenAsync(user2Id);
 
-        // When validating each token with its correct user
-        // Then each user's token should be valid for that user
-        (await _service.ValidateRefreshTokenAsync(user1Token, user1Id)).Should().BeTrue();
-        // And invalid for the other user
-        (await _service.ValidateRefreshTokenAsync(user1Token, user2Id)).Should().BeFalse();
-        // And the second user's token should be valid for that user
-        (await _service.ValidateRefreshTokenAsync(user2Token, user2Id)).Should().BeTrue();
-        // And invalid for the first user
-        (await _service.ValidateRefreshTokenAsync(user2Token, user1Id)).Should().BeFalse();
+        // When validating each token
+        // Then each token should return its associated user ID
+        (await _service.ValidateRefreshTokenAsync(user1Token)).Should().Be(user1Id);
+        (await _service.ValidateRefreshTokenAsync(user2Token)).Should().Be(user2Id);
     }
 }

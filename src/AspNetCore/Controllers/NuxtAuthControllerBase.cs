@@ -348,24 +348,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     {
         LogStarting();
 
-        var userId = GetCurrentUserId();
-        var username = GetCurrentUsername();
-
-        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
+        // Validate the refresh token and get user ID (no JWT required)
+        var userId = await RefreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken);
+        if (string.IsNullOrEmpty(userId))
         {
-            LogRefreshNoToken();
-            return Problem(
-                title: "Authentication Required",
-                detail: "No valid authentication token provided",
-                statusCode: StatusCodes.Status401Unauthorized
-            );
-        }
-
-        // Validate the refresh token
-        var isValid = await RefreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken, userId);
-        if (!isValid)
-        {
-            LogRefreshTokenInvalidUsername(username);
+            LogRefreshTokenInvalid();
             return Problem(
                 title: "Token Refresh Failed",
                 detail: "Invalid or expired refresh token",
@@ -377,7 +364,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var user = await GetUserByIdAsync(userId);
         if (user == null)
         {
-            LogRefreshTokenNoUserUsername(username);
+            LogRefreshTokenNoUser(userId);
             return Problem(
                 title: "User Not Found",
                 detail: "The authenticated user no longer exists",
@@ -387,7 +374,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
         var response = await CreateRefreshResponseAsync(user, request.RefreshToken);
 
-        LogOkUsername(username);
+        LogOkUsername(user.UserName ?? "unknown");
 
         return Ok(response);
     }
@@ -454,14 +441,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     [LoggerMessage(8, LogLevel.Warning, "{Location}: Unauthorized {Username}")]
     private partial void LogSessionUnauthorizedUsername(string username, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(9, LogLevel.Warning, "{Location}: No token")]
-    private partial void LogRefreshNoToken([CallerMemberName] string? location = null);
+    [LoggerMessage(9, LogLevel.Warning, "{Location}: Invalid refresh token")]
+    private partial void LogRefreshTokenInvalid([CallerMemberName] string? location = null);
 
-    [LoggerMessage(10, LogLevel.Warning, "{Location}: Invalid token {Username}")]
-    private partial void LogRefreshTokenInvalidUsername(string username, [CallerMemberName] string? location = null);
-
-    [LoggerMessage(11, LogLevel.Warning, "{Location}: No such user {Username}")]
-    private partial void LogRefreshTokenNoUserUsername(string username, [CallerMemberName] string? location = null);
+    [LoggerMessage(10, LogLevel.Warning, "{Location}: No such user {UserId}")]
+    private partial void LogRefreshTokenNoUser(string userId, [CallerMemberName] string? location = null);
 
     #endregion
 }

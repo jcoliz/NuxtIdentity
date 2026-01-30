@@ -208,8 +208,8 @@ public class ServiceCollectionExtensionsTests
         var token = await service.GenerateRefreshTokenAsync("testUser");
         token.Should().NotBeNullOrEmpty();
 
-        var isValid = await service.ValidateRefreshTokenAsync(token, "testUser");
-        isValid.Should().BeTrue();
+        var returnedUserId = await service.ValidateRefreshTokenAsync(token);
+        returnedUserId.Should().Be("testUser");
     }
 
     [Test]

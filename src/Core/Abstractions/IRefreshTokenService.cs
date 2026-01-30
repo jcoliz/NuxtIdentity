@@ -13,12 +13,15 @@ public interface IRefreshTokenService
     Task<string> GenerateRefreshTokenAsync(string userId);
 
     /// <summary>
-    /// Validates a refresh token for the specified user.
+    /// Validates a refresh token and returns the associated user ID if valid.
     /// </summary>
     /// <param name="token">The refresh token to validate.</param>
-    /// <param name="userId">The user ID to validate against.</param>
-    /// <returns>True if the token is valid; otherwise, false.</returns>
-    Task<bool> ValidateRefreshTokenAsync(string token, string userId);
+    /// <returns>The user ID if the token is valid; otherwise, null.</returns>
+    /// <remarks>
+    /// This method allows token validation without requiring the caller to know the user ID,
+    /// which is useful for refresh endpoints that don't require a valid access token.
+    /// </remarks>
+    Task<string?> ValidateRefreshTokenAsync(string token);
 
     /// <summary>
     /// Revokes a specific refresh token.

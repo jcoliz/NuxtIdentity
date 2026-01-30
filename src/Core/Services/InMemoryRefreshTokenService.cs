@@ -59,27 +59,25 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
     }
 
     /// <inheritdoc/>
-    public async Task<bool> ValidateRefreshTokenAsync(string token, string userId)
+    public async Task<string?> ValidateRefreshTokenAsync(string token)
     {
         var tokenHash = HashToken(token);
 
         await _lock.WaitAsync();
         try
         {
-            var entity = _tokens.FirstOrDefault(t =>
-                t.TokenHash == tokenHash &&
-                t.UserId == userId);
+            var entity = _tokens.FirstOrDefault(t => t.TokenHash == tokenHash);
 
             if (entity == null)
-                return false;
+                return null;
 
             if (entity.IsRevoked)
-                return false;
+                return null;
 
             if (entity.ExpiresAt < _timeProvider.GetUtcNow().DateTime)
-                return false;
+                return null;
 
-            return true;
+            return entity.UserId;
         }
         finally
         {
