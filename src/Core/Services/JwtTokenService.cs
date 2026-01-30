@@ -87,9 +87,9 @@ public partial class JwtTokenService<TUser>(
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var expires = _jwtOptions.Lifespan != TimeSpan.Zero
-            ? _timeProvider.GetUtcNow().Add(_jwtOptions.Lifespan).DateTime
+            ? _timeProvider.GetUtcNow().Add(_jwtOptions.Lifespan).UtcDateTime
 #pragma warning disable CS0618 // Intentional use of obsolete property for backward compatibility
-            : _timeProvider.GetUtcNow().AddHours(_jwtOptions.ExpirationHours).DateTime;
+            : _timeProvider.GetUtcNow().AddHours(_jwtOptions.ExpirationHours).UtcDateTime;
 #pragma warning restore CS0618
 
         var token = new JwtSecurityToken(
