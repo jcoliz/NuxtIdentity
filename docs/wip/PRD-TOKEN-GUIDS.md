@@ -1,6 +1,6 @@
 ---
 status: In Review # Draft | In Review | Approved | Implemented
-design_document: [Link to design document]
+design_document: DESIGN-TOKEN-GUIDS.md
 ado: [Link to ADO Item]
 ---
 
