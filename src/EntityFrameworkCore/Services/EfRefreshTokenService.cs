@@ -57,12 +57,14 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     {
         LogStartingUserId(userId);
 
-        var token = GenerateSecureToken();
-        var tokenHash = HashToken(token);
+        var key = Guid.NewGuid();
+        var secret = GenerateSecureToken();
+        var tokenHash = HashToken(secret);
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = new RefreshTokenEntity
         {
+            Key = key,
             TokenHash = tokenHash,
             UserId = userId,
             ExpiresAt = now.Add(_jwtOptions.RefreshTokenLifespan),
@@ -84,10 +86,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             LogCleanupFailed(ex);
         }
 
-        LogTokenGenerated(token, userId);
-
-        LogOkUserId(userId);
-        return token;
+        LogOkTokenUserId(userId, key);
+        return FormatToken(key, secret);
     }
 
     /// <inheritdoc/>
@@ -95,32 +95,42 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     {
         LogStarting();
 
-        var tokenHash = HashToken(token);
+        if (!TryParseToken(token, out var key, out var secret))
+        {
+            LogOldFormatToken();
+            return null;
+        }
+
+        var secretHash = HashToken(secret);
 
         var entity = await _context.Set<RefreshTokenEntity>()
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+            .FirstOrDefaultAsync(t => t.Key == key);
 
         if (entity == null)
         {
-            LogTokenNotFoundForValidation(token);
+            LogTokenKeyNotFound(key);
+            return null;
+        }
+
+        if (entity.TokenHash != secretHash)
+        {
+            LogTokenSecretMismatch(key, entity.UserId);
             return null;
         }
 
         if (entity.IsRevoked)
         {
-            LogTokenInvalidBecauseRevoked(token,entity.UserId);
+            LogTokenInvalidBecauseRevoked(key, entity.UserId);
             return null;
         }
 
         if (entity.ExpiresAt < _timeProvider.GetUtcNow().UtcDateTime)
         {
-            LogTokenExpired(token,entity.UserId, entity.ExpiresAt);
+            LogTokenExpired(key, entity.UserId, entity.ExpiresAt);
             return null;
         }
 
-        LogTokenValidated(token, entity.UserId);
-
-        LogOkUserId(entity.UserId);
+        LogOkTokenUserId(entity.UserId, key);
         return entity.UserId;
     }
 
@@ -129,10 +139,14 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     {
         LogStarting();
 
-        var tokenHash = HashToken(token);
+        if (!TryParseToken(token, out var key, out _))
+        {
+            LogOldFormatToken();
+            return;
+        }
 
         var entity = await _context.Set<RefreshTokenEntity>()
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+            .FirstOrDefaultAsync(t => t.Key == key);
 
         if (entity != null)
         {
@@ -140,13 +154,7 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             entity.ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.Add(_revokedTokenLifespan);
             await _context.SaveChangesAsync();
 
-            LogTokenRevoked(token, entity.UserId);
-
-            LogOk();
-        }
-        else
-        {
-            LogTokenNotFoundForRevocation(token);
+            LogOkTokenUserId(entity.UserId, key);
         }
     }
 
@@ -227,6 +235,46 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         return Convert.ToBase64String(bytes);
     }
 
+    /// <summary>
+    /// Formats a token key and secret into the composite token string.
+    /// </summary>
+    /// <param name="key">The token key GUID.</param>
+    /// <param name="secret">The token secret.</param>
+    /// <returns>The formatted token string in the format {Key}.{Secret}.</returns>
+    private static string FormatToken(Guid key, string secret)
+    {
+        return $"{key}.{secret}";
+    }
+
+    /// <summary>
+    /// Attempts to parse a composite token into its key and secret components.
+    /// </summary>
+    /// <param name="token">The composite token string.</param>
+    /// <param name="key">The parsed GUID key.</param>
+    /// <param name="secret">The parsed secret portion.</param>
+    /// <returns>True if parsing succeeded; false for old-format or invalid tokens.</returns>
+    private static bool TryParseToken(string token, out Guid key, out string secret)
+    {
+        key = Guid.Empty;
+        secret = string.Empty;
+
+        if (string.IsNullOrEmpty(token))
+            return false;
+
+        // GUID is 36 characters (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+        // Token format: {Key}.{Secret}
+        var dotIndex = token.IndexOf('.');
+        if (dotIndex != 36)
+            return false;
+
+        var keyPart = token.AsSpan(0, 36);
+        if (!Guid.TryParse(keyPart, out key))
+            return false;
+
+        secret = token[(dotIndex + 1)..];
+        return !string.IsNullOrEmpty(secret);
+    }
+
     #region Logger Messages
 
     [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
@@ -238,41 +286,34 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(3, LogLevel.Information, "{Location}: OK")]
     private partial void LogOk([CallerMemberName] string? location = null);
 
-    [LoggerMessage(4, LogLevel.Information, "{Location}: OK {UserId}")]
-    private partial void LogOkUserId(string userId, [CallerMemberName] string? location = null);
-
     [LoggerMessage(5, LogLevel.Information, "{Location}: OK {UserId} {Count}")]
     private partial void LogOkUserIdCount(string userId, int count, [CallerMemberName] string? location = null);
 
     [LoggerMessage(6, LogLevel.Information, "{Location}: OK {Count}")]
     private partial void LogOkCount(int count, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(7, LogLevel.Warning, "{Location}: Token {token} not found {UserId}")]
-    private partial void LogTokenNotFound(string token, string userId, [CallerMemberName] string? location = null);
-
-    [LoggerMessage(8, LogLevel.Warning, "{Location}: Token {token} is invalid {UserId}, because it was revoked")]
-    private partial void LogTokenInvalidBecauseRevoked(string token, string userId, [CallerMemberName] string? location = null);
-
-    [LoggerMessage(9, LogLevel.Warning, "{Location}: Token {token} expired {UserId} {ExpiresAt}")]
-    private partial void LogTokenExpired(string token, string userId, DateTime expiresAt, [CallerMemberName] string? location = null);
-
-    [LoggerMessage(10, LogLevel.Warning, "{Location}: Token {token} not found for revocation")]
-    private partial void LogTokenNotFoundForRevocation(string token, [CallerMemberName] string? location = null);
-
     [LoggerMessage(11, LogLevel.Warning, "{Location}: Cleanup failed")]
     private partial void LogCleanupFailed(Exception ex, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(12, LogLevel.Warning, "{Location}: Token {token} not found for validation")]
-    private partial void LogTokenNotFoundForValidation(string token, [CallerMemberName] string? location = null);
+    // New log messages for key-based token operations (event IDs 16+)
 
-    [LoggerMessage(13, LogLevel.Debug, "{Location}: Token {token} generated for {UserId}")]
-    private partial void LogTokenGenerated(string token, string userId, [CallerMemberName] string? location = null);
+    [LoggerMessage(16, LogLevel.Information, "{Location}: OK Token {TokenKey} for {UserId}")]
+    private partial void LogOkTokenUserId(string userId, Guid tokenKey, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(14, LogLevel.Debug, "{Location}: Token {token} validated for {UserId}")]
-    private partial void LogTokenValidated(string token, string userId, [CallerMemberName] string? location = null);
+    [LoggerMessage(17, LogLevel.Warning, "{Location}: Token {TokenKey} secret mismatch {UserId}")]
+    private partial void LogTokenSecretMismatch(Guid tokenKey, string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(15, LogLevel.Debug, "{Location}: Token {token} revoked for {UserId}")]
-    private partial void LogTokenRevoked(string token, string userId, [CallerMemberName] string? location = null);
+    [LoggerMessage(18, LogLevel.Warning, "{Location}: Token {TokenKey} is invalid {UserId}, because it was revoked")]
+    private partial void LogTokenInvalidBecauseRevoked(Guid tokenKey, string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(19, LogLevel.Warning, "{Location}: Token {TokenKey} expired {UserId} {ExpiresAt}")]
+    private partial void LogTokenExpired(Guid tokenKey, string userId, DateTime expiresAt, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(20, LogLevel.Warning, "{Location}: Token {TokenKey} not found")]
+    private partial void LogTokenKeyNotFound(Guid tokenKey, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(21, LogLevel.Debug, "{Location}: Old-format token received")]
+    private partial void LogOldFormatToken([CallerMemberName] string? location = null);
 
     #endregion
 }

@@ -11,7 +11,16 @@ public class RefreshTokenEntity
     public int Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the hashed value of the refresh token.
+    /// Gets or sets the GUID key for this token, used for lookups and safe logging.
+    /// </summary>
+    /// <remarks>
+    /// This key is included in the token string returned to clients in the format {Key}.{Secret}.
+    /// It can be safely logged for distributed tracing without exposing credentials.
+    /// </remarks>
+    public Guid Key { get; set; }
+
+    /// <summary>
+    /// Gets or sets the hashed value of the refresh token secret.
     /// </summary>
     public string TokenHash { get; set; } = string.Empty;
 

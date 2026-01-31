@@ -32,8 +32,9 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
     /// <inheritdoc/>
     public async Task<string> GenerateRefreshTokenAsync(string userId)
     {
-        var token = GenerateSecureToken();
-        var tokenHash = HashToken(token);
+        var key = Guid.NewGuid();
+        var secret = GenerateSecureToken();
+        var tokenHash = HashToken(secret);
 
         await _lock.WaitAsync();
         try
@@ -42,6 +43,7 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
             var entity = new RefreshTokenEntity
             {
                 Id = _nextId++,
+                Key = key,
                 TokenHash = tokenHash,
                 UserId = userId,
                 ExpiresAt = now.Add(_jwtOptions.RefreshTokenLifespan),
@@ -50,7 +52,7 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
             };
 
             _tokens.Add(entity);
-            return token;
+            return FormatToken(key, secret);
         }
         finally
         {
@@ -61,14 +63,20 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
     /// <inheritdoc/>
     public async Task<string?> ValidateRefreshTokenAsync(string token)
     {
-        var tokenHash = HashToken(token);
+        if (!TryParseToken(token, out var key, out var secret))
+            return null;
+
+        var secretHash = HashToken(secret);
 
         await _lock.WaitAsync();
         try
         {
-            var entity = _tokens.FirstOrDefault(t => t.TokenHash == tokenHash);
+            var entity = _tokens.FirstOrDefault(t => t.Key == key);
 
             if (entity == null)
+                return null;
+
+            if (entity.TokenHash != secretHash)
                 return null;
 
             if (entity.IsRevoked)
@@ -88,12 +96,13 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
     /// <inheritdoc/>
     public async Task RevokeRefreshTokenAsync(string token)
     {
-        var tokenHash = HashToken(token);
+        if (!TryParseToken(token, out var key, out _))
+            return;
 
         await _lock.WaitAsync();
         try
         {
-            var entity = _tokens.FirstOrDefault(t => t.TokenHash == tokenHash);
+            var entity = _tokens.FirstOrDefault(t => t.Key == key);
             if (entity != null)
             {
                 entity.IsRevoked = true;
@@ -121,6 +130,46 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
         {
             _lock.Release();
         }
+    }
+
+    /// <summary>
+    /// Formats a token key and secret into the composite token string.
+    /// </summary>
+    /// <param name="key">The token key GUID.</param>
+    /// <param name="secret">The token secret.</param>
+    /// <returns>The formatted token string in the format {Key}.{Secret}.</returns>
+    private static string FormatToken(Guid key, string secret)
+    {
+        return $"{key}.{secret}";
+    }
+
+    /// <summary>
+    /// Attempts to parse a composite token into its key and secret components.
+    /// </summary>
+    /// <param name="token">The composite token string.</param>
+    /// <param name="key">The parsed GUID key.</param>
+    /// <param name="secret">The parsed secret portion.</param>
+    /// <returns>True if parsing succeeded; false for old-format or invalid tokens.</returns>
+    private static bool TryParseToken(string token, out Guid key, out string secret)
+    {
+        key = Guid.Empty;
+        secret = string.Empty;
+
+        if (string.IsNullOrEmpty(token))
+            return false;
+
+        // GUID is 36 characters (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+        // Token format: {Key}.{Secret}
+        var dotIndex = token.IndexOf('.');
+        if (dotIndex != 36)
+            return false;
+
+        var keyPart = token.AsSpan(0, 36);
+        if (!Guid.TryParse(keyPart, out key))
+            return false;
+
+        secret = token[(dotIndex + 1)..];
+        return !string.IsNullOrEmpty(secret);
     }
 
     private static string GenerateSecureToken()

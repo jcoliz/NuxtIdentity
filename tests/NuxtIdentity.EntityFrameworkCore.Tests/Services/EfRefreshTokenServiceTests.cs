@@ -382,7 +382,7 @@ public class EfRefreshTokenServiceTests
     }
 
     [Test]
-    public async Task GenerateRefreshTokenAsync_ValidUserId_ReturnsBase64String()
+    public async Task GenerateRefreshTokenAsync_ValidUserId_ReturnsKeyDotSecretFormat()
     {
         // Given a valid user ID
         var userId = "user123";
@@ -393,8 +393,17 @@ public class EfRefreshTokenServiceTests
         // Then the token should not be empty
         token.Should().NotBeNullOrEmpty();
 
-        // And it should be a valid base64 string
-        Action act = () => Convert.FromBase64String(token);
+        // And it should be in the format {GUID}.{base64}
+        var dotIndex = token.IndexOf('.');
+        dotIndex.Should().Be(36, "GUID is 36 characters, followed by a period");
+
+        // And the first part should be a valid GUID
+        var guidPart = token[..36];
+        Guid.TryParse(guidPart, out _).Should().BeTrue("first part should be a valid GUID");
+
+        // And the second part should be a valid base64 string
+        var secretPart = token[(dotIndex + 1)..];
+        Action act = () => Convert.FromBase64String(secretPart);
         act.Should().NotThrow();
     }
 
@@ -435,6 +444,7 @@ public class EfRefreshTokenServiceTests
         var pastTime = _timeProvider.GetUtcNow().AddDays(-_jwtOptions.RefreshTokenLifespan.TotalDays - 1);
         faultyContext.RefreshTokens.Add(new Core.Models.RefreshTokenEntity
         {
+            Key = Guid.NewGuid(),
             TokenHash = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(expiredToken))),
             UserId = userId,
             ExpiresAt = pastTime.DateTime,

@@ -34,8 +34,10 @@ public static class NuxtIdentityModelBuilderExtensions
         modelBuilder.Entity<RefreshTokenEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Key).IsUnique();
             entity.HasIndex(e => e.TokenHash);
             entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.Key).IsRequired();
             entity.Property(e => e.TokenHash).IsRequired();
             entity.Property(e => e.UserId).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();

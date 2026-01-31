@@ -1,5 +1,5 @@
 ---
-status: Approved
+status: Implemented
 prd: PRD-TOKEN-GUIDS.md
 ---
 
