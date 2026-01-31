@@ -84,6 +84,8 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             LogCleanupFailed(ex);
         }
 
+        LogTokenGenerated(token, userId);
+
         LogOkUserId(userId);
         return token;
     }
@@ -100,21 +102,23 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
 
         if (entity == null)
         {
-            LogTokenNotFoundForValidation();
+            LogTokenNotFoundForValidation(token);
             return null;
         }
 
         if (entity.IsRevoked)
         {
-            LogTokenRevoked(entity.UserId);
+            LogTokenInvalidBecauseRevoked(token,entity.UserId);
             return null;
         }
 
         if (entity.ExpiresAt < _timeProvider.GetUtcNow().UtcDateTime)
         {
-            LogTokenExpired(entity.UserId, entity.ExpiresAt);
+            LogTokenExpired(token,entity.UserId, entity.ExpiresAt);
             return null;
         }
+
+        LogTokenValidated(token, entity.UserId);
 
         LogOkUserId(entity.UserId);
         return entity.UserId;
@@ -135,11 +139,14 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
             entity.IsRevoked = true;
             entity.ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.Add(_revokedTokenLifespan);
             await _context.SaveChangesAsync();
+
+            LogTokenRevoked(token, entity.UserId);
+
             LogOk();
         }
         else
         {
-            LogTokenNotFoundForRevocation();
+            LogTokenNotFoundForRevocation(token);
         }
     }
 
@@ -240,23 +247,32 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(6, LogLevel.Information, "{Location}: OK {Count}")]
     private partial void LogOkCount(int count, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(7, LogLevel.Warning, "{Location}: Token not found {UserId}")]
-    private partial void LogTokenNotFound(string userId, [CallerMemberName] string? location = null);
+    [LoggerMessage(7, LogLevel.Warning, "{Location}: Token {token} not found {UserId}")]
+    private partial void LogTokenNotFound(string token, string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(8, LogLevel.Warning, "{Location}: Token revoked {UserId}")]
-    private partial void LogTokenRevoked(string userId, [CallerMemberName] string? location = null);
+    [LoggerMessage(8, LogLevel.Warning, "{Location}: Token {token} is invalid {UserId}, because it was revoked")]
+    private partial void LogTokenInvalidBecauseRevoked(string token, string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(9, LogLevel.Warning, "{Location}: Token expired {UserId} {ExpiresAt}")]
-    private partial void LogTokenExpired(string userId, DateTime expiresAt, [CallerMemberName] string? location = null);
+    [LoggerMessage(9, LogLevel.Warning, "{Location}: Token {token} expired {UserId} {ExpiresAt}")]
+    private partial void LogTokenExpired(string token, string userId, DateTime expiresAt, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(10, LogLevel.Warning, "{Location}: Token not found for revocation")]
-    private partial void LogTokenNotFoundForRevocation([CallerMemberName] string? location = null);
+    [LoggerMessage(10, LogLevel.Warning, "{Location}: Token {token} not found for revocation")]
+    private partial void LogTokenNotFoundForRevocation(string token, [CallerMemberName] string? location = null);
 
     [LoggerMessage(11, LogLevel.Warning, "{Location}: Cleanup failed")]
     private partial void LogCleanupFailed(Exception ex, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(12, LogLevel.Warning, "{Location}: Token not found for validation")]
-    private partial void LogTokenNotFoundForValidation([CallerMemberName] string? location = null);
+    [LoggerMessage(12, LogLevel.Warning, "{Location}: Token {token} not found for validation")]
+    private partial void LogTokenNotFoundForValidation(string token, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(13, LogLevel.Debug, "{Location}: Token {token} generated for {UserId}")]
+    private partial void LogTokenGenerated(string token, string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(14, LogLevel.Debug, "{Location}: Token {token} validated for {UserId}")]
+    private partial void LogTokenValidated(string token, string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(15, LogLevel.Debug, "{Location}: Token {token} revoked for {UserId}")]
+    private partial void LogTokenRevoked(string token, string userId, [CallerMemberName] string? location = null);
 
     #endregion
 }
