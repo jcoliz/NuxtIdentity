@@ -34,7 +34,7 @@ jobs:
     - name: Display Coverage Summary
       run: cat ./TestResults/CoverageReport/Summary.txt
     - name: Upload Coverage Report
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: coverage-report
