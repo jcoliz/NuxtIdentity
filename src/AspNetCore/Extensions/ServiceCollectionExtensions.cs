@@ -74,6 +74,8 @@ public static partial class NuxtIdentityServiceCollectionExtensions
                 "JWT Issuer is required. Configure Jwt:Issuer in appsettings.json with a unique value for your application.")
             .Validate(options => !string.IsNullOrWhiteSpace(options.Audience),
                 "JWT Audience is required. Configure Jwt:Audience in appsettings.json with a unique value for your application.")
+            .Validate(options => options.ClockSkew >= TimeSpan.Zero && options.ClockSkew <= TimeSpan.FromMinutes(5),
+                "JWT ClockSkew must be between 00:00:00 and 00:05:00. Use a small value (for example 00:00:30) to tolerate minor clock drift.")
             .ValidateOnStart();
 
         // Add authentication with the parameterless overload

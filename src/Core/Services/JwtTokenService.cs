@@ -143,7 +143,7 @@ public partial class JwtTokenService<TUser>(
             ValidateAudience = true,
             ValidAudience = _jwtOptions.Audience,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = _jwtOptions.ClockSkew
         };
     }
 

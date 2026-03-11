@@ -89,7 +89,7 @@ public class JwtBearerOptionsSetupTests
     }
 
     [Test]
-    public void Configure_DefaultScheme_SetsClockSkewToZero()
+    public void Configure_DefaultScheme_SetsClockSkewFromOptions()
     {
         // Arrange
         var jwtOptions = TestJwtOptions.Create();
@@ -101,7 +101,7 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.ClockSkew.Should().Be(TimeSpan.Zero);
+        bearerOptions.TokenValidationParameters.ClockSkew.Should().Be(jwtOptions.ClockSkew);
     }
 
     [Test]

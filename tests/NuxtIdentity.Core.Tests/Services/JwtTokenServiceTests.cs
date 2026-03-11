@@ -214,8 +214,8 @@ public class JwtTokenServiceTests
         parameters.ValidAudience.Should().Be(_jwtOptions.Audience);
         // And lifetime validation should be enabled
         parameters.ValidateLifetime.Should().BeTrue();
-        // And clock skew should be zero
-        parameters.ClockSkew.Should().Be(TimeSpan.Zero);
+        // And clock skew should come from options
+        parameters.ClockSkew.Should().Be(_jwtOptions.ClockSkew);
     }
 
     [Test]

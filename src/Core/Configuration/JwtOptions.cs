@@ -88,6 +88,16 @@ public class JwtOptions
     public TimeSpan RefreshTokenLifespan { get; set; } = TimeSpan.FromDays(30);
 
     /// <summary>
+    /// Gets or sets the allowed clock skew for token lifetime validation.
+    /// </summary>
+    /// <remarks>
+    /// <para>Allows small differences between issuer and validator system clocks when checking nbf/exp claims.</para>
+    /// <para>Default is 30 seconds to tolerate minor drift while remaining strict for security.</para>
+    /// <para>Can be configured in appsettings.json as a timespan string (e.g., "00:00:30").</para>
+    /// </remarks>
+    public TimeSpan ClockSkew { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Gets or sets the token expiration time in hours.
     /// </summary>
     /// <remarks>

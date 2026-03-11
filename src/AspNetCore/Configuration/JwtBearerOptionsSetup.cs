@@ -58,7 +58,7 @@ public class JwtBearerOptionsSetup : IConfigureNamedOptions<JwtBearerOptions>
             ValidateAudience = true,
             ValidAudience = _jwtOptions.Audience,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero,
+            ClockSkew = _jwtOptions.ClockSkew,
             NameClaimType = JwtRegisteredClaimNames.Name
         };
     }
