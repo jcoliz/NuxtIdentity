@@ -1,5 +1,5 @@
 ---
-status: Draft
+status: In Review
 design_document: TBD
 ado: TBD
 ---
@@ -17,16 +17,18 @@ Users need a way to sign up for an application, and administrators need a way to
 ### Goals
 - [ ] Extend the existing signup endpoint to support invitation-based registration, where an invitation code is required and carries pre-assigned roles, claims, and application-defined entitlements
 - [ ] Provide email confirmation flow endpoints so consuming apps can require users to verify their email address before gaining full access
-- [ ] Provide invitation administration endpoints so administrators can create, view, and revoke invitations
-- [ ] Own the invitation entity in NuxtIdentity with EF Core storage, including lifecycle states (pending, accepted, expired, revoked)
+- [ ] Provide an `IInvitationService` API so developers can build their own invitation administration experience (create, list, revoke invitations) tailored to their application
+- [ ] Maintain the invitation entity in NuxtIdentity with EF Core storage, including lifecycle states (pending, accepted, expired, revoked)
 - [ ] Enable developers to control registration behavior through virtual method overrides on the base controller, following the existing extensibility pattern
-- [ ] Build on the existing `IUserNotifier<TUser>` interface (from Password Management PRD) for all email correspondence (invitation emails, confirmation emails)
+- [ ] Build on the existing `IUserNotifier<TUser>` interface (from Password Management PRD) for email confirmation correspondence
 
 ### Non-Goals
-- Will NOT implement email delivery -- the library provides the `IUserNotifier<TUser>` abstraction; consumers implement delivery
+- Will NOT implement email delivery -- the library provides the `IUserNotifier<TUser>` abstraction for email confirmation; consumers implement delivery
+- Will NOT deliver invitation notifications -- `IInvitationService.CreateAsync` returns the invitation; the developer is responsible for notifying the recipient through their own mechanism
 - Will NOT provide a UI for invitation management or registration -- this is a backend API library
+- Will NOT provide admin endpoints for invitation management -- the library provides `IInvitationService` and the developer builds their own admin controller with their own authorization requirements
 - Will NOT implement user administration (listing users, assigning roles/claims to existing users) -- that is a separate feature. After registration and confirmation, the developer's `OnUserConfirmedAsync` hook grants baseline access; further entitlement upgrades by an admin are a user-administration concern
-- Will NOT manage application-specific entitlements (e.g., list access in ListsWebApp) -- the library provides hooks for the consuming app to act on
+- Will NOT manage application-specific entitlements (e.g., list access in ListsWebApp) -- the library provides hooks and metadata for the consuming app to act on
 - Will NOT implement rate limiting on registration endpoints -- this is an infrastructure concern
 
 ---
@@ -43,13 +45,13 @@ Users need a way to sign up for an application, and administrators need a way to
 
 ### Invitation-based Registration
 
-1. Administrator creates an invitation via `POST /api/auth/invitations`, specifying an email address, roles, claims, and expiration
-2. `IUserNotifier.SendInvitationAsync` is called -- the consuming app delivers the invitation link to the prospective user
+1. Administrator uses an application-specific admin interface that calls `IInvitationService.CreateAsync` to create an invitation, specifying an email address, roles, claims, application-specific metadata, and expiration
+2. The developer delivers the invitation link to the prospective user through their own mechanism (email, in-app notification, etc.)
 3. New user navigates to the registration page with the invitation code
 4. Frontend validates the invitation code via `GET /api/auth/invitations/{code}` to display appropriate UI
 5. User completes registration via `POST /api/auth/signup` with the invitation code
 6. NuxtIdentity assigns the roles and claims from the invitation to the new user
-7. Developer's `OnInvitationAcceptedAsync` hook runs for application-defined entitlement actions
+7. Developer's `OnInvitationAcceptedAsync` hook runs with the full invitation entity (including metadata) for application-defined entitlement actions
 8. User logs in and uses the newly-assigned access
 
 ---
@@ -65,7 +67,7 @@ Users need a way to sign up for an application, and administrators need a way to
 - [ ] The existing `POST /api/auth/signup` endpoint accepts an optional `InvitationCode` field
 - [ ] When a valid invitation code is provided, the user is created and assigned the roles and claims from the invitation
 - [ ] After successful registration, the invitation status is updated to "Accepted" so it cannot be reused
-- [ ] The `OnInvitationAcceptedAsync` hook is called with the user and the invitation entity
+- [ ] The `OnInvitationAcceptedAsync` hook is called with the user and the invitation entity (including metadata)
 - [ ] The existing `OnUserCreatedAsync` hook is still called for all signups (with or without invitation)
 
 ### Story 2: User - Cannot register with invalid invitation
@@ -79,63 +81,65 @@ Users need a way to sign up for an application, and administrators need a way to
 - [ ] An expired invitation returns 400 Bad Request with "invitation has expired"
 - [ ] A revoked invitation returns 400 Bad Request with "invitation has been revoked"
 
-### Story 3: User - Validate invitation code before registration
-**As a** frontend application
+### Story 3: Developer - Validate invitation code before registration
+**As a** developer building a registration frontend
 **I want** to validate an invitation code before showing the registration form
-**So that** users see appropriate UI messages (errors, or a pre-filled registration form)
+**So that** my frontend can render appropriate UI based on the invitation state
 
 **Acceptance Criteria**:
 - [ ] A `GET /api/auth/invitations/{code}` endpoint validates the invitation code
-- [ ] For a valid, pending invitation: returns 200 OK with the invitation email (so the frontend can pre-fill)
-- [ ] For an unknown code: returns 404 Not Found
-- [ ] For a used invitation: returns 400 Bad Request with "already used" message
-- [ ] For an expired invitation: returns 400 Bad Request with "expired" message
-- [ ] For a revoked invitation: returns 400 Bad Request with "revoked" message
+- [ ] All responses return 200 OK with an `InvitationStatus` enum value — the endpoint always succeeds in answering "what is the status of this code?"
+- [ ] For a valid, pending invitation: returns status `Pending` with the invitation email (so the frontend can pre-fill the registration form)
+- [ ] For a used (accepted) invitation: returns status `Accepted` — the frontend can suggest signing in instead
+- [ ] For an expired invitation: returns status `Expired`
+- [ ] For a revoked invitation: returns status `Revoked`
+- [ ] For an unknown code: returns status `NotFound`
 - [ ] This endpoint does not require authentication
 
 ### Story 4: User - Signup rejected without invitation when required
-**As a** developer who requires invitation-based registration
-**I want** signup without an invitation code to be rejected
-**So that** only invited users can create accounts
+**As a** user attempting to register on an invitation-only application
+**I want** to receive a clear rejection when I try to sign up without an invitation code
+**So that** I understand that an invitation is required to create an account
 
 **Acceptance Criteria**:
-- [ ] The base controller provides a virtual `RegistrationOptions` property that returns configuration including `RequireInvitation` (default: `false`)
-- [ ] When `RequireInvitation` is `true`, a signup request without an invitation code returns 403 Forbidden with "invitation required" message
-- [ ] When `RequireInvitation` is `false`, signup without an invitation code follows the open registration flow
+- [ ] The base controller provides a virtual `RegistrationOptions` property that returns configuration including `Mode` (a `RegistrationMode` enum, default: `EmailConfirmation`)
+- [ ] When `Mode` is `InvitationOnly`, a signup request without an invitation code returns 403 Forbidden with "invitation required" message
+- [ ] When `Mode` is `Open` or `EmailConfirmation`, signup without an invitation code follows the open registration flow
 
-### Story 5: Administrator - Create invitation
-**As an** administrator
-**I want** to create invitations for new users
-**So that** I can control who has access and what roles they receive
-
-**Acceptance Criteria**:
-- [ ] A `POST /api/auth/invitations` endpoint creates a new invitation (requires authentication and authorization)
-- [ ] The request includes: email address, roles to assign, claims to assign, and expiration duration
-- [ ] A unique invitation code is generated and returned in the response
-- [ ] `IUserNotifier.SendInvitationAsync` is called with the user-facing invitation details and code
-- [ ] The invitation is persisted with status "Pending"
-- [ ] If no `IUserNotifier` is registered, the endpoint still succeeds but logs a warning
-
-### Story 6: Administrator - View pending invitations
-**As an** administrator
-**I want** to view all pending invitations
-**So that** I can track who has been invited and the status of each invitation
+### Story 5: Developer - Create invitations via service API
+**As a** developer building an admin interface
+**I want** an `IInvitationService` that lets me create invitations programmatically
+**So that** I can build an invitation administration experience tailored to my application
 
 **Acceptance Criteria**:
-- [ ] A `GET /api/auth/invitations` endpoint returns a list of invitations (requires authentication and authorization)
-- [ ] Each invitation includes: email, status (Pending/Accepted/Expired/Revoked), creation date, expiration date, and assigned roles/claims
-- [ ] The list can be filtered by status
+- [ ] An `IInvitationService` interface is provided with a `CreateAsync` method
+- [ ] `CreateAsync` accepts: email address, roles to assign, claims to assign, expiration duration, and optional application-specific metadata (JSON string)
+- [ ] A unique invitation code is generated and returned
+- [ ] The invitation is persisted with status "Pending", including any metadata
+- [ ] The developer is responsible for delivering the invitation to the recipient and for building their own admin controller/endpoint with appropriate authorization
 
-### Story 7: Administrator - Revoke invitation
-**As an** administrator
-**I want** to revoke a pending invitation
-**So that** the invitation can no longer be used
+### Story 6: Developer - List and query invitations via service API
+**As a** developer building an admin interface
+**I want** to query invitations through `IInvitationService`
+**So that** I can display invitation status in my admin UI
 
 **Acceptance Criteria**:
-- [ ] A `DELETE /api/auth/invitations/{code}` endpoint revokes an invitation (requires authentication and authorization)
-- [ ] The invitation status is updated to "Revoked"
+- [ ] `IInvitationService` provides methods to list invitations and get a single invitation by code
+- [ ] Each invitation includes: email, status (via `InvitationStatus` enum), creation date, expiration date, assigned roles/claims, and metadata
+- [ ] Invitations can be filtered by `InvitationStatus` enum value (Pending, Accepted, Expired, Revoked)
+- [ ] The developer is responsible for building their own admin controller/endpoint with appropriate authorization
+
+### Story 7: Developer - Revoke invitations via service API
+**As a** developer building an admin interface
+**I want** to revoke invitations through `IInvitationService`
+**So that** administrators can cancel pending invitations
+
+**Acceptance Criteria**:
+- [ ] `IInvitationService` provides a `RevokeAsync` method that accepts an invitation code
+- [ ] The invitation status is updated to `InvitationStatus.Revoked`
 - [ ] A revoked invitation cannot be used for registration (returns appropriate error per Story 2)
 - [ ] Attempting to revoke an already-accepted or already-revoked invitation returns an appropriate error
+- [ ] The developer is responsible for building their own admin controller/endpoint with appropriate authorization
 
 ### Story 8: User - Confirm email address
 **As a** user who has just registered
@@ -155,10 +159,10 @@ Users need a way to sign up for an application, and administrators need a way to
 **So that** I can choose the right balance of security and user experience for my app
 
 **Acceptance Criteria**:
-- [ ] The `RegistrationOptions` virtual property includes `RequireEmailConfirmation` (default: `false`)
-- [ ] When `RequireEmailConfirmation` is `true`, the signup endpoint generates a confirmation code after user creation and calls `IUserNotifier.SendEmailConfirmationAsync`
-- [ ] When `false`, signup behaves as it does today (immediate access)
-- [ ] Invitation-based registrations auto-confirm the user's email (the invitation itself serves as proof of email access)
+- [ ] The `RegistrationOptions` virtual property includes `Mode` (a `RegistrationMode` enum, default: `EmailConfirmation`)
+- [ ] When `Mode` is `EmailConfirmation`, the signup endpoint generates a confirmation code after user creation and calls `IUserNotifier.SendEmailConfirmationAsync`
+- [ ] When `Mode` is `Open`, signup behaves as it does today (immediate access, no email confirmation)
+- [ ] When `Mode` is `InvitationOnly`, invitation-based registrations auto-confirm the user's email (the invitation itself serves as proof of email access)
 
 ### Story 10: Developer - Hook into registration lifecycle
 **As a** developer using NuxtIdentity
@@ -167,38 +171,83 @@ Users need a way to sign up for an application, and administrators need a way to
 
 **Acceptance Criteria**:
 - [ ] `OnUserCreatedAsync(TUser user)` -- existing hook, called for all signups (already implemented)
-- [ ] `OnInvitationAcceptedAsync(TUser user, Invitation invitation)` -- new hook, called after a user registers with an invitation and roles/claims have been assigned
+- [ ] `OnInvitationAcceptedAsync(TUser user, Invitation invitation)` -- new hook, called after a user registers with an invitation and roles/claims have been assigned. The invitation entity includes metadata for application-specific actions.
 - [ ] `OnUserConfirmedAsync(TUser user)` -- new hook, called after a user's email is confirmed
 - [ ] All hooks are `virtual` with no-op default implementations
-- [ ] Hooks receive enough context for the consuming app to take action (e.g., the invitation entity includes the assigned roles/claims)
+- [ ] Hooks receive enough context for the consuming app to take action (e.g., the invitation entity includes the assigned roles/claims and metadata)
 
-### Story 11: Consumer Developer - Deliver invitation notifications
-**As a** developer consuming NuxtIdentity
-**I want** a clear abstraction for delivering invitation notifications to users
-**So that** I can integrate my own email/notification service
+### Story 11: Removed
+
+This story is no longer relevant. Preserving the number so we don't need to renumber stories.
+
+### Story 12: Developer - Seed invitations for testing
+**As a** developer using NuxtIdentity
+**I want** to seed invitations from configuration at startup
+**So that** my test and development environments have predictable invitation codes available
 
 **Acceptance Criteria**:
-- [ ] The existing `IUserNotifier<TUser>` interface is extended with a `SendInvitationAsync` method
-- [ ] `SendInvitationAsync` receives the email address and the invitation code
-- [ ] The consuming app is responsible for composing URLs, email body, and all formatting
-- [ ] If no notifier is registered, the invitation creation endpoint still succeeds but logs a warning
+- [ ] Invitations defined in configuration are created in the Invitations table if they do not exist
+- [ ] Seeded invitations support specifying: Code (GUID), Status (`InvitationStatus` enum), Roles, Claims, Metadata, and ExpiresAt
+- [ ] Status can be set to any `InvitationStatus` value (Pending, Accepted, Expired, Revoked) to enable testing error handling for each invitation state
+- [ ] Seeded invitations follow the same upsert semantics as other seeded data (create if missing, update if different, never delete)
+- [ ] This story depends on the Identity Seeding feature (PRD-SEEDING) being implemented first
+- [ ] The existing seeder is extended with an `Invitations` section rather than building a separate seeding mechanism
+- [ ] The seeder never seeds an empty GUID. Empty GUID in seeding is considered a mis-configuration, and generates a warning.
+
+**Dependency**: Requires [PRD-SEEDING](PRD-SEEDING.md) to be implemented. The seeder will be extended to support an `Invitations` configuration section.
 
 ---
 
 ## Technical Approach
 
-The registration feature extends `NuxtAuthControllerBase<TUser>` with invitation management and email confirmation, following the existing virtual-method extensibility pattern. Invitations are stored via EF Core with a new `Invitation` entity. The developer controls registration behavior through a `RegistrationOptions` virtual property override, similar to how Playwright handles `ContextOptions()`.
+The registration feature extends `NuxtAuthControllerBase<TUser>` with invitation-based signup and email confirmation, following the existing virtual-method extensibility pattern. Invitations are stored via EF Core with a new `Invitation` entity. The developer controls registration behavior through a `RegistrationOptions` virtual property override containing a `RegistrationMode` enum, similar to how Playwright handles `ContextOptions()`.
 
-**New/Modified API Endpoints**:
+Invitation administration (create, list, revoke) is provided through an `IInvitationService` API rather than pre-built endpoints. This lets each consuming application build its own admin experience with its own authorization requirements, URL structure, and response formats.
+
+**NuxtIdentity-Provided Endpoints**:
 
 | Method | Path | Auth Required | Description |
 |--------|------|---------------|-------------|
 | POST | `/api/auth/signup` | No | Extended: accepts optional `InvitationCode` |
 | GET | `/api/auth/invitations/{code}` | No | Validate invitation code (frontend pre-check) |
-| POST | `/api/auth/invitations` | Yes (Admin) | Create a new invitation |
-| GET | `/api/auth/invitations` | Yes (Admin) | List invitations with status filter |
-| DELETE | `/api/auth/invitations/{code}` | Yes (Admin) | Revoke an invitation |
 | POST | `/api/auth/confirm-email` | No | Confirm email address with code |
+
+**Developer-Built Endpoints** (using `IInvitationService`):
+
+The developer creates their own admin controller and injects `IInvitationService` to build invitation management endpoints. Example:
+
+```csharp
+// Developer builds their own admin controller
+[ApiController]
+[Route("api/admin")]
+[Authorize(Roles = "admin")] // Developer controls authorization
+public class AdminController(IInvitationService invitationService) : ControllerBase
+{
+    [HttpPost("invitations")]
+    public async Task<IActionResult> CreateInvitation(CreateInvitationRequest request)
+    {
+        // Developer can include app-specific metadata (e.g., list access grants)
+        var metadata = JsonSerializer.Serialize(new { ListIds = request.ListIds });
+        var invitation = await invitationService.CreateAsync(
+            request.Email, request.Roles, request.Claims, request.ExpiresIn, metadata);
+        return Ok(invitation);
+    }
+
+    [HttpGet("invitations")]
+    public async Task<IActionResult> ListInvitations([FromQuery] InvitationStatus? status)
+    {
+        var invitations = await invitationService.ListAsync(status);
+        return Ok(invitations);
+    }
+
+    [HttpDelete("invitations/{code}")]
+    public async Task<IActionResult> RevokeInvitation(string code)
+    {
+        await invitationService.RevokeAsync(code);
+        return Ok();
+    }
+}
+```
 
 **Developer Extensibility Pattern**:
 
@@ -206,13 +255,14 @@ The registration feature extends `NuxtAuthControllerBase<TUser>` with invitation
 // Developer overrides in their AuthController
 public override RegistrationOptions RegistrationOptions => new()
 {
-    RequireInvitation = true,
-    RequireEmailConfirmation = false
+    Mode = RegistrationMode.InvitationOnly
 };
 
 protected override Task OnInvitationAcceptedAsync(TUser user, Invitation invitation)
 {
-    // Grant application-specific entitlements based on invitation data
+    // Access app-specific metadata to grant entitlements
+    var metadata = JsonSerializer.Deserialize<MyMetadata>(invitation.Metadata);
+    // Grant access to specific lists, etc.
 }
 
 protected override Task OnUserConfirmedAsync(TUser user)
@@ -235,65 +285,114 @@ flowchart TD
     H --> I[Call OnUserCreatedAsync]
     I --> J[Call OnInvitationAcceptedAsync]
     J --> K[Return login response]
-    B -->|No| L{RequireInvitation?}
-    L -->|Yes| M[403 Forbidden: Invitation required]
-    L -->|No| N[Create user]
-    N --> O{RequireEmailConfirmation?}
-    O -->|Yes| P[Generate confirmation code]
+    B -->|No| L{Mode?}
+    L -->|InvitationOnly| M[403 Forbidden: Invitation required]
+    L -->|Open| N1[Create user]
+    N1 --> T[Call OnUserCreatedAsync]
+    T --> K
+    L -->|EmailConfirmation| N2[Create user]
+    N2 --> P[Generate confirmation code]
     P --> Q[Call SendEmailConfirmationAsync]
     Q --> R[Call OnUserCreatedAsync]
     R --> S[Return success - must confirm email]
-    O -->|No| T[Call OnUserCreatedAsync]
-    T --> K
 ```
 
-**IUserNotifier Extension**:
-
-The existing `IUserNotifier<TUser>` interface (from Password Management PRD) gains one new method:
+**IInvitationService API**:
 
 ```csharp
 /// <summary>
-/// Sends an invitation to the specified email address.
+/// Invitation validation and lifecycle states.
 /// </summary>
-/// <param name="email">The email address to send the invitation to.</param>
-/// <param name="invitationCode">The invitation code for registration.</param>
-/// <param name="roles">The roles that will be assigned upon registration.</param>
-Task SendInvitationAsync(string email, string invitationCode, IReadOnlyList<string> roles);
+public enum InvitationStatus
+{
+    NotFound,
+    Pending,
+    Accepted,
+    Expired,
+    Revoked
+}
+
+/// <summary>
+/// Service for managing invitation lifecycle.
+/// </summary>
+public interface IInvitationService
+{
+    /// <summary>
+    /// Creates a new invitation and optionally notifies the recipient.
+    /// </summary>
+    /// <param name="email">The email address to invite.</param>
+    /// <param name="roles">Roles to assign when the invitation is accepted.</param>
+    /// <param name="claims">Claims to assign when the invitation is accepted.</param>
+    /// <param name="expiresIn">How long before the invitation expires.</param>
+    /// <param name="metadata">Optional JSON string with application-specific data.</param>
+    Task<Invitation> CreateAsync(string email, IReadOnlyList<string> roles,
+        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null);
+
+    /// <summary>
+    /// Gets a single invitation by its code.
+    /// </summary>
+    Task<Invitation?> GetByCodeAsync(string code);
+
+    /// <summary>
+    /// Lists invitations, optionally filtered by status.
+    /// </summary>
+    Task<IReadOnlyList<Invitation>> ListAsync(InvitationStatus? statusFilter = null);
+
+    /// <summary>
+    /// Revokes a pending invitation so it can no longer be used.
+    /// </summary>
+    Task RevokeAsync(string code);
+
+    /// <summary>
+    /// Validates an invitation code and returns the invitation if valid.
+    /// </summary>
+    Task<Invitation?> ValidateAsync(string code);
+}
 ```
 
 **Layers Affected**:
 - [ ] Frontend (Vue/Nuxt)
-- [X] Controllers (API endpoints): Extended signup, new invitation CRUD, new confirm-email
-- [X] Application (Features/Business logic): `IInvitationService`, `IUserNotifier` extension, registration options
-- [X] Entities (Domain models): `Invitation` entity, new request/response models, `RegistrationOptions`
+- [X] Controllers (API endpoints): Extended signup, invitation validation endpoint, confirm-email endpoint
+- [X] Application (Features/Business logic): `IInvitationService` interface and `EfInvitationService` implementation, registration options
+- [X] Entities (Domain models): `Invitation` entity, `InvitationStatus` enum, `RegistrationMode` enum, new request/response models, `RegistrationOptions`
 - [X] Database (Schema changes): New `Invitations` table via EF Core
 
 **High-Level Entity Concepts**:
 
+**InvitationStatus Enum** (new):
+- NotFound, Pending, Accepted, Expired, Revoked
+
 **Invitation Entity** (new):
 - Id (primary key, auto-generated)
-- Code (unique invitation code, required)
+- Code (unique invitation code -- GUID format, required)
 - Email (email address of the invited user, required)
-- Status (Pending/Accepted/Expired/Revoked, required)
+- Status (`InvitationStatus` enum, required)
 - Roles (JSON-serialized list of role names to assign, optional)
 - Claims (JSON-serialized list of claim type/value pairs to assign, optional)
+- Metadata (JSON string for application-specific data, optional -- e.g., list access grants, team assignments)
 - CreatedAt (creation timestamp, required)
 - ExpiresAt (expiration timestamp, required)
 - AcceptedAt (timestamp when used, optional)
 - AcceptedByUserId (user ID of the registrant, optional)
 
+**RegistrationMode Enum** (new):
+- `Open` — No email confirmation required, anyone can register and immediately use the app
+- `EmailConfirmation` — Email confirmation required, anyone can register but must confirm email (default)
+- `InvitationOnly` — Invitation required to register, email auto-confirmed via invitation
+
 **RegistrationOptions** (new):
-- RequireInvitation (whether signup requires an invitation code, default: false)
-- RequireEmailConfirmation (whether open signups require email confirmation, default: false)
+- Mode (`RegistrationMode` enum, default: `EmailConfirmation`)
 
 **Key Business Rules**:
-1. **Invitation Single Use** -- Each invitation code can be used exactly once. After successful registration, the status is set to "Accepted" and the code cannot be reused.
-2. **Invitation Expiration** -- Invitations have a required expiration set at creation time. Expired invitations cannot be used, even if their status is still "Pending."
+1. **Invitation Single Use** -- Each invitation code can be used exactly once. After successful registration, the status is set to `InvitationStatus.Accepted` and the code cannot be reused.
+2. **Invitation Expiration** -- Invitations have a required expiration set at creation time. Expired invitations cannot be used, even if their status is still `Pending`.
 3. **Invitation-based Auto-Confirm** -- Users who register with a valid invitation have their email automatically confirmed, since the invitation delivery itself demonstrates email access.
-4. **Sensible Defaults** -- By default, `RequireInvitation` is `false` and `RequireEmailConfirmation` is `false`, providing open-signup behavior. Developers opt into restricted registration by overriding `RegistrationOptions`.
+4. **Sensible Defaults** -- By default, `RegistrationMode` is `EmailConfirmation`, providing open-signup with email verification. Developers can switch to `Open` (no email confirmation) or `InvitationOnly` by overriding `RegistrationOptions`. The enum eliminates impossible state combinations.
 5. **Role/Claim Transfer** -- Roles and claims defined on the invitation are assigned to the user upon successful registration, before the `OnInvitationAcceptedAsync` hook fires.
-6. **Admin-Only Invitation Management** -- Creating, listing, and revoking invitations requires authentication and administrator authorization. The consuming app controls which roles qualify as "administrator" through standard ASP.NET Core authorization.
+6. **Developer-Owned Admin Experience** -- Invitation administration (create, list, revoke) is done through `IInvitationService`. The developer builds their own admin endpoints with their own authorization, URL structure, and response formats.
 7. **Virtual Methods** -- All new endpoint methods and hooks are `virtual`, following the existing pattern, so consumers can override behavior.
+8. **Metadata Pass-Through** -- The invitation entity carries an optional JSON metadata string that flows from creation through to the `OnInvitationAcceptedAsync` hook. NuxtIdentity stores and delivers this data but does not interpret it -- the consuming app owns the schema and semantics.
+9. **Code is a Secret** -- The invitation `Code` is a bearer credential (anyone who has it can register with pre-assigned roles). It must never be logged. Use the invitation's `Id` (auto-generated primary key) for diagnostic logging, following the same pattern as `RefreshTokenEntity.Key`.
 
 **Code Patterns to Follow**:
 - Controller endpoints: [`NuxtAuthControllerBase.cs`](../../src/AspNetCore/Controllers/NuxtAuthControllerBase.cs) for endpoint pattern and virtual methods
@@ -307,35 +406,33 @@ Task SendInvitationAsync(string email, string invitationCode, IReadOnlyList<stri
 
 ## Open Questions
 
-- [ ] **Authorization for invitation admin endpoints**: Should the library require a specific role (e.g., "admin") or use a policy name that the consumer configures? The consuming app may have different role names for administrators.
-- [ ] **Invitation code format**: Should codes be short human-readable slugs (e.g., 8-character alphanumeric), GUIDs, or something else? Short codes are easier in URLs but less secure against brute-force guessing.
-- [ ] **Library packaging**: Should invitation management live in `NuxtIdentity.AspNetCore` (alongside the auth controller) or in a new package like `NuxtIdentity.Invitations`? The EF Core entity will need to be in `NuxtIdentity.EntityFrameworkCore`.
-- [ ] **Invitation metadata**: Should the invitation entity support an arbitrary metadata/properties bag so consuming apps can attach application-specific data (e.g., "grant access to list X") without extending the entity?
+- [X] **Invitation code format**: Should codes be short human-readable slugs, GUIDs, or something else? **A**: GUIDs (`Guid.NewGuid()`). They are built-in to .NET, globally unique with no collision risk, URL-safe, survive email links, and provide 128 bits of entropy against brute-force. Human readability is not needed since codes are delivered via clickable links.
+- [X] **Library packaging**: Should invitation management live in `NuxtIdentity.AspNetCore` (alongside the auth controller) or in a new package like `NuxtIdentity.Invitations`? **A**: Keep in the existing three packages. A separate package would create coupling problems — the `SignUp` endpoint in `NuxtAuthControllerBase` needs direct access to invitation types for validation, role/claim assignment, and the `OnInvitationAcceptedAsync` hook. A separate package would force either a circular dependency or clumsy runtime service resolution. Instead, follow the same split used for refresh tokens: `IInvitationService` interface and models in Core, controller endpoints and hooks in AspNetCore, `EfInvitationService` and table configuration in EntityFrameworkCore.
+- [X] **Invitation metadata**: Should the invitation entity support an arbitrary metadata/properties bag? **A**: Yes. The `Invitation` entity includes an optional `Metadata` property (JSON string) that the consuming app sets at creation time and reads in the `OnInvitationAcceptedAsync` hook. NuxtIdentity stores and delivers this data but does not interpret it. This supports use cases like "grant access to list X" in ListsWebApp without extending the entity.
 
 ---
 
 ## Success Metrics
 
-- The Registration.feature scenarios from ListsWebApp.V3 can all be implemented against NuxtIdentity's endpoints without custom invitation management code in the consuming app
-- The RegistrationAdministrationTODO.feature scenarios can be implemented using the invitation admin endpoints
+- The Registration.feature scenarios from ListsWebApp.V3 can all be implemented against NuxtIdentity's signup endpoint and `IInvitationService` API
+- The RegistrationAdministrationTODO.feature scenarios can be implemented by the consuming app using `IInvitationService`
 - A consuming app can switch to invitation-only registration by overriding a single property
 - Email confirmation flow works end-to-end when `IUserNotifier` is implemented by the consumer
+- Application-specific entitlements (e.g., list access) can be carried through invitation metadata without extending the library
 
 ---
 
 ## Dependencies & Constraints
 
 **Dependencies**:
-- `IUserNotifier<TUser>` interface from Password Management PRD (must be implemented first or concurrently)
+- `IUserNotifier<TUser>` interface from Password Management PRD (needed for email confirmation flow; must be implemented first or concurrently)
 - ASP.NET Core Identity `UserManager<TUser>` for email confirmation (`GenerateEmailConfirmationTokenAsync`, `ConfirmEmailAsync`)
 - Entity Framework Core for invitation persistence
-- ASP.NET Core authorization for admin endpoints
 
 **Constraints**:
 - Must work with the generic `TUser : IdentityUser` pattern used throughout NuxtIdentity
 - Must follow the existing virtual method pattern on `NuxtAuthControllerBase` for overridability
 - Must not add email-sending dependencies to the library packages
-- Invitation admin endpoints need flexible authorization -- different consuming apps may have different admin role names
 
 ---
 
@@ -347,7 +444,15 @@ This PRD is driven by the functional test scenarios from the ListsWebApp.V3 proj
 
 The `OnUserCreatedAsync` hook already exists in the base controller and will continue to fire for all registrations. The new hooks (`OnInvitationAcceptedAsync`, `OnUserConfirmedAsync`) provide additional extensibility points specific to the new flows.
 
-The `IUserNotifier<TUser>` interface was introduced in the Password Management PRD with `SendResetCodeAsync` and `SendEmailConfirmationAsync`. This PRD adds `SendInvitationAsync` to the same interface, keeping all user notification concerns in one abstraction.
+The `IUserNotifier<TUser>` interface was introduced in the Password Management PRD with `SendResetCodeAsync` and `SendEmailConfirmationAsync`. This PRD uses it for email confirmation only. Invitation delivery is the developer's responsibility — `IInvitationService.CreateAsync` returns the invitation with its code, and the developer decides how to deliver it (email, in-app notification, API response, etc.).
+
+The decision to provide `IInvitationService` instead of pre-built admin endpoints gives developers full control over their admin experience -- authorization, URL structure, response formats, and any application-specific logic around invitation creation (e.g., pre-setting list access in ListsWebApp via metadata).
+
+**Functional Testing Pattern**: Functional tests run on a separate machine and communicate with the backend over HTTP only. ASP.NET Identity's confirmation and reset codes are generated via data protection token providers — the plaintext code is passed to `IUserNotifier` once and only a hash is stored internally. The code cannot be retrieved after the fact, and regenerating it invalidates the previous one. This makes the `IUserNotifier` implementation the **only point** where the plaintext code can be captured.
+
+For email confirmation testing, this PRD depends on the `InMemoryUserNotifier<TUser>` defined in [PRD-PASSWORD-MANAGEMENT Story 8](PRD-PASSWORD-MANAGEMENT.md). The developer registers the test notifier in their backend's test environment and wraps its query API in a test control endpoint so the functional test runner can retrieve captured codes over HTTP.
+
+For invitation testing, no email interception is needed — `IInvitationService.CreateAsync` returns the invitation code directly through the developer's admin endpoint response.
 
 **Related Documents**:
 - [PRD Password Management](PRD-PASSWORD-MANAGEMENT.md) -- defines `IUserNotifier<TUser>` interface
@@ -362,6 +467,6 @@ The `IUserNotifier<TUser>` interface was introduced in the Password Management P
 When handing this off for detailed design/implementation:
 - [X] Document stays within PRD scope (WHAT/WHY). If implementation details are needed, they are in a separate Design Document. See [`PRD-GUIDANCE.md`](PRD-GUIDANCE.md).
 - [X] All user stories have clear acceptance criteria
-- [ ] Open questions are resolved or documented as design decisions
+- [X] Open questions are resolved or documented as design decisions
 - [X] Technical approach section indicates affected layers
 - [X] Code patterns to follow are referenced (links to similar controllers/features)

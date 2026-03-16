@@ -118,6 +118,18 @@ NuxtIdentity currently provides login, signup, session, refresh, and logout endp
 - [ ] Both `InMemoryRefreshTokenService` and `EfRefreshTokenService` implement the new method
 - [ ] The user must re-authenticate (login) to get new tokens after a password change
 
+### Story 8: Developer - Test notification capture for functional tests
+**As a** developer writing functional tests for password reset and email confirmation flows
+**I want** a built-in test `IUserNotifier<TUser>` implementation that captures notification data
+**So that** my functional test runner can retrieve confirmation and reset codes over HTTP without building a custom notification store
+
+**Acceptance Criteria**:
+- [ ] NuxtIdentity provides an `InMemoryUserNotifier<TUser>` implementation of `IUserNotifier<TUser>` that captures all notification calls (reset codes, confirmation codes) in memory
+- [ ] A query API is provided (e.g., `GetNotificationsAsync(string email)`) to retrieve captured notifications by email address
+- [ ] Captured data includes: email address, code, notification type (reset, confirmation), and timestamp
+- [ ] The developer registers this implementation in test/dev environments and wraps the query API in a test control endpoint so the functional test runner can retrieve codes over HTTP
+- [ ] This is necessary because ASP.NET Identity's codes are generated via data protection token providers — the plaintext code is passed to `IUserNotifier` once and only a hash is stored internally; the code cannot be retrieved after the fact, and regenerating it invalidates the previous one
+
 ---
 
 ## Technical Approach

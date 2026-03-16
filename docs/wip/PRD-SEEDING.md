@@ -270,9 +270,12 @@ The developer's existing ListsWebApp project uses a similar configuration-driven
 
 **Security Note**: Passwords in configuration files are a known risk. The recommended practice is to use .NET configuration layering — define non-secret seed data in appsettings.json and inject passwords via environment variables (`IdentitySeeder__Users__0__Password`), container secrets, or Azure Key Vault. The library documentation should include this guidance prominently.
 
+**Future Extension**: When the Registration PRD ([PRD-REGISTRATION](PRD-REGISTRATION.md)) is implemented, the seeder will be extended to support an `Invitations` section for seeding invitation data (codes, statuses, roles, claims, metadata). This enables test environments to have predictable invitation codes in various states (Pending, Accepted, Expired, Revoked).
+
 **Related Documents**:
 - [PRD Template](PRD-TEMPLATE.md)
 - [PRD Token GUIDs](PRD-TOKEN-GUIDS.md) — reference for PRD quality
+- [PRD Registration](PRD-REGISTRATION.md) — will extend the seeder with invitation seeding
 
 ---
 
