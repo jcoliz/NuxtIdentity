@@ -18,6 +18,7 @@
     <Project Path="src/EntityFrameworkCore/NuxtIdentity.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/NuxtIdentity.AspNetCore.Tests/NuxtIdentity.AspNetCore.Tests.csproj" />
     <Project Path="tests/NuxtIdentity.Core.Tests/NuxtIdentity.Core.Tests.csproj" />
     <Project Path="tests/NuxtIdentity.EntityFrameworkCore.Tests/NuxtIdentity.EntityFrameworkCore.Tests.csproj" />
   </Folder>
