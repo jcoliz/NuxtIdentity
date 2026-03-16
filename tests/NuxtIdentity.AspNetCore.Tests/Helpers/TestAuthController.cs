@@ -8,16 +8,21 @@ namespace NuxtIdentity.AspNetCore.Tests.Helpers;
 /// <summary>
 /// Concrete implementation of NuxtAuthControllerBase for testing.
 /// </summary>
-public class TestAuthController : NuxtAuthControllerBase<TestUser>
+public class TestAuthController(
+    IJwtTokenService<TestUser> jwtTokenService,
+    IEnumerable<IUserClaimsProvider<TestUser>> claimsProviders,
+    IRefreshTokenService refreshTokenService,
+    UserManager<TestUser> userManager,
+    SignInManager<TestUser> signInManager,
+    IEnumerable<IUserNotifier<TestUser>> userNotifiers,
+    ILogger<TestAuthController> logger)
+    : NuxtAuthControllerBase<TestUser>(
+        jwtTokenService,
+        claimsProviders,
+        refreshTokenService,
+        userManager,
+        signInManager,
+        userNotifiers,
+        logger)
 {
-    public TestAuthController(
-        IJwtTokenService<TestUser> jwtTokenService,
-        IEnumerable<IUserClaimsProvider<TestUser>> claimsProviders,
-        IRefreshTokenService refreshTokenService,
-        UserManager<TestUser> userManager,
-        SignInManager<TestUser> signInManager,
-        ILogger<TestAuthController> logger)
-        : base(jwtTokenService, claimsProviders, refreshTokenService, userManager, signInManager, logger)
-    {
-    }
 }

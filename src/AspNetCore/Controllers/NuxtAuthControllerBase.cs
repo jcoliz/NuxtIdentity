@@ -64,6 +64,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     IRefreshTokenService refreshTokenService,
     UserManager<TUser> userManager,
     SignInManager<TUser> signInManager,
+    IEnumerable<IUserNotifier<TUser>> userNotifiers,
     ILogger logger) : ControllerBase
     where TUser : IdentityUser, new()
 {
@@ -86,6 +87,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// Gets the sign-in manager for authentication operations.
     /// </summary>
     protected SignInManager<TUser> SignInManager { get; } = signInManager;
+
+    /// <summary>
+    /// Gets the user notifier for sending notifications, or null if none is registered.
+    /// </summary>
+    protected IUserNotifier<TUser>? UserNotifier { get; } = userNotifiers.FirstOrDefault();
 
     #region Helper Methods
 
@@ -209,6 +215,23 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     protected virtual async Task<TUser?> GetUserByIdAsync(string userId)
     {
         return await UserManager.FindByIdAsync(userId);
+    }
+
+    /// <summary>
+    /// Finds a user by username or email address.
+    /// </summary>
+    /// <param name="username">The username to search for, or null.</param>
+    /// <param name="email">The email address to search for, or null.</param>
+    /// <returns>The user if found; otherwise, null.</returns>
+    private async Task<TUser?> FindUserByUsernameOrEmailAsync(string? username, string? email)
+    {
+        if (!string.IsNullOrEmpty(username))
+            return await UserManager.FindByNameAsync(username);
+
+        if (!string.IsNullOrEmpty(email))
+            return await UserManager.FindByEmailAsync(email);
+
+        return null;
     }
 
     #endregion
@@ -446,6 +469,18 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
     [LoggerMessage(10, LogLevel.Warning, "{Location}: No such user {UserId}")]
     private partial void LogRefreshTokenNoUser(string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(11, LogLevel.Warning, "{Location}: No IUserNotifier configured")]
+    private partial void LogNoUserNotifierConfigured([CallerMemberName] string? location = null);
+
+    [LoggerMessage(12, LogLevel.Warning, "{Location}: Reset password failed {Reason}")]
+    private partial void LogResetPasswordFailed(string reason, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(13, LogLevel.Warning, "{Location}: Change password unauthorized {Reason}")]
+    private partial void LogChangePasswordUnauthorized(string reason, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(14, LogLevel.Warning, "{Location}: Change password failed {Username} {Errors}")]
+    private partial void LogChangePasswordFailed(string username, string errors, [CallerMemberName] string? location = null);
 
     #endregion
 }

@@ -308,6 +308,7 @@ public class NuxtAuthControllerTests
         var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
         var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
         var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier<TestUser>>>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
 
         var controller = new TestAuthController(
@@ -316,6 +317,7 @@ public class NuxtAuthControllerTests
             refreshTokenService,
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
+            userNotifiers,
             logger
         );
 
@@ -457,6 +459,7 @@ public class NuxtAuthControllerTests
         var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
         var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
         var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier<TestUser>>>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
 
         var controller = new TestAuthController(
@@ -465,6 +468,7 @@ public class NuxtAuthControllerTests
             refreshTokenService,
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
+            userNotifiers,
             logger
         );
 

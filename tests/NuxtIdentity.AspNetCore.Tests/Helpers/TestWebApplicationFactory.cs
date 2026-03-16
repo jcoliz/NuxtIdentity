@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NuxtIdentity.AspNetCore.Extensions;
+using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
+using NuxtIdentity.Core.Services;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
 
 namespace NuxtIdentity.AspNetCore.Tests.Helpers;
@@ -69,6 +71,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
             // Add NuxtIdentity services
             services.AddNuxtIdentity<TestUser>();
             services.AddNuxtIdentityAuthentication();
+
+            // Register InMemoryUserNotifier for testing password reset flows
+            var testNotifier = new InMemoryUserNotifier<TestUser>();
+            services.AddSingleton<InMemoryUserNotifier<TestUser>>(testNotifier);
+            services.AddSingleton<IUserNotifier<TestUser>>(testNotifier);
 
             // Add EF Core refresh token service
             services.AddNuxtIdentityEntityFramework<TestDbContext>();
