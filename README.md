@@ -27,6 +27,7 @@ and @sidebase/nuxt-auth. Here's what it's doing:
 - 📊 **Structured logging**: High-performance logging for authentication events and troubleshooting.
 - 👤 **Role/claim visibility**: Surfacing user's roles and claims in auth tokens and in the user session.
 - 🔄 **Refresh tokens**: .NET Identity doesn't handle refresh tokens at all, so a big part of this libraries work is storing and validating those with automatic rotation.
+- 🔑 **Password management**: Forgot-password, reset-password, and change-password flows, built on ASP.NET Core Identity's token-based password reset. Consumers provide their own notification delivery via `IUserNotifier<TUser>`.
 
 ## High-Level Flow
 

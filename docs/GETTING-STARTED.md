@@ -236,6 +236,70 @@ Content-Type: application/json
 }
 ```
 
+## Step 9: Add Password Management (Optional)
+
+NuxtIdentity includes built-in password management endpoints: forgot-password, reset-password, and change-password. These wrap ASP.NET Core Identity's token-based password reset and require no database changes.
+
+### Implement IUserNotifier
+
+The forgot-password flow requires an `IUserNotifier<TUser>` implementation to deliver reset codes to users. NuxtIdentity provides the reset token — you decide how to deliver it (email, SMS, etc.):
+
+```csharp
+using NuxtIdentity.Core.Abstractions;
+using Microsoft.AspNetCore.Identity;
+
+namespace MyApp.Services;
+
+public class EmailUserNotifier : IUserNotifier<IdentityUser>
+{
+    private readonly IEmailSender _emailSender;
+
+    public EmailUserNotifier(IEmailSender emailSender)
+    {
+        _emailSender = emailSender;
+    }
+
+    public async Task SendResetCodeAsync(IdentityUser user, string resetCode)
+    {
+        // Build your reset URL and email body
+        var resetUrl = $"https://myapp.com/reset-password?code={Uri.EscapeDataString(resetCode)}&email={user.Email}";
+        await _emailSender.SendAsync(user.Email!, "Password Reset", $"Reset your password: {resetUrl}");
+    }
+
+    public Task SendEmailConfirmationAsync(IdentityUser user, string confirmationCode)
+    {
+        // Reserved for future email confirmation feature
+        return Task.CompletedTask;
+    }
+}
+```
+
+### Register in DI
+
+Add the notifier registration in `Program.cs`:
+
+```csharp
+// ⭐ Register your notifier for password reset delivery
+builder.Services.AddSingleton<IUserNotifier<IdentityUser>, EmailUserNotifier>();
+```
+
+### Available Endpoints
+
+Once registered, the following endpoints are available automatically:
+
+| Endpoint | Method | Auth Required | Description |
+|---|---|---|---|
+| `/api/auth/forgot-password` | POST | No | Generates a reset code and calls your `IUserNotifier` |
+| `/api/auth/reset-password` | POST | No | Validates the reset code and sets a new password |
+| `/api/auth/change-password` | POST | Yes (JWT) | Changes password for the authenticated user |
+
+**Important:** If no `IUserNotifier` is registered, calling `forgot-password` will throw a `NuxtIdentityConfigurationException`. The reset-password and change-password endpoints work without a notifier.
+
+### Security Notes
+
+- `forgot-password` always returns `200 OK` regardless of whether the user exists (prevents user enumeration)
+- Both `reset-password` and `change-password` revoke all existing refresh tokens after success — the client should log the user out and prompt re-authentication
+
 ## Next Steps
 
 - **Customize Identity User**: Extend `IdentityUser` with custom properties
@@ -243,7 +307,6 @@ Content-Type: application/json
 - **Configure CORS**: Enable CORS for your frontend application
 - **Use User Secrets**: Store sensitive configuration in development
 - **Add Email Confirmation**: Implement email verification for new users
-- **Add Password Reset**: Implement password reset functionality
 
 ## Production Considerations
 
