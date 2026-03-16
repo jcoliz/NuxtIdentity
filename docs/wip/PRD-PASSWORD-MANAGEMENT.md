@@ -1,6 +1,6 @@
 ---
-status: In Review
-design_document: TBD
+status: Approved
+design_document: DESIGN-PASSWORD-MANAGEMENT.md
 ado: TBD
 ---
 
