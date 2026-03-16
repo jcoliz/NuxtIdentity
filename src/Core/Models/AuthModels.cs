@@ -50,6 +50,64 @@ public record RefreshRequest
     public string RefreshToken { get; init; } = string.Empty;
 }
 
+/// <summary>
+/// Request data for initiating a password reset flow.
+/// </summary>
+public record ForgotPasswordRequest
+{
+    /// <summary>
+    /// The username of the account to reset. Provide either Username or Email.
+    /// </summary>
+    public string? Username { get; init; }
+
+    /// <summary>
+    /// The email address of the account to reset. Provide either Username or Email.
+    /// </summary>
+    public string? Email { get; init; }
+}
+
+/// <summary>
+/// Request data for resetting a password using a reset code.
+/// </summary>
+public record ResetPasswordRequest
+{
+    /// <summary>
+    /// The username of the account to reset. Provide either Username or Email.
+    /// </summary>
+    public string? Username { get; init; }
+
+    /// <summary>
+    /// The email address of the account to reset. Provide either Username or Email.
+    /// </summary>
+    public string? Email { get; init; }
+
+    /// <summary>
+    /// The password reset code received from the forgot-password flow.
+    /// </summary>
+    public string Code { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The new password to set for the account.
+    /// </summary>
+    public string NewPassword { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Request data for changing a password while logged in.
+/// </summary>
+public record ChangePasswordRequest
+{
+    /// <summary>
+    /// The user's current password for verification.
+    /// </summary>
+    public string CurrentPassword { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The new password to set for the account.
+    /// </summary>
+    public string NewPassword { get; init; } = string.Empty;
+}
+
 #endregion
 
 #region Response Models
