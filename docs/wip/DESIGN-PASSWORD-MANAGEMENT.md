@@ -497,21 +497,39 @@ Add a small set of unit tests for `InMemoryUserNotifier` in the Core.Tests proje
 
 ## Implementation Order
 
+### Phase 1: Core infrastructure
+
 1. Add `IUserNotifier<TUser>` interface to `src/Core/Abstractions/`
 2. Add `NotificationRecord` and `NotificationType` to `src/Core/Models/`
 3. Add request records (`ForgotPasswordRequest`, `ResetPasswordRequest`, `ChangePasswordRequest`) to `AuthModels.cs`
 4. Add `InMemoryUserNotifier<TUser>` to `src/Core/Services/`
 5. Add `InMemoryUserNotifier` unit tests and run them
+
+### Phase 2: Controller scaffolding
+
 6. Update `NuxtAuthControllerBase` constructor to accept `IEnumerable<IUserNotifier<TUser>>`
-7. Add `FindUserByUsernameOrEmailAsync` helper method
-8. Add `ForgotPassword` endpoint
-9. Add `ResetPassword` endpoint
-10. Add `ChangePassword` endpoint
-11. Add logger messages
-12. Update `TestAuthController` constructor
-13. Update `TestWebApplicationFactory` to register notifier
-14. Add integration tests and run them
-15. Iterate until all tests pass
+7. Add all new logger messages
+8. Add `FindUserByUsernameOrEmailAsync` helper method
+9. Update `TestAuthController` constructor
+10. Update `TestWebApplicationFactory` to register notifier
+11. Verify existing tests still pass (constructor change is breaking)
+
+### Phase 3: ForgotPassword endpoint + tests
+
+12. Add `ForgotPassword` endpoint
+13. Add ForgotPassword integration tests and run them
+
+### Phase 4: ResetPassword endpoint + tests
+
+14. Add `ResetPassword` endpoint
+15. Add ResetPassword integration tests and run them (these depend on the ForgotPassword endpoint to generate valid codes)
+
+### Phase 5: ChangePassword endpoint + tests
+
+16. Add `ChangePassword` endpoint
+17. Add ChangePassword integration tests and run them (independent of the other two endpoints)
+
+Note: ResetPassword tests depend on the ForgotPassword endpoint because they need a valid reset code, which can only be obtained through the forgot-password → notifier flow. ForgotPassword and ChangePassword are fully independent of each other and could be implemented in either order.
 
 ---
 
