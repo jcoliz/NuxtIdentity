@@ -1256,4 +1256,275 @@ public class NuxtAuthControllerTests
     }
 
     #endregion
+
+    #region ChangePassword Tests
+
+    [Test]
+    public async Task ChangePassword_ValidCurrentPassword_ReturnsSuccess()
+    {
+        // Given: An existing user who is logged in
+        var username = "testuser";
+        var password = "Test123!";
+        var newPassword = "NewPassword123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        var loginRequest = new LoginRequest { Username = username, Password = password };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResult!.Token.AccessToken);
+
+        // When: User changes password with correct current password
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = password,
+            NewPassword = newPassword
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // Then: 200 OK should be returned with success
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        result.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ChangePassword_ValidChange_CanLoginWithNewPassword()
+    {
+        // Given: An existing user who has changed their password
+        var username = "testuser";
+        var oldPassword = "Test123!";
+        var newPassword = "NewPassword123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, oldPassword);
+
+        // And: The user is logged in and changes password
+        var loginRequest = new LoginRequest { Username = username, Password = oldPassword };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResult!.Token.AccessToken);
+
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = oldPassword,
+            NewPassword = newPassword
+        };
+        await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // When: User logs in with the new password
+        _client.DefaultRequestHeaders.Authorization = null;
+        var newLoginRequest = new LoginRequest { Username = username, Password = newPassword };
+        var response = await _client.PostAsJsonAsync("/api/auth/login", newLoginRequest);
+
+        // Then: Login should succeed
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task ChangePassword_ValidChange_OldPasswordFails()
+    {
+        // Given: An existing user who has changed their password
+        var username = "testuser";
+        var oldPassword = "Test123!";
+        var newPassword = "NewPassword123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, oldPassword);
+
+        // And: The user is logged in and changes password
+        var loginRequest = new LoginRequest { Username = username, Password = oldPassword };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResult!.Token.AccessToken);
+
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = oldPassword,
+            NewPassword = newPassword
+        };
+        await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // When: User tries to log in with the old password
+        _client.DefaultRequestHeaders.Authorization = null;
+        var oldLoginRequest = new LoginRequest { Username = username, Password = oldPassword };
+        var response = await _client.PostAsJsonAsync("/api/auth/login", oldLoginRequest);
+
+        // Then: Login should fail
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task ChangePassword_WrongCurrentPassword_ReturnsBadRequest()
+    {
+        // Given: An existing user who is logged in
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        var loginRequest = new LoginRequest { Username = username, Password = password };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResult!.Token.AccessToken);
+
+        // When: User submits wrong current password
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = "WrongPassword",
+            NewPassword = "NewPassword123!"
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // Then: 400 Bad Request should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task ChangePassword_Unauthenticated_ReturnsUnauthorized()
+    {
+        // Given: No authentication token is provided
+
+        // When: Attempting to change password without being logged in
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = "current",
+            NewPassword = "new"
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // Then: 401 Unauthorized should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task ChangePassword_ValidChange_RevokesRefreshTokens()
+    {
+        // Given: An existing user who is logged in with refresh tokens
+        var username = "testuser";
+        var password = "Test123!";
+        var newPassword = "NewPassword123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        var loginRequest = new LoginRequest { Username = username, Password = password };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var refreshToken = loginResult!.Token.RefreshToken;
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResult.Token.AccessToken);
+
+        // And: The user changes their password
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = password,
+            NewPassword = newPassword
+        };
+        await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // When: Attempting to use the old refresh token
+        var refreshRequest = new RefreshRequest { RefreshToken = refreshToken };
+        var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
+
+        // Then: Refresh should fail because tokens were revoked
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task ChangePassword_WithDeletedUser_ReturnsUnauthorized()
+    {
+        // Given: A user who was logged in but then deleted
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        var loginRequest = new LoginRequest { Username = username, Password = password };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResult!.Token.AccessToken);
+
+        // And: The user is deleted
+        await _userManager.DeleteAsync(user);
+
+        // When: Attempting to change password
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = password,
+            NewPassword = "NewPassword123!"
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
+
+        // Then: 401 Unauthorized should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task ChangePassword_WithTokenMissingUsername_ReturnsUnauthorized()
+    {
+        // Given: A controller with a token that has no username claim
+        var scope = _factory.Services.CreateScope();
+        var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
+        var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
+        var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier<TestUser>>>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
+
+        var controller = new TestAuthController(
+            jwtTokenService,
+            claimsProviders,
+            refreshTokenService,
+            _userManager,
+            scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
+            userNotifiers,
+            logger
+        );
+
+        // And: An authenticated identity with no Name claim
+        var emptyIdentity = new System.Security.Claims.ClaimsIdentity(
+            authenticationType: "TestAuth"
+        );
+        emptyIdentity.AddClaim(new System.Security.Claims.Claim(
+            System.Security.Claims.ClaimTypes.NameIdentifier,
+            "test-user-id"
+        ));
+        var principal = new System.Security.Claims.ClaimsPrincipal(emptyIdentity);
+
+        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = principal
+            }
+        };
+
+        // When: Attempting to change password
+        var changeRequest = new ChangePasswordRequest
+        {
+            CurrentPassword = "current",
+            NewPassword = "new"
+        };
+        var result = await controller.ChangePassword(changeRequest);
+
+        // Then: 401 Unauthorized should be returned
+        result.Should().BeOfType<Microsoft.AspNetCore.Mvc.ObjectResult>();
+        var objectResult = result as Microsoft.AspNetCore.Mvc.ObjectResult;
+        objectResult!.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+
+        var problemDetails = objectResult.Value as Microsoft.AspNetCore.Mvc.ProblemDetails;
+        problemDetails.Should().NotBeNull();
+        problemDetails!.Title.Should().Be("Authentication Required");
+    }
+
+    #endregion
 }

@@ -470,6 +470,10 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// Resets a user's password using a reset code from the forgot-password flow.
     /// </summary>
     /// <param name="request">The reset password request containing user identifier, reset code, and new password.</param>
+    /// <remarks>
+    /// On success, all existing refresh tokens for the user are revoked for security.
+    /// The caller should redirect the user to the login page after a successful reset.
+    /// </remarks>
     [HttpPost("reset-password")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -507,6 +511,65 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         await RefreshTokenService.RevokeAllUserTokensAsync(user.Id);
 
         LogOk();
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// Changes the authenticated user's password.
+    /// </summary>
+    /// <param name="request">The change password request containing the current and new passwords.</param>
+    /// <remarks>
+    /// On success, all existing refresh tokens for the user are revoked for security.
+    /// The caller should log the user out on the client side and prompt them to log in
+    /// again with the new password.
+    /// </remarks>
+    [HttpPost("change-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public virtual async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        LogStarting();
+
+        var username = GetCurrentUsername();
+        if (username == null)
+        {
+            LogChangePasswordUnauthorized("No username in token");
+            return Problem(
+                title: "Authentication Required",
+                detail: "No valid authentication token provided",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
+        }
+
+        var user = await UserManager.FindByNameAsync(username);
+        if (user == null)
+        {
+            LogChangePasswordUnauthorized($"User not found: {username}");
+            return Problem(
+                title: "User Not Found",
+                detail: "The authenticated user no longer exists",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
+        }
+
+        var result = await UserManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            LogChangePasswordFailed(username, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(
+                title: "Password Change Failed",
+                detail: string.Join("; ", result.Errors.Select(e => e.Description)),
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        // Revoke all refresh tokens for security (Story 7)
+        await RefreshTokenService.RevokeAllUserTokensAsync(user.Id);
+
+        LogOkUsername(username);
         return Ok(new { success = true });
     }
 
