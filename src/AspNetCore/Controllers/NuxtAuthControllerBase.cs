@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Exceptions;
 using NuxtIdentity.Core.Models;
 using System.IdentityModel.Tokens.Jwt;
 
@@ -433,7 +434,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <remarks>
     /// Always returns 200 OK regardless of whether the user exists to prevent user enumeration.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="NuxtIdentityConfigurationException">
     /// Thrown when no <see cref="IUserNotifier{TUser}"/> implementation is registered.
     /// The consumer must register an implementation in DI for the forgot-password flow to work.
     /// </exception>
@@ -446,9 +447,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         if (UserNotifier == null)
         {
             LogNoUserNotifierConfigured();
-            throw new InvalidOperationException(
-                "No IUserNotifier<TUser> implementation is registered. " +
-                "Register an implementation in DI to use the forgot-password endpoint.");
+            throw new NuxtIdentityConfigurationException(
+                nameof(IUserNotifier<TUser>));
         }
 
         var user = await FindUserByUsernameOrEmailAsync(request.Username, request.Email);

@@ -10,8 +10,10 @@ namespace NuxtIdentity.Core.Abstractions;
 /// composing URLs, message body, localization, and all formatting. The library
 /// provides only the user object and the raw codes/tokens.
 ///
-/// If no implementation is registered, endpoints that require notification still
-/// succeed but log a warning that no notifier is configured.
+/// If no implementation is registered, endpoints that require notification
+/// (e.g. forgot-password) will throw a
+/// <see cref="NuxtIdentity.Core.Exceptions.NuxtIdentityConfigurationException"/>
+/// to signal the misconfiguration.
 ///
 /// The <see cref="SendEmailConfirmationAsync"/> method is included to support a
 /// future email confirmation feature without requiring an interface refactor.

@@ -11,6 +11,7 @@ using NUnit.Framework;
 using NuxtIdentity.AspNetCore.Tests.Helpers;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
+using NuxtIdentity.Core.Exceptions;
 using NuxtIdentity.Core.Services;
 
 namespace NuxtIdentity.AspNetCore.Tests.Controllers;
@@ -1009,7 +1010,7 @@ public class NuxtAuthControllerTests
     }
 
     [Test]
-    public async Task ForgotPassword_NoNotifierConfigured_ThrowsInvalidOperationException()
+    public async Task ForgotPassword_NoNotifierConfigured_ThrowsConfigurationException()
     {
         // Given: A controller with no IUserNotifier registered
         var scope = _factory.Services.CreateScope();
@@ -1036,10 +1037,10 @@ public class NuxtAuthControllerTests
         // When: Calling forgot password
         var request = new ForgotPasswordRequest { Username = "testuser" };
 
-        // Then: An InvalidOperationException should be thrown
+        // Then: A NuxtIdentityConfigurationException should be thrown
         var act = () => controller.ForgotPassword(request);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*IUserNotifier*");
+        await act.Should().ThrowAsync<NuxtIdentityConfigurationException>()
+            .Where(ex => ex.MissingService.Contains("IUserNotifier"));
     }
 
     #endregion
