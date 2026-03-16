@@ -27,6 +27,19 @@ param()
 $ErrorActionPreference = "Stop"
 
 try {
+    # Check prerequisites
+    if (-not (Get-Command reportgenerator -ErrorAction SilentlyContinue)) {
+        Write-Host "ERROR: 'reportgenerator' is not installed." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "This script requires the ReportGenerator global .NET tool." -ForegroundColor Yellow
+        Write-Host "Install it by running:" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "    dotnet tool install -g dotnet-reportgenerator-globaltool" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "After installing, you may need to restart your terminal for the tool to be available in your PATH." -ForegroundColor Yellow
+        exit 1
+    }
+
     $RootPath = "$PSScriptRoot/.."
     $TestProjects = @(
         "tests/NuxtIdentity.Core.Tests/NuxtIdentity.Core.Tests.csproj",
