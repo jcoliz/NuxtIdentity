@@ -424,6 +424,48 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
     #endregion
 
+    #region Password Management Endpoints
+
+    /// <summary>
+    /// Initiates a password reset flow by generating a reset code and notifying the user.
+    /// </summary>
+    /// <param name="request">The forgot password request containing a username or email.</param>
+    /// <remarks>
+    /// Always returns 200 OK regardless of whether the user exists to prevent user enumeration.
+    /// If no <see cref="IUserNotifier{TUser}"/> is registered, the endpoint still succeeds but
+    /// generates a warning log.
+    /// </remarks>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public virtual async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        LogStarting();
+
+        var user = await FindUserByUsernameOrEmailAsync(request.Username, request.Email);
+
+        if (user != null)
+        {
+            LogFoundUser(user.Id);
+
+            var code = await UserManager.GeneratePasswordResetTokenAsync(user);
+
+            if (UserNotifier != null)
+            {
+                await UserNotifier.SendResetCodeAsync(user, code);
+            }
+            else
+            {
+                LogNoUserNotifierConfigured();
+            }
+        }
+
+        // Always return success to prevent user enumeration
+        LogOk();
+        return Ok(new { success = true });
+    }
+
+    #endregion
+
     #region Hooks
 
     /// <summary>
@@ -481,6 +523,9 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
     [LoggerMessage(14, LogLevel.Warning, "{Location}: Change password failed {Username} {Errors}")]
     private partial void LogChangePasswordFailed(string username, string errors, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(15, LogLevel.Debug, "{Location}: Found user {UserId}")]
+    private partial void LogFoundUser(string userId, [CallerMemberName] string? location = null);
 
     #endregion
 }

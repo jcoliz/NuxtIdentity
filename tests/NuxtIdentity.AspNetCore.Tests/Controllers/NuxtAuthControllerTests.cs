@@ -11,6 +11,7 @@ using NUnit.Framework;
 using NuxtIdentity.AspNetCore.Tests.Helpers;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
+using NuxtIdentity.Core.Services;
 
 namespace NuxtIdentity.AspNetCore.Tests.Controllers;
 
@@ -905,6 +906,106 @@ public class NuxtAuthControllerTests
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    #endregion
+
+    #region ForgotPassword Tests
+
+    [Test]
+    public async Task ForgotPassword_ExistingUser_ReturnsSuccess()
+    {
+        // Given: An existing user
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        // When: Requesting a password reset by username
+        var request = new ForgotPasswordRequest { Username = username };
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
+
+        // Then: 200 OK should be returned with success
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        result.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ForgotPassword_ExistingUserByEmail_ReturnsSuccess()
+    {
+        // Given: An existing user with an email address
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        // When: Requesting a password reset by email
+        var request = new ForgotPasswordRequest { Email = $"{username}@test.com" };
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
+
+        // Then: 200 OK should be returned with success
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        result.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ForgotPassword_NonexistentUser_ReturnsSuccess()
+    {
+        // Given: No user exists with the given username
+
+        // When: Requesting a password reset for a nonexistent user
+        var request = new ForgotPasswordRequest { Username = "nonexistent" };
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
+
+        // Then: 200 OK should still be returned to prevent user enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        result.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ForgotPassword_EmptyRequest_ReturnsSuccess()
+    {
+        // Given: An empty request with no username or email
+
+        // When: Submitting an empty forgot password request
+        var request = new ForgotPasswordRequest();
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
+
+        // Then: 200 OK should still be returned to prevent user enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        result.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ForgotPassword_ExistingUser_NotifiesUser()
+    {
+        // Given: An existing user
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        // When: Requesting a password reset
+        var request = new ForgotPasswordRequest { Username = username };
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
+
+        // Then: The request should succeed
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: The notifier should have captured a reset code
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifications = await notifier.GetNotificationsAsync();
+        notifications.Should().HaveCount(1);
+        notifications[0].Code.Should().NotBeNullOrEmpty();
+        notifications[0].Type.Should().Be(NotificationType.PasswordReset);
     }
 
     #endregion
