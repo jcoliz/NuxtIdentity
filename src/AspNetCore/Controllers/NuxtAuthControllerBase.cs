@@ -466,6 +466,50 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         return Ok(new { success = true });
     }
 
+    /// <summary>
+    /// Resets a user's password using a reset code from the forgot-password flow.
+    /// </summary>
+    /// <param name="request">The reset password request containing user identifier, reset code, and new password.</param>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public virtual async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        LogStarting();
+
+        var user = await FindUserByUsernameOrEmailAsync(request.Username, request.Email);
+
+        if (user == null)
+        {
+            LogResetPasswordFailed("User not found");
+            return Problem(
+                title: "Password Reset Failed",
+                detail: "Invalid request",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        LogFoundUser(user.Id);
+
+        var result = await UserManager.ResetPasswordAsync(user, request.Code, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            LogResetPasswordFailed(string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(
+                title: "Password Reset Failed",
+                detail: string.Join("; ", result.Errors.Select(e => e.Description)),
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        // Revoke all refresh tokens for security (Story 7)
+        await RefreshTokenService.RevokeAllUserTokensAsync(user.Id);
+
+        LogOk();
+        return Ok(new { success = true });
+    }
+
     #endregion
 
     #region Hooks

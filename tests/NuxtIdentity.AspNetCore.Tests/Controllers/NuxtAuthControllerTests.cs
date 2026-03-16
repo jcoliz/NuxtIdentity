@@ -1044,4 +1044,216 @@ public class NuxtAuthControllerTests
     }
 
     #endregion
+
+    #region ResetPassword Tests
+
+    [Test]
+    public async Task ResetPassword_ValidCode_ReturnsSuccess()
+    {
+        // Given: An existing user with a password
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        // And: A password reset code has been generated
+        var forgotRequest = new ForgotPasswordRequest { Username = username };
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
+
+        // And: The reset code is retrieved from the test notifier
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifications = await notifier.GetNotificationsAsync();
+        var resetCode = notifications.First().Code;
+
+        // When: User resets password with the valid code
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = username,
+            Code = resetCode,
+            NewPassword = "NewPassword123!"
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // Then: 200 OK should be returned with success
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        result.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ResetPassword_ValidCode_CanLoginWithNewPassword()
+    {
+        // Given: An existing user whose password has been reset
+        var username = "testuser";
+        var oldPassword = "Test123!";
+        var newPassword = "NewPassword123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, oldPassword);
+
+        // And: The forgot-password flow has been completed
+        var forgotRequest = new ForgotPasswordRequest { Username = username };
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifications = await notifier.GetNotificationsAsync();
+        var resetCode = notifications.First().Code;
+
+        // And: The password has been reset
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = username,
+            Code = resetCode,
+            NewPassword = newPassword
+        };
+        await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // When: User logs in with the new password
+        var loginRequest = new LoginRequest { Username = username, Password = newPassword };
+        var response = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+
+        // Then: Login should succeed
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task ResetPassword_ValidCode_OldPasswordFails()
+    {
+        // Given: An existing user whose password has been reset
+        var username = "testuser";
+        var oldPassword = "Test123!";
+        var newPassword = "NewPassword123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, oldPassword);
+
+        // And: The forgot-password flow has been completed
+        var forgotRequest = new ForgotPasswordRequest { Username = username };
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifications = await notifier.GetNotificationsAsync();
+        var resetCode = notifications.First().Code;
+
+        // And: The password has been reset
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = username,
+            Code = resetCode,
+            NewPassword = newPassword
+        };
+        await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // When: User tries to log in with the old password
+        var loginRequest = new LoginRequest { Username = username, Password = oldPassword };
+        var response = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+
+        // Then: Login should fail
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task ResetPassword_InvalidCode_ReturnsBadRequest()
+    {
+        // Given: An existing user
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        // When: User submits an invalid reset code
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = username,
+            Code = "invalid-code",
+            NewPassword = "NewPassword123!"
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // Then: 400 Bad Request should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task ResetPassword_NonexistentUser_ReturnsBadRequest()
+    {
+        // Given: No user exists with the given username
+
+        // When: Submitting a reset request for a nonexistent user
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = "nonexistent",
+            Code = "some-code",
+            NewPassword = "NewPassword123!"
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // Then: 400 Bad Request should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task ResetPassword_WeakPassword_ReturnsBadRequest()
+    {
+        // Given: An existing user with a valid reset code
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        // And: A valid reset code has been generated
+        var forgotRequest = new ForgotPasswordRequest { Username = username };
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifications = await notifier.GetNotificationsAsync();
+        var resetCode = notifications.First().Code;
+
+        // When: User resets with an empty password (fails minimum length of 1)
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = username,
+            Code = resetCode,
+            NewPassword = ""
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // Then: 400 Bad Request should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task ResetPassword_ValidCode_RevokesRefreshTokens()
+    {
+        // Given: An existing user who has logged in and has refresh tokens
+        var username = "testuser";
+        var password = "Test123!";
+        var user = new TestUser(username);
+        await _userManager.CreateAsync(user, password);
+
+        var loginRequest = new LoginRequest { Username = username, Password = password };
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var loginContent = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var refreshToken = loginContent!.Token.RefreshToken;
+
+        // And: A password reset code has been generated and password is reset
+        var forgotRequest = new ForgotPasswordRequest { Username = username };
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifications = await notifier.GetNotificationsAsync();
+        var resetCode = notifications.First().Code;
+
+        var resetRequest = new ResetPasswordRequest
+        {
+            Username = username,
+            Code = resetCode,
+            NewPassword = "NewPassword123!"
+        };
+        await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
+
+        // When: Attempting to use the old refresh token
+        var refreshRequest = new RefreshRequest { RefreshToken = refreshToken };
+        var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
+
+        // Then: Refresh should fail because tokens were revoked
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    #endregion
 }
