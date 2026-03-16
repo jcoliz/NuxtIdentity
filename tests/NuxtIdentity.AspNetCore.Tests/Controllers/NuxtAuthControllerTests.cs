@@ -596,11 +596,7 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/logout", logoutRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -616,7 +612,7 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/logout", logoutRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -926,11 +922,8 @@ public class NuxtAuthControllerTests
         var request = new ForgotPasswordRequest { Username = username };
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
-        // Then: 200 OK should be returned with success
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        // Then: 204 No Content should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -946,11 +939,8 @@ public class NuxtAuthControllerTests
         var request = new ForgotPasswordRequest { Email = $"{username}@test.com" };
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
-        // Then: 200 OK should be returned with success
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        // Then: 204 No Content should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -962,11 +952,8 @@ public class NuxtAuthControllerTests
         var request = new ForgotPasswordRequest { Username = "nonexistent" };
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
-        // Then: 200 OK should still be returned to prevent user enumeration
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        // Then: 204 No Content should still be returned to prevent user enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -978,11 +965,8 @@ public class NuxtAuthControllerTests
         var request = new ForgotPasswordRequest();
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
-        // Then: 200 OK should still be returned to prevent user enumeration
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        // Then: 204 No Content should still be returned to prevent user enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -999,7 +983,7 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
         // Then: The request should succeed
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // And: The notifier should have captured a reset code
         var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
@@ -1074,11 +1058,8 @@ public class NuxtAuthControllerTests
         };
         var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
 
-        // Then: 200 OK should be returned with success
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        // Then: 204 No Content should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]
@@ -1284,11 +1265,8 @@ public class NuxtAuthControllerTests
         };
         var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
 
-        // Then: 200 OK should be returned with success
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        result.GetProperty("success").GetBoolean().Should().BeTrue();
+        // Then: 204 No Content should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Test]

@@ -407,9 +407,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// Handles logout logic. Can be overridden for custom behavior.
     /// </summary>
     /// <param name="request">The logout request containing the refresh token to revoke.</param>
-    /// <returns>Success response.</returns>
     [HttpPost("logout")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public virtual async Task<IActionResult> Logout([FromBody] RefreshRequest request)
     {
         LogStarting();
@@ -420,7 +419,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         }
 
         LogOk();
-        return Ok(new { success = true });
+        return NoContent();
     }
 
     #endregion
@@ -432,14 +431,14 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// </summary>
     /// <param name="request">The forgot password request containing a username or email.</param>
     /// <remarks>
-    /// Always returns 200 OK regardless of whether the user exists to prevent user enumeration.
+    /// Always returns 204 No Content regardless of whether the user exists to prevent user enumeration.
     /// </remarks>
     /// <exception cref="NuxtIdentityConfigurationException">
     /// Thrown when no <see cref="IUserNotifier{TUser}"/> implementation is registered.
     /// The consumer must register an implementation in DI for the forgot-password flow to work.
     /// </exception>
     [HttpPost("forgot-password")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public virtual async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         LogStarting();
@@ -463,7 +462,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
         // Always return success to prevent user enumeration
         LogOk();
-        return Ok(new { success = true });
+        return NoContent();
     }
 
     /// <summary>
@@ -475,7 +474,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// The caller should redirect the user to the login page after a successful reset.
     /// </remarks>
     [HttpPost("reset-password")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public virtual async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
@@ -511,7 +510,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         await RefreshTokenService.RevokeAllUserTokensAsync(user.Id);
 
         LogOk();
-        return Ok(new { success = true });
+        return NoContent();
     }
 
     /// <summary>
@@ -525,7 +524,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// </remarks>
     [HttpPost("change-password")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public virtual async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
@@ -570,7 +569,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         await RefreshTokenService.RevokeAllUserTokensAsync(user.Id);
 
         LogOkUsername(username);
-        return Ok(new { success = true });
+        return NoContent();
     }
 
     #endregion
