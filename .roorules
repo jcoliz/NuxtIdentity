@@ -137,6 +137,65 @@ public async Task GenerateAccessToken_ValidUser_ReturnsValidToken()
 - Compile-time validation of regex patterns
 - Generated code is optimized and cached for reuse
 
+## Exception Pattern
+
+**Always use custom NuxtIdentity exception types for library errors. Never throw built-in framework exceptions for library-specific error conditions.**
+
+1. **Base exception** - All library-specific exceptions must inherit from `NuxtIdentityException` (in `NuxtIdentity.Core.Exceptions`). This allows consumers to catch all library errors with a single `catch (NuxtIdentityException)` block.
+
+2. **Never throw built-in exceptions for library errors** - Do NOT throw `InvalidOperationException`, `Exception`, `SystemException`, or other built-in types for conditions unique to NuxtIdentity. These are indistinguishable from exceptions thrown by ASP.NET Core, EF Core, or other dependencies, forcing consumers into fragile string-based exception handling.
+
+3. **When built-in exceptions ARE acceptable** - Standard parameter validation exceptions are fine because they represent contract violations by the caller, not library-specific errors:
+   - `ArgumentNullException` / `ArgumentException` — standard parameter validation
+   - `NotSupportedException` — abstract method not implemented
+   - `ObjectDisposedException` — standard disposal pattern
+
+4. **Existing exception types** - Use the appropriate existing exception class:
+   - `NuxtIdentityException` — base class for general library errors
+   - `NuxtIdentityConfigurationException` — thrown when a required service is missing from DI (includes a `MissingService` property)
+
+5. **Creating new exception types** - When adding a new exception type:
+   - Inherit from `NuxtIdentityException` (or a more specific subclass)
+   - Place in `src/Core/Exceptions/`
+   - Include XML documentation with `<summary>` and `<remarks>`
+   - Provide constructors for message, message+inner, and any domain-specific properties
+   - Add unit tests in `tests/NuxtIdentity.Core.Tests/Exceptions/`
+
+### Example: Throwing a Configuration Exception
+
+```csharp
+if (UserNotifier == null)
+{
+    throw new NuxtIdentityConfigurationException(nameof(IUserNotifier<TUser>));
+}
+```
+
+### Example: Consumer Catching Library Errors
+
+```csharp
+try
+{
+    await authController.ForgotPassword(request);
+}
+catch (NuxtIdentityConfigurationException ex)
+{
+    // Handle specific misconfiguration — ex.MissingService tells you what's missing
+    logger.LogError("Missing service: {Service}", ex.MissingService);
+}
+catch (NuxtIdentityException ex)
+{
+    // Handle any other NuxtIdentity error
+    logger.LogError("NuxtIdentity error: {Message}", ex.Message);
+}
+```
+
+### Benefits
+
+- **Catchability** — Consumers can catch library errors specifically without ambiguity
+- **Disambiguation** — No confusion with framework exceptions from ASP.NET Core, EF Core, etc.
+- **Typed properties** — Domain-specific properties (e.g., `MissingService`) enable programmatic handling without string matching
+- **Versioning** — Exception types are part of the public API contract, making breaking changes explicit
+
 ## Test Execution Pattern
 
 **Always run tests after creating or modifying them to verify they pass.**
