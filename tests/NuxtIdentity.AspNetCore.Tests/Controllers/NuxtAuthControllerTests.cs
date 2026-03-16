@@ -1008,5 +1008,39 @@ public class NuxtAuthControllerTests
         notifications[0].Type.Should().Be(NotificationType.PasswordReset);
     }
 
+    [Test]
+    public async Task ForgotPassword_NoNotifierConfigured_ThrowsInvalidOperationException()
+    {
+        // Given: A controller with no IUserNotifier registered
+        var scope = _factory.Services.CreateScope();
+        var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
+        var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
+        var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
+
+        var controller = new TestAuthController(
+            jwtTokenService,
+            claimsProviders,
+            refreshTokenService,
+            _userManager,
+            scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
+            Enumerable.Empty<IUserNotifier<TestUser>>(),
+            logger
+        );
+
+        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext()
+        };
+
+        // When: Calling forgot password
+        var request = new ForgotPasswordRequest { Username = "testuser" };
+
+        // Then: An InvalidOperationException should be thrown
+        var act = () => controller.ForgotPassword(request);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*IUserNotifier*");
+    }
+
     #endregion
 }

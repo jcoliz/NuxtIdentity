@@ -432,14 +432,24 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <param name="request">The forgot password request containing a username or email.</param>
     /// <remarks>
     /// Always returns 200 OK regardless of whether the user exists to prevent user enumeration.
-    /// If no <see cref="IUserNotifier{TUser}"/> is registered, the endpoint still succeeds but
-    /// generates a warning log.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when no <see cref="IUserNotifier{TUser}"/> implementation is registered.
+    /// The consumer must register an implementation in DI for the forgot-password flow to work.
+    /// </exception>
     [HttpPost("forgot-password")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public virtual async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         LogStarting();
+
+        if (UserNotifier == null)
+        {
+            LogNoUserNotifierConfigured();
+            throw new InvalidOperationException(
+                "No IUserNotifier<TUser> implementation is registered. " +
+                "Register an implementation in DI to use the forgot-password endpoint.");
+        }
 
         var user = await FindUserByUsernameOrEmailAsync(request.Username, request.Email);
 
@@ -448,15 +458,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             LogFoundUser(user.Id);
 
             var code = await UserManager.GeneratePasswordResetTokenAsync(user);
-
-            if (UserNotifier != null)
-            {
-                await UserNotifier.SendResetCodeAsync(user, code);
-            }
-            else
-            {
-                LogNoUserNotifierConfigured();
-            }
+            await UserNotifier.SendResetCodeAsync(user, code);
         }
 
         // Always return success to prevent user enumeration

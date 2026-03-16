@@ -85,7 +85,7 @@ NuxtIdentity currently provides login, signup, session, refresh, and logout endp
 - [ ] `SendEmailConfirmationAsync` receives the user object and the confirmation code string (for future email confirmation feature)
 - [ ] The consumer registers their implementation in DI
 - [ ] The forgot-password endpoint calls `SendResetCodeAsync` after generating the code
-- [ ] If no notifier is registered, the endpoint still succeeds but generates a warning log
+- [ ] If no notifier is registered, the forgot-password endpoint throws `InvalidOperationException` (surfaced as 500 by middleware), indicating a developer configuration error
 
 ### Story 5: User - Receives clear error for weak password
 **As a** user setting a new password (via reset or change)
