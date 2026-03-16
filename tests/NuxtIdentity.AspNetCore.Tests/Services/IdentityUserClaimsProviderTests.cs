@@ -64,10 +64,9 @@ public class IdentityUserClaimsProviderTests
 
         // Assert
         claims.Should().NotBeEmpty();
-        claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
-        claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == user.UserName);
-        claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == user.Email);
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.UserName);
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.Id);
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.UserName);
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email);
         claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Jti);
     }
 
@@ -210,7 +209,7 @@ public class IdentityUserClaimsProviderTests
         claims.Should().NotBeEmpty();
         claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == roleName);
         // Should still have standard claims even though role wasn't found
-        claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier);
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub);
     }
 
     [Test]
@@ -261,9 +260,9 @@ public class IdentityUserClaimsProviderTests
 
         // Assert
         claims.Should().NotBeEmpty();
-        claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == "");
-        claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "");
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == "");
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == "");
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == "");
+        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == "user123");
     }
 
     [Test]

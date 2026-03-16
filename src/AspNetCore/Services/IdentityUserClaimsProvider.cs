@@ -133,7 +133,7 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
     {
         var _ = builder.AddClaimsWithCount([
             new(JwtRegisteredClaimNames.Sub, user.Id),
-            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new(JwtRegisteredClaimNames.Name, user.UserName ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         ]);

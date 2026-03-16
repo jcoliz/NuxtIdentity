@@ -306,11 +306,13 @@ public class NuxtAuthControllerTests
         // Arrange - Get services to create a controller instance
         var scope = _factory.Services.CreateScope();
         var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
+        var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
         var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
 
         var controller = new TestAuthController(
             jwtTokenService,
+            claimsProviders,
             refreshTokenService,
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
@@ -453,11 +455,13 @@ public class NuxtAuthControllerTests
         // Arrange - Get services to create a controller instance
         var scope = _factory.Services.CreateScope();
         var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
+        var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
         var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
 
         var controller = new TestAuthController(
             jwtTokenService,
+            claimsProviders,
             refreshTokenService,
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
@@ -492,8 +496,8 @@ public class NuxtAuthControllerTests
 
         var problemDetails = objectResult.Value as Microsoft.AspNetCore.Mvc.ProblemDetails;
         problemDetails.Should().NotBeNull();
-        problemDetails!.Title.Should().Be("Authentication Required");
-        problemDetails.Detail.Should().Be("No valid authentication token provided");
+        problemDetails!.Title.Should().Be("Token Refresh Failed");
+        problemDetails.Detail.Should().Be("Invalid or expired refresh token");
     }
 
     [Test]

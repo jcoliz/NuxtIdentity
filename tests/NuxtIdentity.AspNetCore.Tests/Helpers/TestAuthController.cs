@@ -12,11 +12,12 @@ public class TestAuthController : NuxtAuthControllerBase<TestUser>
 {
     public TestAuthController(
         IJwtTokenService<TestUser> jwtTokenService,
+        IEnumerable<IUserClaimsProvider<TestUser>> claimsProviders,
         IRefreshTokenService refreshTokenService,
         UserManager<TestUser> userManager,
         SignInManager<TestUser> signInManager,
         ILogger<TestAuthController> logger)
-        : base(jwtTokenService, refreshTokenService, userManager, signInManager, logger)
+        : base(jwtTokenService, claimsProviders, refreshTokenService, userManager, signInManager, logger)
     {
     }
 }
