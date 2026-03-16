@@ -12,7 +12,7 @@ using NuxtIdentity.AspNetCore.Tests.Helpers;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
 using NuxtIdentity.Core.Exceptions;
-using NuxtIdentity.Core.Services;
+using NuxtIdentity.AspNetCore.Services;
 
 namespace NuxtIdentity.AspNetCore.Tests.Controllers;
 

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 using NuxtIdentity.AspNetCore.Extensions;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
-using NuxtIdentity.Core.Services;
+using NuxtIdentity.AspNetCore.Services;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
 
 namespace NuxtIdentity.AspNetCore.Tests.Helpers;

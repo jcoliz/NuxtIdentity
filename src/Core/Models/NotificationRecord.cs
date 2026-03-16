@@ -22,6 +22,16 @@ public enum NotificationType
 public record NotificationRecord
 {
     /// <summary>
+    /// The identity of the user who was notified (e.g. IdentityUser.Id).
+    /// </summary>
+    public string UserId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The username of the user who was notified.
+    /// </summary>
+    public string UserName { get; init; } = string.Empty;
+
+    /// <summary>
     /// The code sent to the user (reset code or confirmation code).
     /// </summary>
     public string Code { get; init; } = string.Empty;

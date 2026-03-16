@@ -1,11 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
 using NUnit.Framework;
+using NuxtIdentity.AspNetCore.Services;
+using NuxtIdentity.AspNetCore.Tests.Helpers;
 using NuxtIdentity.Core.Models;
-using NuxtIdentity.Core.Services;
-using NuxtIdentity.Core.Tests.Helpers;
 
-namespace NuxtIdentity.Core.Tests.Services;
+namespace NuxtIdentity.AspNetCore.Tests.Services;
 
 /// <summary>
 /// Unit tests for <see cref="InMemoryUserNotifier{TUser}"/>.
@@ -28,7 +28,7 @@ public class InMemoryUserNotifierTests
     public async Task SendResetCodeAsync_CapturesNotification()
     {
         // Given: A user and a reset code
-        var user = new TestUser { Id = "user1", Username = "testuser", Email = "test@example.com" };
+        var user = new TestUser("testuser") { Id = "user1" };
         var resetCode = "abc123";
 
         // When: A reset code notification is sent
@@ -45,10 +45,26 @@ public class InMemoryUserNotifierTests
     }
 
     [Test]
+    public async Task SendResetCodeAsync_CapturesUserId()
+    {
+        // Given: A user with a known ID and a reset code
+        var user = new TestUser("testuser") { Id = "user1" };
+        var resetCode = "abc123";
+
+        // When: A reset code notification is sent
+        await _notifier.SendResetCodeAsync(user, resetCode);
+
+        // Then: The notification should capture the user's identity
+        var notifications = await _notifier.GetNotificationsAsync();
+        notifications[0].UserId.Should().Be("user1");
+        notifications[0].UserName.Should().Be("testuser");
+    }
+
+    [Test]
     public async Task SendEmailConfirmationAsync_CapturesNotification()
     {
         // Given: A user and a confirmation code
-        var user = new TestUser { Id = "user1", Username = "testuser", Email = "test@example.com" };
+        var user = new TestUser("testuser") { Id = "user1" };
         var confirmationCode = "confirm456";
 
         // When: An email confirmation notification is sent
@@ -64,10 +80,26 @@ public class InMemoryUserNotifierTests
     }
 
     [Test]
+    public async Task SendEmailConfirmationAsync_CapturesUserId()
+    {
+        // Given: A user with a known ID and a confirmation code
+        var user = new TestUser("confirmuser") { Id = "user2" };
+        var confirmationCode = "confirm456";
+
+        // When: An email confirmation notification is sent
+        await _notifier.SendEmailConfirmationAsync(user, confirmationCode);
+
+        // Then: The notification should capture the user's identity
+        var notifications = await _notifier.GetNotificationsAsync();
+        notifications[0].UserId.Should().Be("user2");
+        notifications[0].UserName.Should().Be("confirmuser");
+    }
+
+    [Test]
     public async Task GetNotificationsAsync_MultipleNotifications_ReturnsAll()
     {
         // Given: A user with multiple notifications sent
-        var user = new TestUser { Id = "user1", Username = "testuser", Email = "test@example.com" };
+        var user = new TestUser("testuser") { Id = "user1" };
         await _notifier.SendResetCodeAsync(user, "reset1");
         await _notifier.SendEmailConfirmationAsync(user, "confirm1");
         await _notifier.SendResetCodeAsync(user, "reset2");
@@ -86,10 +118,30 @@ public class InMemoryUserNotifierTests
     }
 
     [Test]
+    public async Task GetNotificationsAsync_MultipleUsers_CapturesEachUserId()
+    {
+        // Given: Two different users with notifications
+        var user1 = new TestUser("alice") { Id = "id-alice" };
+        var user2 = new TestUser("bob") { Id = "id-bob" };
+
+        // When: Notifications are sent for both users
+        await _notifier.SendResetCodeAsync(user1, "reset-alice");
+        await _notifier.SendResetCodeAsync(user2, "reset-bob");
+
+        // Then: Each notification should capture the correct user identity
+        var notifications = await _notifier.GetNotificationsAsync();
+        notifications.Should().HaveCount(2);
+        notifications[0].UserId.Should().Be("id-alice");
+        notifications[0].UserName.Should().Be("alice");
+        notifications[1].UserId.Should().Be("id-bob");
+        notifications[1].UserName.Should().Be("bob");
+    }
+
+    [Test]
     public async Task ClearAsync_RemovesAllNotifications()
     {
         // Given: Notifications have been captured
-        var user = new TestUser { Id = "user1", Username = "testuser", Email = "test@example.com" };
+        var user = new TestUser("testuser") { Id = "user1" };
         await _notifier.SendResetCodeAsync(user, "reset1");
         await _notifier.SendEmailConfirmationAsync(user, "confirm1");
 
