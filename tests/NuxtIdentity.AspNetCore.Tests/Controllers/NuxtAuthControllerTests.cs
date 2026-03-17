@@ -991,6 +991,11 @@ public class NuxtAuthControllerTests
         notifications.Should().HaveCount(1);
         notifications[0].Code.Should().NotBeNullOrEmpty();
         notifications[0].Type.Should().Be(NotificationType.PasswordReset);
+
+        // And: The code should be Base64URL-safe (no +, /, or = characters)
+        notifications[0].Code.Should().NotContain("+", "code should use Base64URL encoding");
+        notifications[0].Code.Should().NotContain("/", "code should use Base64URL encoding");
+        notifications[0].Code.Should().NotContain("=", "code should use Base64URL encoding");
     }
 
     [Test]

@@ -457,7 +457,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             LogFoundUser(user.Id);
 
             var code = await UserManager.GeneratePasswordResetTokenAsync(user);
-            await UserNotifier.SendResetCodeAsync(user, code);
+            var urlSafeCode = ToBase64Url(code);
+            await UserNotifier.SendResetCodeAsync(user, urlSafeCode);
         }
 
         // Always return success to prevent user enumeration
@@ -494,7 +495,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
         LogFoundUser(user.Id);
 
-        var result = await UserManager.ResetPasswordAsync(user, request.Code, request.NewPassword);
+        var originalCode = FromBase64Url(request.Code);
+        var result = await UserManager.ResetPasswordAsync(user, originalCode, request.NewPassword);
 
         if (!result.Succeeded)
         {
@@ -584,6 +586,46 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     {
         // Hook for derived classes to implement custom logic after user creation
         return Task.CompletedTask;
+    }
+
+    #endregion
+
+    #region Base64URL Encoding
+
+    /// <summary>
+    /// Converts a standard base64 string to a Base64URL-safe string by replacing
+    /// URL-unsafe characters and removing padding.
+    /// </summary>
+    /// <param name="base64">The standard base64 string to convert.</param>
+    /// <returns>A URL-safe Base64URL string.</returns>
+    private static string ToBase64Url(string base64)
+    {
+        return base64
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+    }
+
+    /// <summary>
+    /// Converts a Base64URL-safe string back to a standard base64 string by restoring
+    /// URL-unsafe characters and adding padding.
+    /// </summary>
+    /// <param name="base64Url">The Base64URL string to convert.</param>
+    /// <returns>A standard base64 string with proper padding.</returns>
+    private static string FromBase64Url(string base64Url)
+    {
+        var base64 = base64Url
+            .Replace('-', '+')
+            .Replace('_', '/');
+
+        // Restore padding
+        switch (base64.Length % 4)
+        {
+            case 2: base64 += "=="; break;
+            case 3: base64 += "="; break;
+        }
+
+        return base64;
     }
 
     #endregion
