@@ -1,5 +1,5 @@
 ---
-status: Approved
+status: Implemented
 design_document: DESIGN-PASSWORD-MANAGEMENT.md
 ado: TBD
 ---

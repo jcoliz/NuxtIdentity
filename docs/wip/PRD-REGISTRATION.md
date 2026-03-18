@@ -56,7 +56,7 @@ Users need a way to sign up for an application, and administrators need a way to
 
 ---
 
-## User Stories
+## User Stories: Phase 1
 
 ### Story 1: User - Register with invitation code
 **As a** user who has received an invitation
@@ -118,6 +118,20 @@ Users need a way to sign up for an application, and administrators need a way to
 - [ ] The invitation is persisted with status "Pending", including any metadata
 - [ ] The developer is responsible for delivering the invitation to the recipient and for building their own admin controller/endpoint with appropriate authorization
 
+### Story 10: Developer - Hook into registration lifecycle
+**As a** developer using NuxtIdentity
+**I want** lifecycle hooks for key registration events
+**So that** I can implement application-specific logic without modifying the library
+
+**Acceptance Criteria**:
+- [ ] `OnUserCreatedAsync(TUser user)` -- existing hook, called for all signups (already implemented)
+- [ ] `OnInvitationAcceptedAsync(TUser user, Invitation invitation)` -- new hook, called after a user registers with an invitation and roles/claims have been assigned. The invitation entity includes metadata for application-specific actions.
+- [ ] `OnUserConfirmedAsync(TUser user)` -- new hook, called after a user's email is confirmed
+- [ ] All hooks are `virtual` with no-op default implementations
+- [ ] Hooks receive enough context for the consuming app to take action (e.g., the invitation entity includes the assigned roles/claims and metadata)
+
+## User Stories: Phase 2
+
 ### Story 6: Developer - List and query invitations via service API
 **As a** developer building an admin interface
 **I want** to query invitations through `IInvitationService`
@@ -140,6 +154,24 @@ Users need a way to sign up for an application, and administrators need a way to
 - [ ] A revoked invitation cannot be used for registration (returns appropriate error per Story 2)
 - [ ] Attempting to revoke an already-accepted or already-revoked invitation returns an appropriate error
 - [ ] The developer is responsible for building their own admin controller/endpoint with appropriate authorization
+
+### Story 12: Developer - Seed invitations for testing
+**As a** developer using NuxtIdentity
+**I want** to seed invitations from configuration at startup
+**So that** my test and development environments have predictable invitation codes available
+
+**Acceptance Criteria**:
+- [ ] Invitations defined in configuration are created in the Invitations table if they do not exist
+- [ ] Seeded invitations support specifying: Code (GUID), Status (`InvitationStatus` enum), Roles, Claims, Metadata, and ExpiresAt
+- [ ] Status can be set to any `InvitationStatus` value (Pending, Accepted, Expired, Revoked) to enable testing error handling for each invitation state
+- [ ] Seeded invitations follow the same upsert semantics as other seeded data (create if missing, update if different, never delete)
+- [ ] This story depends on the Identity Seeding feature (PRD-SEEDING) being implemented first
+- [ ] The existing seeder is extended with an `Invitations` section rather than building a separate seeding mechanism
+- [ ] The seeder never seeds an empty GUID. Empty GUID in seeding is considered a mis-configuration, and generates a warning.
+
+**Dependency**: Requires [PRD-SEEDING](PRD-SEEDING.md) to be implemented. The seeder will be extended to support an `Invitations` configuration section.
+
+## User Stories: Phase 3
 
 ### Story 8: User - Confirm email address
 **As a** user who has just registered
@@ -164,37 +196,9 @@ Users need a way to sign up for an application, and administrators need a way to
 - [ ] When `Mode` is `Open`, signup behaves as it does today (immediate access, no email confirmation)
 - [ ] When `Mode` is `InvitationOnly`, invitation-based registrations auto-confirm the user's email (the invitation itself serves as proof of email access)
 
-### Story 10: Developer - Hook into registration lifecycle
-**As a** developer using NuxtIdentity
-**I want** lifecycle hooks for key registration events
-**So that** I can implement application-specific logic without modifying the library
-
-**Acceptance Criteria**:
-- [ ] `OnUserCreatedAsync(TUser user)` -- existing hook, called for all signups (already implemented)
-- [ ] `OnInvitationAcceptedAsync(TUser user, Invitation invitation)` -- new hook, called after a user registers with an invitation and roles/claims have been assigned. The invitation entity includes metadata for application-specific actions.
-- [ ] `OnUserConfirmedAsync(TUser user)` -- new hook, called after a user's email is confirmed
-- [ ] All hooks are `virtual` with no-op default implementations
-- [ ] Hooks receive enough context for the consuming app to take action (e.g., the invitation entity includes the assigned roles/claims and metadata)
-
 ### Story 11: Removed
 
 This story is no longer relevant. Preserving the number so we don't need to renumber stories.
-
-### Story 12: Developer - Seed invitations for testing
-**As a** developer using NuxtIdentity
-**I want** to seed invitations from configuration at startup
-**So that** my test and development environments have predictable invitation codes available
-
-**Acceptance Criteria**:
-- [ ] Invitations defined in configuration are created in the Invitations table if they do not exist
-- [ ] Seeded invitations support specifying: Code (GUID), Status (`InvitationStatus` enum), Roles, Claims, Metadata, and ExpiresAt
-- [ ] Status can be set to any `InvitationStatus` value (Pending, Accepted, Expired, Revoked) to enable testing error handling for each invitation state
-- [ ] Seeded invitations follow the same upsert semantics as other seeded data (create if missing, update if different, never delete)
-- [ ] This story depends on the Identity Seeding feature (PRD-SEEDING) being implemented first
-- [ ] The existing seeder is extended with an `Invitations` section rather than building a separate seeding mechanism
-- [ ] The seeder never seeds an empty GUID. Empty GUID in seeding is considered a mis-configuration, and generates a warning.
-
-**Dependency**: Requires [PRD-SEEDING](PRD-SEEDING.md) to be implemented. The seeder will be extended to support an `Invitations` configuration section.
 
 ---
 
