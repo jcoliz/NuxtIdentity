@@ -39,11 +39,13 @@ Represents the lifecycle state of an invitation: `NotFound`, `Pending`, `Accepte
 **File**: `src/Core/Models/RegistrationModels.cs` (new)
 
 `RegistrationMode` enum controls how user registration behaves:
-- `Open` — Anyone can register, no email confirmation required
-- `EmailConfirmation` — Anyone can register but must confirm email (default)
+- `Open` — Anyone can register, no email confirmation required (default for Phase 1)
+- `EmailConfirmation` — Anyone can register but must confirm email (**Phase 3 — not implemented yet**)
 - `InvitationOnly` — Invitation code required to register, email auto-confirmed
 
-`RegistrationOptions` is a record with a single `Mode` property defaulting to `EmailConfirmation`. The controller exposes this as a virtual property that developers override to change registration behavior.
+`RegistrationOptions` is a record with a single `Mode` property defaulting to `Open`. The controller exposes this as a virtual property that developers override to change registration behavior.
+
+**Phase 1 limitation**: If a developer sets `Mode = EmailConfirmation`, the `SignUp` endpoint throws `NotImplementedException` with a message indicating email confirmation is not yet supported. This prevents silent misbehavior — the developer gets an immediate, clear signal rather than the system quietly skipping email confirmation. The default is `Open` (not `EmailConfirmation`) in Phase 1 to avoid this trap. When Phase 3 is implemented, the default will change to `EmailConfirmation` per the PRD.
 
 These are placed in Core because the controller (in AspNetCore) needs them, and future service implementations may also reference `RegistrationMode`. Following the same pattern as [`AuthModels.cs`](../../src/Core/Models/AuthModels.cs) which is in Core but consumed by the controller.
 
@@ -165,16 +167,21 @@ Add `IEnumerable<IInvitationService> invitationServices` to the primary construc
 
 Consumers who don't use EF Core may not have an `IInvitationService` registered. Using `IEnumerable` avoids startup failures while the invitation endpoints throw a descriptive `NuxtIdentityConfigurationException` at runtime if the service is needed but missing.
 
+**Fix for IUserNotifier fan-out**: The existing `UserNotifier` property calls `.FirstOrDefault()`, meaning only the first registered `IUserNotifier` is called. This should be changed to iterate all registered notifiers. The controller should store the full `IEnumerable<IUserNotifier<TUser>>` and call all implementations in `ForgotPassword` (and future endpoints). This is a bug fix to the existing password management implementation that should be included in this phase. For example, a consumer might register both an email notifier and an audit-log notifier.
+
+`IInvitationService` is different — it's a stateful data service (not a fan-out notification), so exactly zero or one instance is expected. The constructor should validate that at most one is registered and throw a `NuxtIdentityConfigurationException` with a clear message (e.g., "Multiple IInvitationService implementations registered. Only one invitation store is supported.") if more than one is found. Store the single instance (or null) in the `InvitationService` property.
+
 #### 9.2. RegistrationOptions Virtual Property
 
-A `protected virtual RegistrationOptions RegistrationOptions` property returning `new()` (defaults to `EmailConfirmation` mode). In Phase 1, `EmailConfirmation` and `Open` modes both follow the current open signup behavior — the distinction only matters in Phase 3 when email confirmation endpoints are implemented.
+A `protected virtual RegistrationOptions RegistrationOptions` property returning `new()` (defaults to `Open` mode in Phase 1). Developers override this to switch to `InvitationOnly`.
 
 #### 9.3. Refactored SignUp Endpoint
 
 The existing `SignUp` method is refactored into a dispatcher:
-1. If `InvitationCode` is provided → delegate to private `SignUpWithInvitationAsync`
-2. If no code and `Mode == InvitationOnly` → return 403 Forbidden with "invitation required"
-3. Otherwise → delegate to private `SignUpOpenAsync` (existing behavior extracted)
+1. If `Mode == EmailConfirmation` → throw `NotImplementedException` (not yet supported)
+2. If `InvitationCode` is provided → delegate to private `SignUpWithInvitationAsync`
+3. If no code and `Mode == InvitationOnly` → return 403 Forbidden with "invitation required"
+4. Otherwise (`Open` mode) → delegate to private `SignUpOpenAsync` (existing behavior extracted)
 
 `SignUpOpenAsync` preserves exactly the current open registration logic.
 
@@ -221,8 +228,9 @@ flowchart TD
     K --> L[OnInvitationAcceptedAsync]
     L --> M[Return LoginResponse]
     B -->|No| N{RegistrationMode?}
+    N -->|EmailConfirmation| O2[Throw NotImplementedException]
     N -->|InvitationOnly| O[403: Invitation required]
-    N -->|Open / EmailConfirmation| P[Create user]
+    N -->|Open| P[Create user]
     P --> Q[OnUserCreatedAsync]
     Q --> M
 ```
@@ -354,7 +362,15 @@ Add to existing test files: invitation table creation, unique Code index, round-
 
 ### Why IEnumerable&lt;IInvitationService&gt; instead of direct injection?
 
-Following the `IEnumerable<IUserNotifier<TUser>>` pattern. Consumers who only use `InMemoryRefreshTokenService` may not have an `IInvitationService` registered. `IEnumerable` avoids startup failures while invitation endpoints throw `NuxtIdentityConfigurationException` at runtime if the service is needed but missing.
+Consumers who only use `InMemoryRefreshTokenService` may not have an `IInvitationService` registered. `IEnumerable` avoids startup failures while invitation endpoints throw `NuxtIdentityConfigurationException` at runtime if the service is needed but missing. Unlike `IUserNotifier` (which fans out to all registered implementations), `IInvitationService` expects exactly zero or one — multiple registrations throw a `NuxtIdentityConfigurationException` at construction time.
+
+### Why fix IUserNotifier to call all registered implementations?
+
+The existing password management implementation stores only `.FirstOrDefault()`, meaning additional notifiers are silently ignored. A consumer might register both an email notifier and an audit-log notifier, expecting both to fire. This phase fixes the controller to iterate all registered `IUserNotifier<TUser>` implementations when sending notifications.
+
+### Why default to Open (not EmailConfirmation) in Phase 1?
+
+The PRD specifies `EmailConfirmation` as the ultimate default, but Phase 1 does not implement the email confirmation endpoints. Defaulting to `EmailConfirmation` would silently skip confirmation, creating a false sense of security. Defaulting to `Open` and throwing `NotImplementedException` for `EmailConfirmation` makes the limitation explicit. The default changes to `EmailConfirmation` in Phase 3.
 
 ### Why InvitationEntity in Core (not EntityFrameworkCore)?
 
