@@ -162,14 +162,16 @@ Users need a way to sign up for an application, and administrators need a way to
 
 **Acceptance Criteria**:
 - [ ] Invitations defined in configuration are created in the Invitations table if they do not exist
-- [ ] Seeded invitations support specifying: Code (GUID), Status (`InvitationStatus` enum), Roles, Claims, Metadata, and ExpiresAt
-- [ ] Status can be set to any `InvitationStatus` value (Pending, Accepted, Expired, Revoked) to enable testing error handling for each invitation state
+- [ ] Seeded invitations support specifying: Code (GUID, required), Email, Roles, Claims, Metadata, and ExpiresIn (duration)
+- [ ] The developer provides a predictable Code (GUID) in configuration so that tests and manual workflows can reference it
+- [ ] All seeded invitations are created with Pending status — testing non-Pending states (Accepted, Expired, Revoked) is the responsibility of the test controller, not the seeder
 - [ ] Seeded invitations follow the same upsert semantics as other seeded data (create if missing, update if different, never delete)
+- [ ] The upsert match key is Code — if an invitation with the same Code already exists, it is updated rather than duplicated
 - [ ] This story depends on the Identity Seeding feature (PRD-SEEDING) being implemented first
 - [ ] The existing seeder is extended with an `Invitations` section rather than building a separate seeding mechanism
-- [ ] The seeder never seeds an empty GUID. Empty GUID in seeding is considered a mis-configuration, and generates a warning.
+- [ ] The seeder never seeds an empty GUID (`00000000-0000-0000-0000-000000000000`). An empty GUID in configuration is treated as a misconfiguration and generates a warning
 
-**Dependency**: Requires [PRD-SEEDING](PRD-SEEDING.md) to be implemented. The seeder will be extended to support an `Invitations` configuration section.
+**Dependency**: Requires [PRD-SEEDING](PRD-SEEDING.md) to be implemented. The seeder will be extended to support an `Invitations` configuration section. The canonical definition of this story now lives in PRD-SEEDING Story 6.
 
 ## User Stories: Phase 3
 
