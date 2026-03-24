@@ -209,34 +209,48 @@ public abstract partial class NuxtAuthControllerBase<TUser>
             );
         }
 
-        // Assign roles from invitation
+        // Assign roles from invitation (failures are logged, not fatal per design)
         if (!string.IsNullOrEmpty(invitation.Roles))
         {
-            var roles = JsonSerializer.Deserialize<List<string>>(invitation.Roles);
-            if (roles != null && roles.Count > 0)
+            try
             {
-                var roleResult = await UserManager.AddToRolesAsync(user, roles);
-                if (!roleResult.Succeeded)
+                var roles = JsonSerializer.Deserialize<List<string>>(invitation.Roles);
+                if (roles != null && roles.Count > 0)
                 {
-                    LogSignupRoleAssignmentFailed(request.Username,
-                        string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                    var roleResult = await UserManager.AddToRolesAsync(user, roles);
+                    if (!roleResult.Succeeded)
+                    {
+                        LogSignupRoleAssignmentFailed(request.Username,
+                            string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                    }
                 }
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogSignupRoleAssignmentFailed(request.Username, ex.Message);
             }
         }
 
-        // Assign claims from invitation
+        // Assign claims from invitation (failures are logged, not fatal per design)
         if (!string.IsNullOrEmpty(invitation.Claims))
         {
-            var claimInfos = JsonSerializer.Deserialize<List<ClaimInfo>>(invitation.Claims);
-            if (claimInfos != null && claimInfos.Count > 0)
+            try
             {
-                var claims = claimInfos.Select(c => new Claim(c.Type, c.Value)).ToList();
-                var claimResult = await UserManager.AddClaimsAsync(user, claims);
-                if (!claimResult.Succeeded)
+                var claimInfos = JsonSerializer.Deserialize<List<ClaimInfo>>(invitation.Claims);
+                if (claimInfos != null && claimInfos.Count > 0)
                 {
-                    LogSignupClaimAssignmentFailed(request.Username,
-                        string.Join(", ", claimResult.Errors.Select(e => e.Description)));
+                    var claims = claimInfos.Select(c => new Claim(c.Type, c.Value)).ToList();
+                    var claimResult = await UserManager.AddClaimsAsync(user, claims);
+                    if (!claimResult.Succeeded)
+                    {
+                        LogSignupClaimAssignmentFailed(request.Username,
+                            string.Join(", ", claimResult.Errors.Select(e => e.Description)));
+                    }
                 }
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogSignupClaimAssignmentFailed(request.Username, ex.Message);
             }
         }
 
