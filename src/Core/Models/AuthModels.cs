@@ -37,6 +37,11 @@ public record SignUpRequest
     /// The password for the new account.
     /// </summary>
     public string Password { get; init; } = string.Empty;
+
+    /// <summary>
+    /// An optional invitation code for invitation-based registration.
+    /// </summary>
+    public string? InvitationCode { get; init; }
 }
 
 /// <summary>
@@ -148,6 +153,24 @@ public record SessionResponse
     /// Information about the currently authenticated user, or null if not authenticated.
     /// </summary>
     public UserInfo? User { get; init; } = new();
+}
+
+/// <summary>
+/// Response data for the invitation status validation endpoint.
+/// </summary>
+public record InvitationStatusResponse
+{
+    /// <summary>
+    /// The lifecycle status of the invitation code.
+    /// </summary>
+    public InvitationStatus Status { get; init; }
+
+    /// <summary>
+    /// The invitation email, returned only for <see cref="InvitationStatus.Pending"/> status
+    /// so the frontend can pre-fill the registration form. Null for all other statuses to
+    /// avoid information leakage.
+    /// </summary>
+    public string? Email { get; init; }
 }
 
 #endregion
