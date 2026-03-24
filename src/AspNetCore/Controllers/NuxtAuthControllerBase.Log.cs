@@ -71,5 +71,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>
     [LoggerMessage(21, LogLevel.Warning, "{Location}: Signup claim assignment failed {Username} {Errors}")]
     private partial void LogSignupClaimAssignmentFailed(string username, string errors, [CallerMemberName] string? location = null);
 
+    [LoggerMessage(22, LogLevel.Information, "{Location}: Invitation status resolved {Status}")]
+    private partial void LogValidateInvitationResult(InvitationStatus status, [CallerMemberName] string? location = null);
+
     #endregion
 }

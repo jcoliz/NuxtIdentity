@@ -369,6 +369,131 @@ public class InvitationSignUpTests
     }
 
     #endregion
+
+    #region ValidateInvitation Tests (Story 3)
+
+    [Test]
+    public async Task ValidateInvitation_PendingInvitation_ReturnsStatusAndEmail()
+    {
+        // Given: A valid pending invitation
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__validate@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24));
+
+        // When: Checking the invitation status
+        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: Status should be Pending with email visible
+        var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(InvitationStatus.Pending);
+        result.Email.Should().Be("__TEST__validate@test.com");
+    }
+
+    [Test]
+    public async Task ValidateInvitation_AcceptedInvitation_ReturnsStatusWithoutEmail()
+    {
+        // Given: An invitation that has been accepted
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__accepted@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24),
+            status: InvitationStatus.Accepted);
+
+        // When: Checking the invitation status
+        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: Status should be Accepted with no email
+        var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(InvitationStatus.Accepted);
+        result.Email.Should().BeNull();
+    }
+
+    [Test]
+    public async Task ValidateInvitation_ExpiredInvitation_ReturnsStatusWithoutEmail()
+    {
+        // Given: An invitation that has expired
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__expired@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24),
+            status: InvitationStatus.Expired);
+
+        // When: Checking the invitation status
+        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: Status should be Expired with no email
+        var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(InvitationStatus.Expired);
+        result.Email.Should().BeNull();
+    }
+
+    [Test]
+    public async Task ValidateInvitation_RevokedInvitation_ReturnsStatusWithoutEmail()
+    {
+        // Given: An invitation that has been revoked
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__revoked@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24),
+            status: InvitationStatus.Revoked);
+
+        // When: Checking the invitation status
+        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: Status should be Revoked with no email
+        var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(InvitationStatus.Revoked);
+        result.Email.Should().BeNull();
+    }
+
+    [Test]
+    public async Task ValidateInvitation_UnknownCode_ReturnsNotFoundStatus()
+    {
+        // Given: A non-existent invitation code
+
+        // When: Checking the status of an unknown code
+        var response = await _client.GetAsync($"/api/auth/invitations/{Guid.NewGuid()}/status");
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: Status should be NotFound with no email
+        var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(InvitationStatus.NotFound);
+        result.Email.Should().BeNull();
+    }
+
+    #endregion
 }
 
 /// <summary>

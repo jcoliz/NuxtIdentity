@@ -358,5 +358,44 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         return NoContent();
     }
 
+    /// <summary>
+    /// Validates an invitation code and returns its current status.
+    /// </summary>
+    /// <param name="code">The invitation code to validate.</param>
+    /// <remarks>
+    /// Always returns 200 OK with the invitation status. Does not require authentication.
+    /// Returns the invitation email only for <see cref="InvitationStatus.Pending"/> status
+    /// so the frontend can pre-fill the registration form. For all other statuses, the email
+    /// is null to avoid information leakage.
+    /// </remarks>
+    [HttpGet("invitations/{code}/status")]
+    [ProducesResponseType(typeof(InvitationStatusResponse), StatusCodes.Status200OK)]
+    public virtual async Task<IActionResult> ValidateInvitation(string code)
+    {
+        LogStarting();
+
+        if (InvitationService == null)
+        {
+            throw new NuxtIdentityConfigurationException(nameof(IInvitationService));
+        }
+
+        var status = await InvitationService.ResolveStatusAsync(code);
+
+        string? email = null;
+        if (status == InvitationStatus.Pending)
+        {
+            var invitation = await InvitationService.GetByCodeAsync(code);
+            email = invitation?.Email;
+        }
+
+        LogValidateInvitationResult(status);
+
+        return Ok(new InvitationStatusResponse
+        {
+            Status = status,
+            Email = email
+        });
+    }
+
     #endregion
 }
