@@ -368,6 +368,150 @@ public class InvitationSignUpTests
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Test]
+    public async Task SignUp_WithInvitation_DuplicateUsername_Returns400()
+    {
+        // Given: An existing user with the same username
+        var user = new TestUser("dupeuser");
+        await _userManager.CreateAsync(user, "Test123!");
+
+        // And: A valid pending invitation
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__dupeuser@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24));
+
+        // When: User signs up with invitation but duplicate username
+        var request = new SignUpRequest
+        {
+            Username = "dupeuser",
+            Email = "__TEST__dupeuser@test.com",
+            Password = "Test123!",
+            InvitationCode = invitation.Code.ToString()
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
+
+        // Then: 400 Bad Request should be returned with Registration Failed
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Registration Failed");
+    }
+
+    [Test]
+    public async Task SignUp_WithInvitation_WeakPassword_Returns400()
+    {
+        // Given: A valid pending invitation
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__weakpw@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24));
+
+        // When: User signs up with an empty password
+        var request = new SignUpRequest
+        {
+            Username = "weakpwuser",
+            Email = "__TEST__weakpw@test.com",
+            Password = "",
+            InvitationCode = invitation.Code.ToString()
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
+
+        // Then: 400 Bad Request should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Registration Failed");
+    }
+
+    [Test]
+    public async Task SignUp_WithInvitation_NonexistentRole_StillSucceeds()
+    {
+        // Given: A valid pending invitation with a role that doesn't exist
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__badrole@test.com",
+            new List<string> { "NonExistentRole" },
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24));
+
+        // When: User signs up with the invitation
+        var request = new SignUpRequest
+        {
+            Username = "badroleuser",
+            Email = "__TEST__badrole@test.com",
+            Password = "Test123!",
+            InvitationCode = invitation.Code.ToString()
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
+
+        // Then: 200 OK should still be returned (role failure is logged, not fatal)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: User should be created but without the nonexistent role
+        var verifyUser = await _userManager.FindByNameAsync("badroleuser");
+        verifyUser.Should().NotBeNull();
+        var roles = await _userManager.GetRolesAsync(verifyUser!);
+        roles.Should().NotContain("NonExistentRole");
+    }
+
+    [Test]
+    public async Task SignUp_WithInvitation_NoRolesOrClaims_StillSucceeds()
+    {
+        // Given: A valid invitation with empty roles and claims
+        var scope = _factory.Services.CreateScope();
+        var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
+        var invitation = await invitationService.CreateAsync(
+            "__TEST__noroles@test.com",
+            new List<string>(),
+            new List<ClaimInfo>(),
+            TimeSpan.FromHours(24));
+
+        // When: User signs up with the invitation
+        var request = new SignUpRequest
+        {
+            Username = "norolesuser",
+            Email = "__TEST__noroles@test.com",
+            Password = "Test123!",
+            InvitationCode = invitation.Code.ToString()
+        };
+        var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: User should have no extra roles or claims
+        var verifyUser = await _userManager.FindByNameAsync("norolesuser");
+        verifyUser.Should().NotBeNull();
+        var roles = await _userManager.GetRolesAsync(verifyUser!);
+        roles.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task ValidateInvitation_InvalidGuidFormat_ReturnsNotFoundStatus()
+    {
+        // Given: An invalid GUID string
+
+        // When: Checking the status of an invalid code
+        var response = await _client.GetAsync("/api/auth/invitations/not-a-valid-guid/status");
+
+        // Then: 200 OK should be returned
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // And: Status should be NotFound
+        var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(InvitationStatus.NotFound);
+        result.Email.Should().BeNull();
+    }
+
     #endregion
 
     #region ValidateInvitation Tests (Story 3)
