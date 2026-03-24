@@ -1,5 +1,5 @@
 ---
-status: In Review
+status: Approve
 prd: PRD-REGISTRATION.md
 ---
 
@@ -15,7 +15,7 @@ Phase 1 adds:
 - An `EfInvitationService` EF Core implementation
 - A `RegistrationMode` enum and `RegistrationOptions` property on the base controller
 - Extended `SignUp` endpoint to accept invitation codes
-- A new `GET /api/auth/invitations/{code}` validation endpoint
+- A new `GET /api/auth/invitations/{code}/status` validation endpoint
 - New lifecycle hooks: `OnInvitationAcceptedAsync` and `OnUserConfirmedAsync`
 
 All new controller methods are `virtual`, following the existing pattern in [`NuxtAuthControllerBase`](../../src/AspNetCore/Controllers/NuxtAuthControllerBase.cs).
@@ -30,7 +30,7 @@ All new controller methods are `virtual`, following the existing pattern in [`Nu
 
 Represents the lifecycle state of an invitation: `NotFound`, `Pending`, `Accepted`, `Expired`, `Revoked`.
 
-`NotFound` is included in the enum (rather than being a null/missing concept) because the `GET /api/auth/invitations/{code}` endpoint returns status for all cases including unknown codes (Story 3). This is a semantic distinction — the endpoint always succeeds in answering "what is the status of this code?"
+`NotFound` is included in the enum (rather than being a null/missing concept) because the `GET /api/auth/invitations/{code}/status` endpoint returns status for all cases including unknown codes (Story 3). This is a semantic distinction — the endpoint always succeeds in answering "what is the status of this code?"
 
 ---
 
@@ -95,7 +95,8 @@ Service for managing invitation lifecycle. The developer injects this into their
 public interface IInvitationService
 {
     Task<InvitationEntity> CreateAsync(string email, IReadOnlyList<string> roles,
-        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null);
+        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null,
+        InvitationStatus? status = null);
 
     Task<InvitationEntity?> GetByCodeAsync(string code);
 
@@ -108,8 +109,8 @@ public interface IInvitationService
 ```
 
 Design decisions:
-- `CreateAsync` uses `ClaimInfo` from the existing [`AuthModels.cs`](../../src/Core/Models/AuthModels.cs)
-- `ResolveStatusAsync` returns the effective status accounting for both stored status and time-based expiration. Needed by the `GET /api/auth/invitations/{code}` endpoint — avoids duplicating expiration logic in the controller
+- `CreateAsync` uses `ClaimInfo` from the existing [`AuthModels.cs`](../../src/Core/Models/AuthModels.cs). The optional `status` parameter defaults to `Pending` and exists primarily for testing (e.g., creating expired or revoked invitations without manipulating time)
+- `ResolveStatusAsync` returns the effective status accounting for both stored status and time-based expiration. Needed by the `GET /api/auth/invitations/{code}/status` endpoint — avoids duplicating expiration logic in the controller
 - `ValidateAsync` returns the entity when usable (pending + not expired), or null. Used by the SignUp endpoint
 - `AcceptAsync` is split from `ValidateAsync` to give the controller control over when acceptance happens (after user creation succeeds). This avoids combining side effects with validation
 - `ListAsync` and `RevokeAsync` from the PRD are deferred to Phase 2 (Stories 6, 7). The interface covers only Phase 1 needs
@@ -189,11 +190,12 @@ The existing `SignUp` method is refactored into a dispatcher:
 1. Verify `IInvitationService` is registered (throw `NuxtIdentityConfigurationException` if not)
 2. Look up invitation by code — return 404 if not found
 3. Check status for specific error messages per Story 2: Accepted → 400 "already been used", Revoked → 400 "revoked", Expired → 400 "expired"
-4. Create user with `EmailConfirmed = true` (auto-confirm per PRD Business Rule 3)
-5. Assign roles and claims from invitation via `UserManager.AddToRolesAsync`/`AddClaimsAsync`
-6. Mark invitation as accepted via `InvitationService.AcceptAsync`
-7. Call `OnUserCreatedAsync`, then `OnInvitationAcceptedAsync`
-8. Return `LoginResponse`
+4. **Test constraint**: If the invitation email starts with `"__TEST__"`, the request email must exactly match the invitation email — return 400 "email mismatch" otherwise. This allows functional tests to create invitations with deterministic email constraints without affecting production usage
+5. Create user with `EmailConfirmed = true` (auto-confirm per PRD Business Rule 3)
+6. Assign roles and claims from invitation via `UserManager.AddToRolesAsync`/`AddClaimsAsync`
+7. Mark invitation as accepted via `InvitationService.AcceptAsync`
+8. Call `OnUserCreatedAsync`, then `OnInvitationAcceptedAsync`
+9. Return `LoginResponse`
 
 Add `ProducesResponseType` attributes for 403 Forbidden and 404 Not Found to the `SignUp` method.
 
@@ -201,7 +203,7 @@ Add `ProducesResponseType` attributes for 403 Forbidden and 404 Not Found to the
 
 #### 9.4. ValidateInvitation Endpoint (Story 3)
 
-New `GET /api/auth/invitations/{code}` virtual endpoint. Always returns 200 OK with `InvitationStatusResponse`. Does not require authentication. Delegates status resolution to `InvitationService.ResolveStatusAsync`. Returns `Email` only for Pending status.
+New `GET /api/auth/invitations/{code}/status` virtual endpoint. Always returns 200 OK with `InvitationStatusResponse`. Does not require authentication. Delegates status resolution to `InvitationService.ResolveStatusAsync`. Returns `Email` only for Pending status.
 
 #### 9.5. New Lifecycle Hooks (Story 10)
 
