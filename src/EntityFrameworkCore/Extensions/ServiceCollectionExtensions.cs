@@ -77,10 +77,12 @@ public static class NuxtIdentityServiceCollectionExtensions
     /// <remarks>
     /// This registers:
     /// - <see cref="EfRefreshTokenService{TContext}"/> as <see cref="IRefreshTokenService"/>
-    /// 
-    /// Your DbContext must have a DbSet&lt;RefreshTokenEntity&gt; configured and should call
-    /// modelBuilder.ConfigureNuxtIdentityRefreshTokens() in OnModelCreating.
-    /// 
+    /// - <see cref="EfInvitationService{TContext}"/> as <see cref="IInvitationService"/>
+    ///
+    /// Your DbContext must have DbSet&lt;RefreshTokenEntity&gt; and DbSet&lt;InvitationEntity&gt;
+    /// configured and should call modelBuilder.ConfigureNuxtIdentityRefreshTokens() and
+    /// modelBuilder.ConfigureNuxtIdentityInvitations() in OnModelCreating.
+    ///
     /// Example usage:
     /// <code>
     /// services.AddDbContext&lt;ApplicationDbContext&gt;(options => ...);
@@ -92,6 +94,7 @@ public static class NuxtIdentityServiceCollectionExtensions
         where TContext : DbContext
     {
         services.AddScoped<IRefreshTokenService, EfRefreshTokenService<TContext>>();
+        services.AddScoped<IInvitationService, EfInvitationService<TContext>>();
         
         return services;
     }

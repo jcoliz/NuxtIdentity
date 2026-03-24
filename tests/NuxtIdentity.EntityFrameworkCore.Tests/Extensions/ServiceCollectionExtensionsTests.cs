@@ -260,4 +260,19 @@ public class ServiceCollectionExtensionsTests
         var service = serviceProvider.GetService<IRefreshTokenService>();
         service.Should().NotBeNull();
     }
+
+    [Test]
+    public void AddNuxtIdentityEntityFramework_RegistersInvitationService()
+    {
+        // Given: A service collection with DbContext
+        _services.AddNuxtIdentityEntityFramework<TestDbContext>();
+
+        // When: Building the service provider
+        var serviceProvider = _services.BuildServiceProvider();
+
+        // Then: The IInvitationService should be registered
+        var service = serviceProvider.GetService<IInvitationService>();
+        service.Should().NotBeNull();
+        service.Should().BeOfType<EfInvitationService<TestDbContext>>();
+    }
 }

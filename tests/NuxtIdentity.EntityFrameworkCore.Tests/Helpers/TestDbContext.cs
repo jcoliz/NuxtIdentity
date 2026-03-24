@@ -16,9 +16,12 @@ public class TestDbContext : DbContext
 
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
 
+    public DbSet<InvitationEntity> Invitations => Set<InvitationEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ConfigureNuxtIdentityRefreshTokens();
+        modelBuilder.ConfigureNuxtIdentityInvitations();
     }
 }

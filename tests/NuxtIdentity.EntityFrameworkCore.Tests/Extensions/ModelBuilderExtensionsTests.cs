@@ -326,4 +326,82 @@ public class ModelBuilderExtensionsTests
         var retrieved = await _context.RefreshTokens.FindAsync(entityId);
         retrieved.Should().BeNull();
     }
+
+    #region Invitation Entity Tests
+
+    [Test]
+    public void ConfigureNuxtIdentityInvitations_ConfiguresEntity_EntityCanBeQueried()
+    {
+        // Given: A database context with NuxtIdentity invitation configuration applied
+
+        // When: Querying the Invitations DbSet
+        var query = _context.Invitations.AsQueryable();
+
+        // Then: The query should be executable without errors
+        Action act = () => query.ToList();
+        act.Should().NotThrow();
+    }
+
+    [Test]
+    public async Task ConfigureNuxtIdentityInvitations_EntityConfiguration_SupportsBasicCrudOperations()
+    {
+        // Given: An invitation entity
+        var entity = new InvitationEntity
+        {
+            Code = Guid.NewGuid(),
+            Email = "user@test.com",
+            Status = InvitationStatus.Pending,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(7)
+        };
+
+        // When: Adding the entity to the database
+        _context.Invitations.Add(entity);
+        await _context.SaveChangesAsync();
+
+        // Then: The entity should be retrievable
+        var retrieved = await _context.Invitations.FirstOrDefaultAsync();
+        retrieved.Should().NotBeNull();
+        retrieved!.Email.Should().Be("user@test.com");
+        retrieved.Status.Should().Be(InvitationStatus.Pending);
+    }
+
+    [Test]
+    public async Task ConfigureNuxtIdentityInvitations_RoundTrip_StoresAndRetrievesAllProperties()
+    {
+        // Given: An invitation entity with all properties set
+        var entity = new InvitationEntity
+        {
+            Code = Guid.NewGuid(),
+            Email = "user@test.com",
+            Status = InvitationStatus.Pending,
+            Roles = """["Admin","User"]""",
+            Claims = """[{"Type":"dept","Value":"eng"}]""",
+            Metadata = """{"source":"test"}""",
+            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            ExpiresAt = new DateTime(2025, 1, 8, 0, 0, 0, DateTimeKind.Utc),
+            AcceptedAt = new DateTime(2025, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            AcceptedByUserId = "user-123"
+        };
+
+        // When: Storing and retrieving the entity
+        _context.Invitations.Add(entity);
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+        var retrieved = await _context.Invitations.FirstAsync();
+
+        // Then: All properties should round-trip correctly
+        retrieved.Code.Should().Be(entity.Code);
+        retrieved.Email.Should().Be("user@test.com");
+        retrieved.Status.Should().Be(InvitationStatus.Pending);
+        retrieved.Roles.Should().Be("""["Admin","User"]""");
+        retrieved.Claims.Should().Be("""[{"Type":"dept","Value":"eng"}]""");
+        retrieved.Metadata.Should().Be("""{"source":"test"}""");
+        retrieved.CreatedAt.Should().Be(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        retrieved.ExpiresAt.Should().Be(new DateTime(2025, 1, 8, 0, 0, 0, DateTimeKind.Utc));
+        retrieved.AcceptedAt.Should().Be(new DateTime(2025, 1, 2, 0, 0, 0, DateTimeKind.Utc));
+        retrieved.AcceptedByUserId.Should().Be("user-123");
+    }
+
+    #endregion
 }
