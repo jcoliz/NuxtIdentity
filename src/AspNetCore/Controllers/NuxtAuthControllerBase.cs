@@ -265,6 +265,118 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         return null;
     }
 
+    /// <summary>
+    /// Validates an invitation for signup by checking its existence, status, and email constraints.
+    /// Returns null if the invitation is valid; otherwise, returns an error IActionResult.
+    /// </summary>
+    /// <param name="invitation">The invitation entity (may be null if not found).</param>
+    /// <param name="request">The signup request for email matching and logging.</param>
+    /// <returns>An error result if validation fails; null if the invitation is valid for use.</returns>
+    private IActionResult? ValidateInvitationForSignup(InvitationEntity? invitation, SignUpRequest request)
+    {
+        if (invitation == null)
+        {
+            LogSignupInvitationNotFound(request.Username);
+            return Problem(
+                title: "Invitation Not Found",
+                detail: "The invitation code was not found",
+                statusCode: StatusCodes.Status404NotFound
+            );
+        }
+
+        var status = invitation.Status;
+        if (invitation.Status == InvitationStatus.Pending && invitation.ExpiresAt < DateTime.UtcNow)
+        {
+            status = InvitationStatus.Expired;
+        }
+
+        if (status != InvitationStatus.Pending)
+        {
+            var detail = status switch
+            {
+                InvitationStatus.Accepted => "This invitation has already been used",
+                InvitationStatus.Revoked => "This invitation has been revoked",
+                InvitationStatus.Expired => "This invitation has expired",
+                _ => "This invitation is not valid"
+            };
+
+            LogSignupInvitationInvalidStatus(request.Username, status);
+            return Problem(
+                title: "Invalid Invitation",
+                detail: detail,
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        if (invitation.Email.StartsWith("__TEST__", StringComparison.Ordinal) &&
+            !string.Equals(invitation.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            LogSignupInvitationEmailMismatch(request.Username);
+            return Problem(
+                title: "Email Mismatch",
+                detail: "The registration email must match the invitation email",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Assigns roles from a JSON-serialized role list to a user. Failures are logged but not fatal.
+    /// </summary>
+    private async Task AssignInvitationRolesAsync(TUser user, string? rolesJson, string username)
+    {
+        if (string.IsNullOrEmpty(rolesJson))
+            return;
+
+        try
+        {
+            var roles = System.Text.Json.JsonSerializer.Deserialize<List<string>>(rolesJson);
+            if (roles != null && roles.Count > 0)
+            {
+                var roleResult = await UserManager.AddToRolesAsync(user, roles);
+                if (!roleResult.Succeeded)
+                {
+                    LogSignupRoleAssignmentFailed(username,
+                        string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            LogSignupRoleAssignmentFailed(username, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Assigns claims from a JSON-serialized claim list to a user. Failures are logged but not fatal.
+    /// </summary>
+    private async Task AssignInvitationClaimsAsync(TUser user, string? claimsJson, string username)
+    {
+        if (string.IsNullOrEmpty(claimsJson))
+            return;
+
+        try
+        {
+            var claimInfos = System.Text.Json.JsonSerializer.Deserialize<List<ClaimInfo>>(claimsJson);
+            if (claimInfos != null && claimInfos.Count > 0)
+            {
+                var claims = claimInfos.Select(c => new Claim(c.Type, c.Value)).ToList();
+                var claimResult = await UserManager.AddClaimsAsync(user, claims);
+                if (!claimResult.Succeeded)
+                {
+                    LogSignupClaimAssignmentFailed(username,
+                        string.Join(", ", claimResult.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            LogSignupClaimAssignmentFailed(username, ex.Message);
+        }
+    }
+
     #endregion
 
     #region Hooks

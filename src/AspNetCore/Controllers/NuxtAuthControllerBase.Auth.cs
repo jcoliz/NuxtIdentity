@@ -139,53 +139,12 @@ public abstract partial class NuxtAuthControllerBase<TUser>
             throw new NuxtIdentityConfigurationException(nameof(IInvitationService));
         }
 
+        // Validate invitation status and email constraints
         var invitation = await InvitationService.GetByCodeAsync(request.InvitationCode!);
-
-        if (invitation == null)
+        var validationError = ValidateInvitationForSignup(invitation, request);
+        if (validationError != null)
         {
-            LogSignupInvitationNotFound(request.Username);
-            return Problem(
-                title: "Invitation Not Found",
-                detail: "The invitation code was not found",
-                statusCode: StatusCodes.Status404NotFound
-            );
-        }
-
-        // Check for specific error status messages per Story 2
-        var status = invitation.Status;
-        if (invitation.Status == InvitationStatus.Pending && invitation.ExpiresAt < DateTime.UtcNow)
-        {
-            status = InvitationStatus.Expired;
-        }
-
-        if (status != InvitationStatus.Pending)
-        {
-            var detail = status switch
-            {
-                InvitationStatus.Accepted => "This invitation has already been used",
-                InvitationStatus.Revoked => "This invitation has been revoked",
-                InvitationStatus.Expired => "This invitation has expired",
-                _ => "This invitation is not valid"
-            };
-
-            LogSignupInvitationInvalidStatus(request.Username, status);
-            return Problem(
-                title: "Invalid Invitation",
-                detail: detail,
-                statusCode: StatusCodes.Status400BadRequest
-            );
-        }
-
-        // Test constraint: __TEST__ prefix emails must match exactly
-        if (invitation.Email.StartsWith("__TEST__", StringComparison.Ordinal) &&
-            !string.Equals(invitation.Email, request.Email, StringComparison.OrdinalIgnoreCase))
-        {
-            LogSignupInvitationEmailMismatch(request.Username);
-            return Problem(
-                title: "Email Mismatch",
-                detail: "The registration email must match the invitation email",
-                statusCode: StatusCodes.Status400BadRequest
-            );
+            return validationError;
         }
 
         // Create user with EmailConfirmed = true (auto-confirm per PRD Business Rule 3)
@@ -197,11 +156,9 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         };
 
         var result = await UserManager.CreateAsync(user, request.Password);
-
         if (!result.Succeeded)
         {
             LogSignupFailedUsername(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
-
             return Problem(
                 title: "Registration Failed",
                 detail: string.Join("; ", result.Errors.Select(e => e.Description)),
@@ -209,55 +166,12 @@ public abstract partial class NuxtAuthControllerBase<TUser>
             );
         }
 
-        // Assign roles from invitation (failures are logged, not fatal per design)
-        if (!string.IsNullOrEmpty(invitation.Roles))
-        {
-            try
-            {
-                var roles = JsonSerializer.Deserialize<List<string>>(invitation.Roles);
-                if (roles != null && roles.Count > 0)
-                {
-                    var roleResult = await UserManager.AddToRolesAsync(user, roles);
-                    if (!roleResult.Succeeded)
-                    {
-                        LogSignupRoleAssignmentFailed(request.Username,
-                            string.Join(", ", roleResult.Errors.Select(e => e.Description)));
-                    }
-                }
-            }
-            catch (InvalidOperationException ex)
-            {
-                LogSignupRoleAssignmentFailed(request.Username, ex.Message);
-            }
-        }
+        // Assign roles and claims from invitation (failures logged, not fatal)
+        await AssignInvitationRolesAsync(user, invitation!.Roles, request.Username);
+        await AssignInvitationClaimsAsync(user, invitation.Claims, request.Username);
 
-        // Assign claims from invitation (failures are logged, not fatal per design)
-        if (!string.IsNullOrEmpty(invitation.Claims))
-        {
-            try
-            {
-                var claimInfos = JsonSerializer.Deserialize<List<ClaimInfo>>(invitation.Claims);
-                if (claimInfos != null && claimInfos.Count > 0)
-                {
-                    var claims = claimInfos.Select(c => new Claim(c.Type, c.Value)).ToList();
-                    var claimResult = await UserManager.AddClaimsAsync(user, claims);
-                    if (!claimResult.Succeeded)
-                    {
-                        LogSignupClaimAssignmentFailed(request.Username,
-                            string.Join(", ", claimResult.Errors.Select(e => e.Description)));
-                    }
-                }
-            }
-            catch (InvalidOperationException ex)
-            {
-                LogSignupClaimAssignmentFailed(request.Username, ex.Message);
-            }
-        }
-
-        // Mark invitation as accepted
+        // Mark invitation as accepted and call lifecycle hooks
         await InvitationService.AcceptAsync(invitation, user.Id);
-
-        // Call lifecycle hooks
         await OnUserCreatedAsync(user);
         await OnInvitationAcceptedAsync(user, invitation);
 
