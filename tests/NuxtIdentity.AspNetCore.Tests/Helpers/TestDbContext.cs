@@ -20,5 +20,8 @@ public class TestDbContext : IdentityDbContext<TestUser>
 
         // Add NuxtIdentity refresh token configuration
         builder.ConfigureNuxtIdentityRefreshTokens();
+
+        // Add NuxtIdentity invitation configuration
+        builder.ConfigureNuxtIdentityInvitations();
     }
 }

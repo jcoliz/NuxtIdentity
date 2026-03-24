@@ -32,6 +32,7 @@ public class AuthController(
     UserManager<IdentityUser> userManager,
     SignInManager<IdentityUser> signInManager,
     IEnumerable<IUserNotifier<IdentityUser>> userNotifiers,
+    IEnumerable<IInvitationService> invitationServices,
     ILogger<AuthController> logger)
     : NuxtAuthControllerBase<IdentityUser>(
         jwtTokenService,
@@ -40,6 +41,7 @@ public class AuthController(
         userManager,
         signInManager,
         userNotifiers,
+        invitationServices,
         logger)
 {
     // No additional implementation needed; all functionality is in the base class.

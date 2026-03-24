@@ -320,6 +320,7 @@ public class NuxtAuthControllerTests
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
             userNotifiers,
+            Enumerable.Empty<IInvitationService>(),
             logger
         );
 
@@ -471,6 +472,7 @@ public class NuxtAuthControllerTests
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
             userNotifiers,
+            Enumerable.Empty<IInvitationService>(),
             logger
         );
 
@@ -1015,6 +1017,7 @@ public class NuxtAuthControllerTests
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
             Enumerable.Empty<IUserNotifier<TestUser>>(),
+            Enumerable.Empty<IInvitationService>(),
             logger
         );
 
@@ -1470,6 +1473,7 @@ public class NuxtAuthControllerTests
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
             userNotifiers,
+            Enumerable.Empty<IInvitationService>(),
             logger
         );
 

@@ -66,6 +66,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     UserManager<TUser> userManager,
     SignInManager<TUser> signInManager,
     IEnumerable<IUserNotifier<TUser>> userNotifiers,
+    IEnumerable<IInvitationService> invitationServices,
     ILogger logger) : ControllerBase
     where TUser : IdentityUser, new()
 {
@@ -90,9 +91,30 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     protected SignInManager<TUser> SignInManager { get; } = signInManager;
 
     /// <summary>
-    /// Gets the user notifier for sending notifications, or null if none is registered.
+    /// Gets all registered user notifiers for sending notifications (e.g., email, audit log).
     /// </summary>
-    protected IUserNotifier<TUser>? UserNotifier { get; } = userNotifiers.FirstOrDefault();
+    protected IEnumerable<IUserNotifier<TUser>> UserNotifiers { get; } = userNotifiers;
+
+    /// <summary>
+    /// Gets the invitation service, or null if none is registered.
+    /// </summary>
+    /// <exception cref="NuxtIdentityConfigurationException">
+    /// Thrown during construction if more than one <see cref="IInvitationService"/> is registered.
+    /// </exception>
+    protected IInvitationService? InvitationService { get; } = invitationServices.Count() switch
+    {
+        0 => null,
+        1 => invitationServices.First(),
+        _ => throw new NuxtIdentityConfigurationException(
+            nameof(IInvitationService),
+            "Multiple IInvitationService implementations registered. Only one invitation store is supported.")
+    };
+
+    /// <summary>
+    /// Gets the registration options controlling how user registration behaves.
+    /// Override in derived controllers to change registration mode (e.g., <see cref="RegistrationMode.InvitationOnly"/>).
+    /// </summary>
+    protected virtual RegistrationOptions RegistrationOptions => new();
 
     #region Helper Methods
 
@@ -443,7 +465,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     {
         LogStarting();
 
-        if (UserNotifier == null)
+        if (!UserNotifiers.Any())
         {
             LogNoUserNotifierConfigured();
             throw new NuxtIdentityConfigurationException(
@@ -458,7 +480,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
             var code = await UserManager.GeneratePasswordResetTokenAsync(user);
             var urlSafeCode = ToBase64Url(code);
-            await UserNotifier.SendResetCodeAsync(user, urlSafeCode);
+
+            foreach (var notifier in UserNotifiers)
+            {
+                await notifier.SendResetCodeAsync(user, urlSafeCode);
+            }
         }
 
         // Always return success to prevent user enumeration
@@ -581,10 +607,31 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <summary>
     /// Hook method called after a user is created. Can be overridden for custom logic.
     /// </summary>
-    /// <param name="user"></param>
+    /// <param name="user">The newly created user.</param>
     protected virtual Task OnUserCreatedAsync(TUser user)
     {
         // Hook for derived classes to implement custom logic after user creation
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Hook method called after a user signs up via invitation with roles and claims assigned.
+    /// Can be overridden for custom post-invitation-acceptance logic.
+    /// </summary>
+    /// <param name="user">The newly created user.</param>
+    /// <param name="invitation">The invitation that was accepted.</param>
+    protected virtual Task OnInvitationAcceptedAsync(TUser user, InvitationEntity invitation)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Hook method called after a user's email is confirmed. Added as a placeholder for Phase 3.
+    /// Can be overridden for custom post-confirmation logic.
+    /// </summary>
+    /// <param name="user">The user whose email was confirmed.</param>
+    protected virtual Task OnUserConfirmedAsync(TUser user)
+    {
         return Task.CompletedTask;
     }
 

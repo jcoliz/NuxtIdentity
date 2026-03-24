@@ -15,6 +15,7 @@ public class TestAuthController(
     UserManager<TestUser> userManager,
     SignInManager<TestUser> signInManager,
     IEnumerable<IUserNotifier<TestUser>> userNotifiers,
+    IEnumerable<IInvitationService> invitationServices,
     ILogger<TestAuthController> logger)
     : NuxtAuthControllerBase<TestUser>(
         jwtTokenService,
@@ -23,6 +24,7 @@ public class TestAuthController(
         userManager,
         signInManager,
         userNotifiers,
+        invitationServices,
         logger)
 {
 }
