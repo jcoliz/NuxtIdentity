@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -10,13 +13,15 @@ using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Configuration;
 using NuxtIdentity.AspNetCore.Services;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
+using System.Reflection;
 
 namespace NuxtIdentity.AspNetCore.Tests.Helpers;
 
 /// <summary>
-/// Test web application factory for integration testing with in-memory database.
+/// Test web application factory configured for invitation-only registration mode.
+/// Uses <see cref="InvitationOnlyTestAuthController"/> instead of <see cref="TestAuthController"/>.
 /// </summary>
-public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
+public class InvitationOnlyTestWebApplicationFactory : WebApplicationFactory<TestProgram>
 {
     private SqliteConnection? _connection;
 
@@ -80,13 +85,13 @@ public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
             // Add EF Core refresh token service
             services.AddNuxtIdentityEntityFramework<TestDbContext>();
 
-            // Add controllers — use TestAuthController only (exclude InvitationOnlyTestAuthController)
+            // Add controllers — use InvitationOnlyTestAuthController only (exclude TestAuthController)
             services.AddControllers()
-                .AddApplicationPart(typeof(TestAuthController).Assembly)
+                .AddApplicationPart(typeof(InvitationOnlyTestAuthController).Assembly)
                 .ConfigureApplicationPartManager(manager =>
                 {
                     manager.FeatureProviders.Add(
-                        new ExcludeControllerFeatureProvider(typeof(InvitationOnlyTestAuthController)));
+                        new ExcludeControllerFeatureProvider(typeof(TestAuthController)));
                 });
 
             // Build service provider and create database
@@ -124,3 +129,26 @@ public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
     }
 }
 
+/// <summary>
+/// Feature provider that excludes a specific controller type from MVC controller discovery.
+/// </summary>
+/// <param name="excludedType">The controller type to exclude.</param>
+internal class ExcludeControllerFeatureProvider(Type excludedType) : IApplicationFeatureProvider<ControllerFeature>
+{
+    /// <summary>
+    /// Removes the excluded controller type from the discovered controllers.
+    /// </summary>
+    /// <param name="parts">The application parts.</param>
+    /// <param name="feature">The controller feature being populated.</param>
+    public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature)
+    {
+        var toRemove = feature.Controllers
+            .Where(c => c.AsType() == excludedType)
+            .ToList();
+
+        foreach (var controller in toRemove)
+        {
+            feature.Controllers.Remove(controller);
+        }
+    }
+}

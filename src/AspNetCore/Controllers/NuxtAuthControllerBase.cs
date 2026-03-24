@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -301,17 +302,52 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     }
 
     /// <summary>
-    /// Registers a new user.
+    /// Registers a new user. Dispatches to open or invitation-based registration
+    /// based on <see cref="RegistrationOptions"/> and the presence of an invitation code.
     /// </summary>
-    /// <param name="request">Signup credentials.</param>
-    /// <returns>JWT tokens and user information if successful; otherwise, bad request.</returns>
+    /// <param name="request">Signup credentials, optionally including an invitation code.</param>
     [HttpPost("signup")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public virtual async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
     {
         LogStartingUsername(request.Username);
 
+        var mode = RegistrationOptions.Mode;
+
+        if (mode == RegistrationMode.EmailConfirmation)
+        {
+            throw new NotImplementedException(
+                "Email confirmation registration mode is not yet supported. " +
+                "Use RegistrationMode.Open or RegistrationMode.InvitationOnly in Phase 1.");
+        }
+
+        if (!string.IsNullOrEmpty(request.InvitationCode))
+        {
+            return await SignUpWithInvitationAsync(request);
+        }
+
+        if (mode == RegistrationMode.InvitationOnly)
+        {
+            LogSignupForbiddenInvitationRequired(request.Username);
+            return Problem(
+                title: "Invitation Required",
+                detail: "An invitation code is required to register",
+                statusCode: StatusCodes.Status403Forbidden
+            );
+        }
+
+        return await SignUpOpenAsync(request);
+    }
+
+    /// <summary>
+    /// Handles open registration (no invitation required). Preserves the original SignUp behavior.
+    /// </summary>
+    /// <param name="request">Signup credentials.</param>
+    private async Task<IActionResult> SignUpOpenAsync(SignUpRequest request)
+    {
         var user = new TUser
         {
             UserName = request.Username,
@@ -332,6 +368,133 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         }
 
         await OnUserCreatedAsync(user);
+
+        var response = await CreateLoginResponseAsync(user);
+        LogOkUsername(request.Username);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Handles invitation-based registration with role/claim assignment and email auto-confirmation.
+    /// </summary>
+    /// <param name="request">Signup credentials including an invitation code.</param>
+    /// <exception cref="NuxtIdentityConfigurationException">
+    /// Thrown when no <see cref="IInvitationService"/> is registered but an invitation code is provided.
+    /// </exception>
+    private async Task<IActionResult> SignUpWithInvitationAsync(SignUpRequest request)
+    {
+        if (InvitationService == null)
+        {
+            throw new NuxtIdentityConfigurationException(nameof(IInvitationService));
+        }
+
+        var invitation = await InvitationService.GetByCodeAsync(request.InvitationCode!);
+
+        if (invitation == null)
+        {
+            LogSignupInvitationNotFound(request.Username);
+            return Problem(
+                title: "Invitation Not Found",
+                detail: "The invitation code was not found",
+                statusCode: StatusCodes.Status404NotFound
+            );
+        }
+
+        // Check for specific error status messages per Story 2
+        var status = invitation.Status;
+        if (invitation.Status == InvitationStatus.Pending && invitation.ExpiresAt < DateTime.UtcNow)
+        {
+            status = InvitationStatus.Expired;
+        }
+
+        if (status != InvitationStatus.Pending)
+        {
+            var detail = status switch
+            {
+                InvitationStatus.Accepted => "This invitation has already been used",
+                InvitationStatus.Revoked => "This invitation has been revoked",
+                InvitationStatus.Expired => "This invitation has expired",
+                _ => "This invitation is not valid"
+            };
+
+            LogSignupInvitationInvalidStatus(request.Username, status);
+            return Problem(
+                title: "Invalid Invitation",
+                detail: detail,
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        // Test constraint: __TEST__ prefix emails must match exactly
+        if (invitation.Email.StartsWith("__TEST__", StringComparison.Ordinal) &&
+            !string.Equals(invitation.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            LogSignupInvitationEmailMismatch(request.Username);
+            return Problem(
+                title: "Email Mismatch",
+                detail: "The registration email must match the invitation email",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        // Create user with EmailConfirmed = true (auto-confirm per PRD Business Rule 3)
+        var user = new TUser
+        {
+            UserName = request.Username,
+            Email = request.Email,
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(user, request.Password);
+
+        if (!result.Succeeded)
+        {
+            LogSignupFailedUsername(request.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
+
+            return Problem(
+                title: "Registration Failed",
+                detail: string.Join("; ", result.Errors.Select(e => e.Description)),
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        // Assign roles from invitation
+        if (!string.IsNullOrEmpty(invitation.Roles))
+        {
+            var roles = JsonSerializer.Deserialize<List<string>>(invitation.Roles);
+            if (roles != null && roles.Count > 0)
+            {
+                var roleResult = await UserManager.AddToRolesAsync(user, roles);
+                if (!roleResult.Succeeded)
+                {
+                    LogSignupRoleAssignmentFailed(request.Username,
+                        string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+
+        // Assign claims from invitation
+        if (!string.IsNullOrEmpty(invitation.Claims))
+        {
+            var claimInfos = JsonSerializer.Deserialize<List<ClaimInfo>>(invitation.Claims);
+            if (claimInfos != null && claimInfos.Count > 0)
+            {
+                var claims = claimInfos.Select(c => new Claim(c.Type, c.Value)).ToList();
+                var claimResult = await UserManager.AddClaimsAsync(user, claims);
+                if (!claimResult.Succeeded)
+                {
+                    LogSignupClaimAssignmentFailed(request.Username,
+                        string.Join(", ", claimResult.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+
+        // Mark invitation as accepted
+        await InvitationService.AcceptAsync(invitation, user.Id);
+
+        // Call lifecycle hooks
+        await OnUserCreatedAsync(user);
+        await OnInvitationAcceptedAsync(user, invitation);
 
         var response = await CreateLoginResponseAsync(user);
         LogOkUsername(request.Username);
@@ -723,6 +886,24 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
 
     [LoggerMessage(15, LogLevel.Debug, "{Location}: Found user {UserId}")]
     private partial void LogFoundUser(string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(16, LogLevel.Warning, "{Location}: Signup forbidden, invitation required {Username}")]
+    private partial void LogSignupForbiddenInvitationRequired(string username, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(17, LogLevel.Warning, "{Location}: Signup invitation not found {Username}")]
+    private partial void LogSignupInvitationNotFound(string username, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(18, LogLevel.Warning, "{Location}: Signup invitation invalid status {Username} {Status}")]
+    private partial void LogSignupInvitationInvalidStatus(string username, InvitationStatus status, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(19, LogLevel.Warning, "{Location}: Signup invitation email mismatch {Username}")]
+    private partial void LogSignupInvitationEmailMismatch(string username, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(20, LogLevel.Warning, "{Location}: Signup role assignment failed {Username} {Errors}")]
+    private partial void LogSignupRoleAssignmentFailed(string username, string errors, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(21, LogLevel.Warning, "{Location}: Signup claim assignment failed {Username} {Errors}")]
+    private partial void LogSignupClaimAssignmentFailed(string username, string errors, [CallerMemberName] string? location = null);
 
     #endregion
 }
