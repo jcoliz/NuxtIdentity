@@ -86,6 +86,8 @@ public static class NuxtIdentityModelBuilderExtensions
             entity.Property(e => e.Metadata).HasMaxLength(4000);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();
+            entity.Property(e => e.IsTest).IsRequired();
+            entity.HasIndex(e => e.IsTest);
         });
 
         return modelBuilder;

@@ -47,17 +47,18 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation with roles and claims
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__inviteuser@test.com",
-            new List<string> { "Admin" },
-            new List<ClaimInfo> { new() { Type = "department", Value = "engineering" } },
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "inviteuser@test.com",
+            Roles = """["Admin"]""",
+            Claims = """[{"Type":"department","Value":"engineering"}]"""
+        });
 
         // When: User signs up with the invitation code
         var request = new SignUpRequest
         {
             Username = "inviteuser",
-            Email = "__TEST__inviteuser@test.com",
+            Email = "inviteuser@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -79,17 +80,17 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation with roles
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__roleuser@test.com",
-            new List<string> { "Admin" },
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "roleuser@test.com",
+            Roles = """["Admin"]"""
+        });
 
         // When: User signs up with the invitation code
         var request = new SignUpRequest
         {
             Username = "roleuser",
-            Email = "__TEST__roleuser@test.com",
+            Email = "roleuser@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -108,17 +109,17 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation with claims
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__claimuser@test.com",
-            new List<string>(),
-            new List<ClaimInfo> { new() { Type = "department", Value = "engineering" } },
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "claimuser@test.com",
+            Claims = """[{"Type":"department","Value":"engineering"}]"""
+        });
 
         // When: User signs up with the invitation code
         var request = new SignUpRequest
         {
             Username = "claimuser",
-            Email = "__TEST__claimuser@test.com",
+            Email = "claimuser@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -137,18 +138,17 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation
         var setupScope = _factory.Services.CreateScope();
         var setupService = setupScope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await setupService.CreateAsync(
-            "__TEST__acceptuser@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await setupService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "acceptuser@test.com"
+        });
         var invitationCode = invitation.Code.ToString();
 
         // When: User signs up with the invitation code
         var request = new SignUpRequest
         {
             Username = "acceptuser",
-            Email = "__TEST__acceptuser@test.com",
+            Email = "acceptuser@test.com",
             Password = "Test123!",
             InvitationCode = invitationCode
         };
@@ -167,17 +167,16 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__confirmuser@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "confirmuser@test.com"
+        });
 
         // When: User signs up with the invitation code
         var request = new SignUpRequest
         {
             Username = "confirmuser",
-            Email = "__TEST__confirmuser@test.com",
+            Email = "confirmuser@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -214,18 +213,17 @@ public class InvitationSignUpTests
         // Given: An invitation that has already been accepted
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__used@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24),
-            status: InvitationStatus.Accepted);
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "used@test.com",
+            Status = InvitationStatus.Accepted
+        });
 
         // When: User signs up with the accepted invitation code
         var request = new SignUpRequest
         {
             Username = "usedcode",
-            Email = "__TEST__used@test.com",
+            Email = "used@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -244,18 +242,17 @@ public class InvitationSignUpTests
         // Given: An invitation that has been created with expired status
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__expired@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24),
-            status: InvitationStatus.Expired);
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "expired@test.com",
+            Status = InvitationStatus.Expired
+        });
 
         // When: User signs up with the expired invitation code
         var request = new SignUpRequest
         {
             Username = "expiredcode",
-            Email = "__TEST__expired@test.com",
+            Email = "expired@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -274,18 +271,17 @@ public class InvitationSignUpTests
         // Given: An invitation that has been revoked
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__revoked@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24),
-            status: InvitationStatus.Revoked);
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "revoked@test.com",
+            Status = InvitationStatus.Revoked
+        });
 
         // When: User signs up with the revoked invitation code
         var request = new SignUpRequest
         {
             Username = "revokedcode",
-            Email = "__TEST__revoked@test.com",
+            Email = "revoked@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -321,16 +317,15 @@ public class InvitationSignUpTests
     }
 
     [Test]
-    public async Task SignUp_WithTestPrefixEmail_MismatchedEmail_Returns400()
+    public async Task SignUp_WithTestInvitation_MismatchedEmail_Returns400()
     {
-        // Given: An invitation with __TEST__ prefix email
+        // Given: A test invitation with specific email
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__specific@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "specific@test.com"
+        });
 
         // When: User signs up with a different email
         var request = new SignUpRequest
@@ -378,17 +373,16 @@ public class InvitationSignUpTests
         // And: A valid pending invitation
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__dupeuser@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "dupeuser@test.com"
+        });
 
         // When: User signs up with invitation but duplicate username
         var request = new SignUpRequest
         {
             Username = "dupeuser",
-            Email = "__TEST__dupeuser@test.com",
+            Email = "dupeuser@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -407,17 +401,16 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__weakpw@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "weakpw@test.com"
+        });
 
         // When: User signs up with an empty password
         var request = new SignUpRequest
         {
             Username = "weakpwuser",
-            Email = "__TEST__weakpw@test.com",
+            Email = "weakpw@test.com",
             Password = "",
             InvitationCode = invitation.Code.ToString()
         };
@@ -436,17 +429,17 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation with a role that doesn't exist
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__badrole@test.com",
-            new List<string> { "NonExistentRole" },
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "badrole@test.com",
+            Roles = """["NonExistentRole"]"""
+        });
 
         // When: User signs up with the invitation
         var request = new SignUpRequest
         {
             Username = "badroleuser",
-            Email = "__TEST__badrole@test.com",
+            Email = "badrole@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -465,20 +458,19 @@ public class InvitationSignUpTests
     [Test]
     public async Task SignUp_WithInvitation_NoRolesOrClaims_StillSucceeds()
     {
-        // Given: A valid invitation with empty roles and claims
+        // Given: A valid invitation with no roles and claims
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__noroles@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "noroles@test.com"
+        });
 
         // When: User signs up with the invitation
         var request = new SignUpRequest
         {
             Username = "norolesuser",
-            Email = "__TEST__noroles@test.com",
+            Email = "noroles@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };
@@ -522,11 +514,10 @@ public class InvitationSignUpTests
         // Given: A valid pending invitation
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__validate@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "validate@test.com"
+        });
 
         // When: Checking the invitation status
         var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
@@ -538,7 +529,7 @@ public class InvitationSignUpTests
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
         result.Should().NotBeNull();
         result!.Status.Should().Be(InvitationStatus.Pending);
-        result.Email.Should().Be("__TEST__validate@test.com");
+        result.Email.Should().Be("validate@test.com");
     }
 
     [Test]
@@ -547,12 +538,11 @@ public class InvitationSignUpTests
         // Given: An invitation that has been accepted
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__accepted@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24),
-            status: InvitationStatus.Accepted);
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "accepted@test.com",
+            Status = InvitationStatus.Accepted
+        });
 
         // When: Checking the invitation status
         var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
@@ -573,12 +563,11 @@ public class InvitationSignUpTests
         // Given: An invitation that has expired
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__expired@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24),
-            status: InvitationStatus.Expired);
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "expired@test.com",
+            Status = InvitationStatus.Expired
+        });
 
         // When: Checking the invitation status
         var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
@@ -599,12 +588,11 @@ public class InvitationSignUpTests
         // Given: An invitation that has been revoked
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__revoked@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24),
-            status: InvitationStatus.Revoked);
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "revoked@test.com",
+            Status = InvitationStatus.Revoked
+        });
 
         // When: Checking the invitation status
         var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
@@ -692,17 +680,16 @@ public class InvitationOnlyModeTests
         // Given: A valid pending invitation
         var scope = _factory.Services.CreateScope();
         var invitationService = scope.ServiceProvider.GetRequiredService<IInvitationService>();
-        var invitation = await invitationService.CreateAsync(
-            "__TEST__invonly@test.com",
-            new List<string>(),
-            new List<ClaimInfo>(),
-            TimeSpan.FromHours(24));
+        var invitation = await invitationService.CreateTestAsync(new InvitationEntity
+        {
+            Email = "invonly@test.com"
+        });
 
         // When: User signs up with the invitation code
         var request = new SignUpRequest
         {
             Username = "invonlyuser",
-            Email = "__TEST__invonly@test.com",
+            Email = "invonly@test.com",
             Password = "Test123!",
             InvitationCode = invitation.Code.ToString()
         };

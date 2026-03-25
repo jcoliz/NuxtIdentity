@@ -1,6 +1,7 @@
 ---
-status: Approve
+status: Implemented
 prd: PRD-REGISTRATION.md
+phase: 1
 ---
 
 # Design Document: Registration — Phase 1

@@ -133,6 +133,18 @@ Users need a way to sign up for an application, and administrators need a way to
 - [ ] All hooks are `virtual` with no-op default implementations
 - [ ] Hooks receive enough context for the consuming app to take action (e.g., the invitation entity includes the assigned roles/claims and metadata)
 
+### Story 13: Developer - Write functional tests
+**As a** developer using NuxtIdentity
+**I want** to set up all possible situations in my tests
+**So that** I can ensure my application behaves correctly in all cases
+
+**Acceptance Critera**
+- [ ] When creating an invitation, I can set any available status
+- [ ] When creating an invitation for tests, it is uniquely marked as being for testing
+- [ ] I can delete all test invitations at once
+- [ ] Accounts created from test invitations must match the email in the invitation (ergo an email is required).
+- [ ] I can set *all* storable properties of the invitation, including the code itself, except the database ID and the marker denoting it as a test invitation.
+
 ## User Stories: Phase 2
 
 ### Story 6: Developer - List and query invitations via service API
@@ -341,6 +353,18 @@ public interface IInvitationService
         string? metadata = null);
 
     /// <summary>
+    /// Creates an invitation for testing with full control over storable properties.
+    /// Id is auto-generated and IsTest is always set to true.
+    /// Email is required for test invitations.
+    /// </summary>
+    Task<Invitation> CreateTestAsync(Invitation invitation);
+
+    /// <summary>
+    /// Deletes all invitations marked as test invitations.
+    /// </summary>
+    Task<int> DeleteTestInvitationsAsync();
+
+    /// <summary>
     /// Gets a single invitation by its code.
     /// </summary>
     Task<Invitation?> GetByCodeAsync(string code);
@@ -379,6 +403,7 @@ public interface IInvitationService
 - Code (unique invitation code -- GUID format, required)
 - Email (email address of the invited user, optional — null when not applicable)
 - Status (`InvitationStatus` enum, required)
+- IsTest (boolean, marks test invitations for bulk cleanup and email enforcement, default false)
 - Roles (JSON-serialized list of role names to assign, optional)
 - Claims (JSON-serialized list of claim type/value pairs to assign, optional)
 - Metadata (JSON string for application-specific data, optional -- e.g., list access grants, team assignments)
@@ -405,6 +430,7 @@ public interface IInvitationService
 7. **Virtual Methods** -- All new endpoint methods and hooks are `virtual`, following the existing pattern, so consumers can override behavior.
 8. **Metadata Pass-Through** -- The invitation entity carries an optional JSON metadata string that flows from creation through to the `OnInvitationAcceptedAsync` hook. NuxtIdentity stores and delivers this data but does not interpret it -- the consuming app owns the schema and semantics.
 9. **Code is a Secret** -- The invitation `Code` is a bearer credential (anyone who has it can register with pre-assigned roles). It must never be logged. Use the invitation's `Id` (auto-generated primary key) for diagnostic logging, following the same pattern as `RefreshTokenEntity.Key`.
+10. **Test Invitation Email Enforcement** -- When an invitation has `IsTest = true`, the registering user's email must exactly match the invitation email. This prevents test data from being used with arbitrary accounts. The `IsTest` flag replaces the earlier `__TEST__` email prefix convention. Test invitations require a non-null email at creation time.
 
 **Code Patterns to Follow**:
 - Controller endpoints: [`NuxtAuthControllerBase.cs`](../../src/AspNetCore/Controllers/NuxtAuthControllerBase.cs) for endpoint pattern and virtual methods

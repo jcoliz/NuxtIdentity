@@ -53,8 +53,7 @@ public partial class EfInvitationService<TContext> : IInvitationService
     /// <inheritdoc/>
     public async Task<InvitationEntity> CreateAsync(string? email = null,
         IReadOnlyList<string>? roles = null, IReadOnlyList<ClaimInfo>? claims = null,
-        TimeSpan? expiresIn = null, string? metadata = null,
-        InvitationStatus? status = null)
+        TimeSpan? expiresIn = null, string? metadata = null)
     {
         LogStarting();
 
@@ -67,7 +66,7 @@ public partial class EfInvitationService<TContext> : IInvitationService
         {
             Code = Guid.NewGuid(),
             Email = email,
-            Status = status ?? InvitationStatus.Pending,
+            Status = InvitationStatus.Pending,
             Roles = effectiveRoles.Count > 0 ? JsonSerializer.Serialize(effectiveRoles) : null,
             Claims = effectiveClaims.Count > 0 ? JsonSerializer.Serialize(effectiveClaims) : null,
             Metadata = metadata,
@@ -80,6 +79,74 @@ public partial class EfInvitationService<TContext> : IInvitationService
 
         LogOkInvitationId(entity.Id);
         return entity;
+    }
+
+    /// <inheritdoc/>
+    public async Task<InvitationEntity> CreateTestAsync(InvitationEntity invitation)
+    {
+        ArgumentNullException.ThrowIfNull(invitation);
+        LogStarting();
+
+        if (string.IsNullOrEmpty(invitation.Email))
+        {
+            throw new ArgumentException(
+                "Email is required for test invitations.", nameof(invitation));
+        }
+
+        // Force test flag — caller cannot override
+        invitation.IsTest = true;
+
+        // Default status to Pending if not explicitly set (NotFound should never be stored)
+        if (invitation.Status == InvitationStatus.NotFound)
+        {
+            invitation.Status = InvitationStatus.Pending;
+        }
+
+        // Auto-generate code if not provided
+        if (invitation.Code == Guid.Empty)
+        {
+            invitation.Code = Guid.NewGuid();
+        }
+
+        // Default timestamps if not provided
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        if (invitation.CreatedAt == default)
+        {
+            invitation.CreatedAt = now;
+        }
+        if (invitation.ExpiresAt == default)
+        {
+            invitation.ExpiresAt = now.Add(DefaultExpiration);
+        }
+
+        // Reset Id so EF auto-generates it
+        invitation.Id = 0;
+
+        _context.Set<InvitationEntity>().Add(invitation);
+        await _context.SaveChangesAsync();
+
+        LogOkInvitationId(invitation.Id);
+        return invitation;
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> DeleteTestInvitationsAsync()
+    {
+        LogStarting();
+
+        var testInvitations = await _context.Set<InvitationEntity>()
+            .Where(e => e.IsTest)
+            .ToListAsync();
+
+        var count = testInvitations.Count;
+        if (count > 0)
+        {
+            _context.Set<InvitationEntity>().RemoveRange(testInvitations);
+            await _context.SaveChangesAsync();
+        }
+
+        LogDeletedTestInvitations(count);
+        return count;
     }
 
     /// <inheritdoc/>
@@ -209,6 +276,9 @@ public partial class EfInvitationService<TContext> : IInvitationService
 
     [LoggerMessage(8, LogLevel.Debug, "{Location}: Invitation {InvitationId} not usable, status {Status}")]
     private partial void LogInvitationNotUsable(int invitationId, InvitationStatus status, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(9, LogLevel.Information, "{Location}: Deleted {Count} test invitations")]
+    private partial void LogDeletedTestInvitations(int count, [CallerMemberName] string? location = null);
 
     #endregion
 }

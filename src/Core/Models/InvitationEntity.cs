@@ -82,4 +82,15 @@ public class InvitationEntity
     /// Gets or sets the user ID of the registrant who accepted the invitation, or null if not yet accepted.
     /// </summary>
     public string? AcceptedByUserId { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this invitation was created for testing purposes.
+    /// </summary>
+    /// <remarks>
+    /// Test invitations enforce email matching on signup and can be bulk-deleted
+    /// via <c>IInvitationService.DeleteTestInvitationsAsync</c>.
+    /// This flag is set automatically by <c>IInvitationService.CreateTestAsync</c>
+    /// and cannot be overridden by the caller.
+    /// </remarks>
+    public bool IsTest { get; set; }
 }

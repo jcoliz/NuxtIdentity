@@ -183,16 +183,16 @@ public class EfInvitationServiceTests
     }
 
     [Test]
-    public async Task CreateAsync_WithExplicitStatus_UsesProvidedStatus()
+    public async Task CreateAsync_AlwaysCreatesPending()
     {
-        // Given: An explicit status of Expired (for testing)
+        // Given: Valid invitation data
 
-        // When: Creating an invitation with explicit status
+        // When: Creating an invitation
         var entity = await _service.CreateAsync("user@test.com", new List<string>(),
-            new List<ClaimInfo>(), TimeSpan.FromDays(7), status: InvitationStatus.Expired);
+            new List<ClaimInfo>(), TimeSpan.FromDays(7));
 
-        // Then: The status should be Expired
-        entity.Status.Should().Be(InvitationStatus.Expired);
+        // Then: The status should always be Pending
+        entity.Status.Should().Be(InvitationStatus.Pending);
     }
 
     [Test]
@@ -356,9 +356,12 @@ public class EfInvitationServiceTests
     [Test]
     public async Task ResolveStatusAsync_RevokedInvitation_ReturnsRevoked()
     {
-        // Given: A revoked invitation (created with Revoked status for testing)
-        var created = await _service.CreateAsync("user@test.com", new List<string>(),
-            new List<ClaimInfo>(), TimeSpan.FromDays(7), status: InvitationStatus.Revoked);
+        // Given: A revoked invitation (created via test method)
+        var created = await _service.CreateTestAsync(new InvitationEntity
+        {
+            Email = "user@test.com",
+            Status = InvitationStatus.Revoked
+        });
 
         // When: Resolving the status
         var status = await _service.ResolveStatusAsync(created.Code.ToString());
@@ -450,9 +453,12 @@ public class EfInvitationServiceTests
     [Test]
     public async Task ValidateAsync_RevokedInvitation_ReturnsNull()
     {
-        // Given: A revoked invitation
-        var created = await _service.CreateAsync("user@test.com", new List<string>(),
-            new List<ClaimInfo>(), TimeSpan.FromDays(7), status: InvitationStatus.Revoked);
+        // Given: A revoked invitation (created via test method)
+        var created = await _service.CreateTestAsync(new InvitationEntity
+        {
+            Email = "user@test.com",
+            Status = InvitationStatus.Revoked
+        });
 
         // When: Validating the invitation
         var entity = await _service.ValidateAsync(created.Code.ToString());
@@ -509,6 +515,237 @@ public class EfInvitationServiceTests
 
         // And: AcceptedByUserId should be set
         stored.AcceptedByUserId.Should().Be("user-123");
+    }
+
+    #endregion
+
+    #region CreateTestAsync
+
+    [Test]
+    public async Task CreateTestAsync_WithAllProperties_PersistsCorrectly()
+    {
+        // Given: A fully-specified test invitation
+        var code = Guid.NewGuid();
+        var invitation = new InvitationEntity
+        {
+            Code = code,
+            Email = "test@test.com",
+            Status = InvitationStatus.Accepted,
+            Roles = """["Admin"]""",
+            Claims = """[{"Type":"dept","Value":"eng"}]""",
+            Metadata = """{"key":"value"}""",
+            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            ExpiresAt = new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            AcceptedAt = new DateTime(2025, 1, 15, 0, 0, 0, DateTimeKind.Utc),
+            AcceptedByUserId = "user-456"
+        };
+
+        // When: Creating a test invitation
+        var result = await _service.CreateTestAsync(invitation);
+
+        // Then: All caller-set properties should be persisted
+        result.Code.Should().Be(code);
+        result.Email.Should().Be("test@test.com");
+        result.Status.Should().Be(InvitationStatus.Accepted);
+        result.Roles.Should().Be("""["Admin"]""");
+        result.Claims.Should().Be("""[{"Type":"dept","Value":"eng"}]""");
+        result.Metadata.Should().Be("""{"key":"value"}""");
+        result.CreatedAt.Should().Be(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        result.ExpiresAt.Should().Be(new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc));
+        result.AcceptedAt.Should().Be(new DateTime(2025, 1, 15, 0, 0, 0, DateTimeKind.Utc));
+        result.AcceptedByUserId.Should().Be("user-456");
+
+        // And: IsTest should be true
+        result.IsTest.Should().BeTrue();
+
+        // And: Id should be auto-generated (non-zero)
+        result.Id.Should().BeGreaterThan(0);
+    }
+
+    [Test]
+    public async Task CreateTestAsync_ForcesIsTestTrue()
+    {
+        // Given: A test invitation with IsTest explicitly set to false
+        var invitation = new InvitationEntity
+        {
+            Email = "test@test.com",
+            IsTest = false
+        };
+
+        // When: Creating a test invitation
+        var result = await _service.CreateTestAsync(invitation);
+
+        // Then: IsTest should be true regardless of caller's value
+        result.IsTest.Should().BeTrue();
+    }
+
+    [Test]
+    public async Task CreateTestAsync_WithEmptyCode_GeneratesNewCode()
+    {
+        // Given: A test invitation with no code (Guid.Empty)
+        var invitation = new InvitationEntity
+        {
+            Email = "test@test.com",
+            Code = Guid.Empty
+        };
+
+        // When: Creating a test invitation
+        var result = await _service.CreateTestAsync(invitation);
+
+        // Then: A non-empty code should be generated
+        result.Code.Should().NotBe(Guid.Empty);
+    }
+
+    [Test]
+    public async Task CreateTestAsync_WithDefaultTimestamps_AppliesDefaults()
+    {
+        // Given: A test invitation with default timestamps
+        var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
+        var invitation = new InvitationEntity
+        {
+            Email = "test@test.com"
+        };
+
+        // When: Creating a test invitation
+        var result = await _service.CreateTestAsync(invitation);
+
+        // Then: CreatedAt should be current time
+        result.CreatedAt.Should().Be(currentTime);
+
+        // And: ExpiresAt should be 30 days from now
+        result.ExpiresAt.Should().Be(currentTime.AddDays(30));
+    }
+
+    [Test]
+    public async Task CreateTestAsync_IgnoresId()
+    {
+        // Given: A test invitation with an explicit Id
+        var invitation = new InvitationEntity
+        {
+            Id = 999,
+            Email = "test@test.com"
+        };
+
+        // When: Creating a test invitation
+        var result = await _service.CreateTestAsync(invitation);
+
+        // Then: Id should be auto-generated, not the caller's value
+        result.Id.Should().NotBe(999);
+        result.Id.Should().BeGreaterThan(0);
+    }
+
+    [Test]
+    public void CreateTestAsync_NullEmail_ThrowsArgumentException()
+    {
+        // Given: A test invitation with null email
+        var invitation = new InvitationEntity
+        {
+            Email = null
+        };
+
+        // When: Creating a test invitation
+        // Then: ArgumentException should be thrown
+        var act = () => _service.CreateTestAsync(invitation);
+        act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*Email*required*");
+    }
+
+    [Test]
+    public void CreateTestAsync_EmptyEmail_ThrowsArgumentException()
+    {
+        // Given: A test invitation with empty email
+        var invitation = new InvitationEntity
+        {
+            Email = ""
+        };
+
+        // When: Creating a test invitation
+        // Then: ArgumentException should be thrown
+        var act = () => _service.CreateTestAsync(invitation);
+        act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*Email*required*");
+    }
+
+    [Test]
+    public void CreateTestAsync_NullInvitation_ThrowsArgumentNullException()
+    {
+        // Given: A null invitation
+
+        // When: Creating a test invitation
+        // Then: ArgumentNullException should be thrown
+        var act = () => _service.CreateTestAsync(null!);
+        act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Test]
+    public async Task CreateTestAsync_CodeIsAvailableOnPassedInObject()
+    {
+        // Given: A test invitation with empty code
+        var invitation = new InvitationEntity
+        {
+            Email = "test@test.com",
+            Code = Guid.Empty
+        };
+
+        // When: Creating a test invitation
+        await _service.CreateTestAsync(invitation);
+
+        // Then: The generated code should be available on the original object
+        invitation.Code.Should().NotBe(Guid.Empty);
+    }
+
+    #endregion
+
+    #region DeleteTestInvitationsAsync
+
+    [Test]
+    public async Task DeleteTestInvitationsAsync_DeletesTestInvitations()
+    {
+        // Given: Two test invitations and one production invitation
+        await _service.CreateTestAsync(new InvitationEntity { Email = "test1@test.com" });
+        await _service.CreateTestAsync(new InvitationEntity { Email = "test2@test.com" });
+        await _service.CreateAsync("prod@test.com");
+
+        // When: Deleting test invitations
+        var count = await _service.DeleteTestInvitationsAsync();
+
+        // Then: Two invitations should be deleted
+        count.Should().Be(2);
+
+        // And: Only the production invitation should remain
+        var remaining = await _context.Invitations.ToListAsync();
+        remaining.Should().HaveCount(1);
+        remaining[0].Email.Should().Be("prod@test.com");
+        remaining[0].IsTest.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task DeleteTestInvitationsAsync_NoTestInvitations_ReturnsZero()
+    {
+        // Given: Only production invitations exist
+        await _service.CreateAsync("prod@test.com");
+
+        // When: Deleting test invitations
+        var count = await _service.DeleteTestInvitationsAsync();
+
+        // Then: Zero should be returned
+        count.Should().Be(0);
+
+        // And: The production invitation should still exist
+        var remaining = await _context.Invitations.CountAsync();
+        remaining.Should().Be(1);
+    }
+
+    [Test]
+    public async Task DeleteTestInvitationsAsync_EmptyDatabase_ReturnsZero()
+    {
+        // Given: No invitations exist
+
+        // When: Deleting test invitations
+        var count = await _service.DeleteTestInvitationsAsync();
+
+        // Then: Zero should be returned
+        count.Should().Be(0);
     }
 
     #endregion

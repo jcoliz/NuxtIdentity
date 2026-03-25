@@ -21,10 +21,32 @@ public interface IInvitationService
     /// <param name="claims">Optional claims to assign to the user upon acceptance. Defaults to empty.</param>
     /// <param name="expiresIn">Optional duration until the invitation expires. Defaults to 30 days.</param>
     /// <param name="metadata">Optional application-specific metadata stored with the invitation.</param>
-    /// <param name="status">Optional initial status. Defaults to <see cref="InvitationStatus.Pending"/>. Primarily for testing.</param>
     Task<InvitationEntity> CreateAsync(string? email = null, IReadOnlyList<string>? roles = null,
-        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null, string? metadata = null,
-        InvitationStatus? status = null);
+        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null, string? metadata = null);
+
+    /// <summary>
+    /// Creates an invitation for testing purposes with full control over storable properties.
+    /// </summary>
+    /// <param name="invitation">
+    /// The invitation entity to persist. The caller may set any storable property including
+    /// <see cref="InvitationEntity.Code"/>, <see cref="InvitationEntity.Status"/>,
+    /// <see cref="InvitationEntity.Email"/>, roles, claims, metadata, and timestamps.
+    /// The <see cref="InvitationEntity.Id"/> and <see cref="InvitationEntity.IsTest"/> properties
+    /// are ignored — Id is auto-generated and IsTest is always set to true.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="invitation"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <see cref="InvitationEntity.Email"/> is null or empty.</exception>
+    Task<InvitationEntity> CreateTestAsync(InvitationEntity invitation);
+
+    /// <summary>
+    /// Deletes all invitations marked as test invitations.
+    /// </summary>
+    /// <returns>The number of invitations deleted.</returns>
+    /// <remarks>
+    /// Only invitations with <see cref="InvitationEntity.IsTest"/> set to true are affected.
+    /// Production invitations are never deleted by this method.
+    /// </remarks>
+    Task<int> DeleteTestInvitationsAsync();
 
     /// <summary>
     /// Retrieves an invitation by its code.
