@@ -195,6 +195,87 @@ public class EfInvitationServiceTests
         entity.Status.Should().Be(InvitationStatus.Expired);
     }
 
+    [Test]
+    public async Task CreateAsync_NoParameters_UsesDefaults()
+    {
+        // Given: No parameters specified
+
+        // When: Creating an invitation with all defaults
+        var entity = await _service.CreateAsync();
+
+        // Then: The entity should have a non-empty Code
+        entity.Code.Should().NotBe(Guid.Empty);
+
+        // And: Email should be null
+        entity.Email.Should().BeNull();
+
+        // And: Status should be Pending
+        entity.Status.Should().Be(InvitationStatus.Pending);
+
+        // And: Roles and Claims should be null (empty collections stored as null)
+        entity.Roles.Should().BeNull();
+        entity.Claims.Should().BeNull();
+
+        // And: Metadata should be null
+        entity.Metadata.Should().BeNull();
+
+        // And: ExpiresAt should be 30 days from creation
+        var expectedExpiry = entity.CreatedAt.AddDays(30);
+        entity.ExpiresAt.Should().Be(expectedExpiry);
+    }
+
+    [Test]
+    public async Task CreateAsync_NullRolesAndClaims_StoresNull()
+    {
+        // Given: Null roles and claims (explicitly passed)
+
+        // When: Creating an invitation with null roles and claims
+        var entity = await _service.CreateAsync(
+            email: "user@test.com",
+            roles: null,
+            claims: null,
+            expiresIn: TimeSpan.FromDays(7));
+
+        // Then: Roles should be null
+        entity.Roles.Should().BeNull();
+
+        // And: Claims should be null
+        entity.Claims.Should().BeNull();
+    }
+
+    [Test]
+    public async Task CreateAsync_NullEmail_StoresNull()
+    {
+        // Given: No email specified
+
+        // When: Creating an invitation without an email
+        var entity = await _service.CreateAsync(
+            roles: new List<string> { "Admin" },
+            claims: new List<ClaimInfo>(),
+            expiresIn: TimeSpan.FromDays(7));
+
+        // Then: Email should be null
+        entity.Email.Should().BeNull();
+
+        // And: The invitation should be persisted
+        var stored = await _context.Invitations.FindAsync(entity.Id);
+        stored.Should().NotBeNull();
+        stored!.Email.Should().BeNull();
+    }
+
+    [Test]
+    public async Task CreateAsync_NullExpiresIn_DefaultsTo30Days()
+    {
+        // Given: No expiration specified
+        var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // When: Creating an invitation without an expiration
+        var entity = await _service.CreateAsync(email: "user@test.com");
+
+        // Then: ExpiresAt should be 30 days from creation
+        entity.ExpiresAt.Should().Be(currentTime.AddDays(30));
+    }
+
     #endregion
 
     #region GetByCodeAsync

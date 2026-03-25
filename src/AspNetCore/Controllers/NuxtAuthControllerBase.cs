@@ -308,7 +308,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             );
         }
 
-        if (invitation.Email.StartsWith("__TEST__", StringComparison.Ordinal) &&
+        if (invitation.Email?.StartsWith("__TEST__", StringComparison.Ordinal) == true &&
             !string.Equals(invitation.Email, request.Email, StringComparison.OrdinalIgnoreCase))
         {
             LogSignupInvitationEmailMismatch(request.Username);

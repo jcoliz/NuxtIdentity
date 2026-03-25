@@ -79,7 +79,7 @@ public static class NuxtIdentityModelBuilderExtensions
             entity.HasIndex(e => e.Email);
             entity.HasIndex(e => e.Status);
             entity.Property(e => e.Code).IsRequired();
-            entity.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.Email).HasMaxLength(256);
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.Roles).HasMaxLength(4000);
             entity.Property(e => e.Claims).HasMaxLength(4000);

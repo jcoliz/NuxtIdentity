@@ -45,7 +45,7 @@ Users need a way to sign up for an application, and administrators need a way to
 
 ### Invitation-based Registration
 
-1. Administrator uses an application-specific admin interface that calls `IInvitationService.CreateAsync` to create an invitation, specifying an email address, roles, claims, application-specific metadata, and expiration
+1. Administrator uses an application-specific admin interface that calls `IInvitationService.CreateAsync` to create an invitation, optionally specifying an email address, roles, claims, application-specific metadata, and expiration (all parameters are optional with sensible defaults)
 2. The developer delivers the invitation link to the prospective user through their own mechanism (email, in-app notification, etc.)
 3. New user navigates to the registration page with the invitation code
 4. Frontend validates the invitation code via `GET /api/auth/invitations/{code}` to display appropriate UI
@@ -113,7 +113,10 @@ Users need a way to sign up for an application, and administrators need a way to
 
 **Acceptance Criteria**:
 - [ ] An `IInvitationService` interface is provided with a `CreateAsync` method
-- [ ] `CreateAsync` accepts: email address, roles to assign, claims to assign, expiration duration, and optional application-specific metadata (JSON string)
+- [ ] All `CreateAsync` parameters are optional: email address, roles to assign, claims to assign, expiration duration, and application-specific metadata (JSON string)
+- [ ] When email is not provided, the invitation is created without an associated email address (the entity stores null)
+- [ ] When roles or claims are not provided, they default to empty (no roles/claims assigned on acceptance)
+- [ ] When expiration duration is not provided, the invitation defaults to 30 days
 - [ ] A unique invitation code is generated and returned
 - [ ] The invitation is persisted with status "Pending", including any metadata
 - [ ] The developer is responsible for delivering the invitation to the recipient and for building their own admin controller/endpoint with appropriate authorization
@@ -233,9 +236,11 @@ public class AdminController(IInvitationService invitationService) : ControllerB
     public async Task<IActionResult> CreateInvitation(CreateInvitationRequest request)
     {
         // Developer can include app-specific metadata (e.g., list access grants)
+        // All parameters are optional — create a bare invitation or a fully-specified one
         var metadata = JsonSerializer.Serialize(new { ListIds = request.ListIds });
         var invitation = await invitationService.CreateAsync(
-            request.Email, request.Roles, request.Claims, request.ExpiresIn, metadata);
+            email: request.Email, roles: request.Roles, claims: request.Claims,
+            expiresIn: request.ExpiresIn, metadata: metadata);
         return Ok(invitation);
     }
 
@@ -324,15 +329,16 @@ public enum InvitationStatus
 public interface IInvitationService
 {
     /// <summary>
-    /// Creates a new invitation and optionally notifies the recipient.
+    /// Creates a new invitation. All parameters are optional with sensible defaults.
     /// </summary>
-    /// <param name="email">The email address to invite.</param>
-    /// <param name="roles">Roles to assign when the invitation is accepted.</param>
-    /// <param name="claims">Claims to assign when the invitation is accepted.</param>
-    /// <param name="expiresIn">How long before the invitation expires.</param>
+    /// <param name="email">Optional email address to invite. Null if not applicable.</param>
+    /// <param name="roles">Optional roles to assign when the invitation is accepted. Defaults to empty.</param>
+    /// <param name="claims">Optional claims to assign when the invitation is accepted. Defaults to empty.</param>
+    /// <param name="expiresIn">Optional duration before expiration. Defaults to 30 days.</param>
     /// <param name="metadata">Optional JSON string with application-specific data.</param>
-    Task<Invitation> CreateAsync(string email, IReadOnlyList<string> roles,
-        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null);
+    Task<Invitation> CreateAsync(string? email = null, IReadOnlyList<string>? roles = null,
+        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null,
+        string? metadata = null);
 
     /// <summary>
     /// Gets a single invitation by its code.
@@ -371,7 +377,7 @@ public interface IInvitationService
 **Invitation Entity** (new):
 - Id (primary key, auto-generated)
 - Code (unique invitation code -- GUID format, required)
-- Email (email address of the invited user, required)
+- Email (email address of the invited user, optional — null when not applicable)
 - Status (`InvitationStatus` enum, required)
 - Roles (JSON-serialized list of role names to assign, optional)
 - Claims (JSON-serialized list of claim type/value pairs to assign, optional)

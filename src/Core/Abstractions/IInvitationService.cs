@@ -14,16 +14,16 @@ namespace NuxtIdentity.Core.Abstractions;
 public interface IInvitationService
 {
     /// <summary>
-    /// Creates a new invitation with the specified email, roles, claims, and expiration.
+    /// Creates a new invitation. All parameters are optional with sensible defaults.
     /// </summary>
-    /// <param name="email">The email address of the invited user.</param>
-    /// <param name="roles">The roles to assign to the user upon acceptance.</param>
-    /// <param name="claims">The claims to assign to the user upon acceptance.</param>
-    /// <param name="expiresIn">The duration until the invitation expires.</param>
+    /// <param name="email">Optional email address of the invited user. Null when not tied to a specific email.</param>
+    /// <param name="roles">Optional roles to assign to the user upon acceptance. Defaults to empty.</param>
+    /// <param name="claims">Optional claims to assign to the user upon acceptance. Defaults to empty.</param>
+    /// <param name="expiresIn">Optional duration until the invitation expires. Defaults to 30 days.</param>
     /// <param name="metadata">Optional application-specific metadata stored with the invitation.</param>
     /// <param name="status">Optional initial status. Defaults to <see cref="InvitationStatus.Pending"/>. Primarily for testing.</param>
-    Task<InvitationEntity> CreateAsync(string email, IReadOnlyList<string> roles,
-        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null,
+    Task<InvitationEntity> CreateAsync(string? email = null, IReadOnlyList<string>? roles = null,
+        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null, string? metadata = null,
         InvitationStatus? status = null);
 
     /// <summary>

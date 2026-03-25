@@ -60,7 +60,7 @@ Represents an invitation to register for the application.
 **Properties**:
 - `Id` (int, auto-generated) — Safe-to-log identifier. Per PRD business rule, `Code` is a secret, so `Id` is used in all diagnostic logging, following the `RefreshTokenEntity.Key` pattern
 - `Code` (Guid) — Unique invitation code. Stored as `Guid` for type safety and efficient indexing
-- `Email` (string) — Email address of the invited user
+- `Email` (string?) — Optional email address of the invited user. Null when the invitation is not tied to a specific email address
 - `Status` (InvitationStatus) — Current lifecycle state. `NotFound` (0) is never stored; it is only used in API responses
 - `Roles` (string?) — JSON-serialized list of role names to assign on acceptance
 - `Claims` (string?) — JSON-serialized list of `ClaimInfo` type/value pairs to assign on acceptance
@@ -94,9 +94,10 @@ Service for managing invitation lifecycle. The developer injects this into their
 ```csharp
 public interface IInvitationService
 {
-    Task<InvitationEntity> CreateAsync(string email, IReadOnlyList<string> roles,
-        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null,
-        InvitationStatus? status = null);
+    Task<InvitationEntity> CreateAsync(string? email = null,
+        IReadOnlyList<string>? roles = null,
+        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null,
+        string? metadata = null, InvitationStatus? status = null);
 
     Task<InvitationEntity?> GetByCodeAsync(string code);
 
@@ -109,6 +110,7 @@ public interface IInvitationService
 ```
 
 Design decisions:
+- All `CreateAsync` parameters are optional with sensible defaults: `email` → null, `roles`/`claims` → null (treated as empty internally), `expiresIn` → 30 days, `metadata` → null, `status` → Pending. This lets developers create bare invitations (just a code) or fully-specified ones
 - `CreateAsync` uses `ClaimInfo` from the existing [`AuthModels.cs`](../../src/Core/Models/AuthModels.cs). The optional `status` parameter defaults to `Pending` and exists primarily for testing (e.g., creating expired or revoked invitations without manipulating time)
 - `ResolveStatusAsync` returns the effective status accounting for both stored status and time-based expiration. Needed by the `GET /api/auth/invitations/{code}/status` endpoint — avoids duplicating expiration logic in the controller
 - `ValidateAsync` returns the entity when usable (pending + not expired), or null. Used by the SignUp endpoint
@@ -144,9 +146,9 @@ Configuration:
 - Primary key on `Id`
 - Unique index on `Code` (primary query path)
 - Indexes on `Email` and `Status` (useful for Phase 2 admin queries)
-- `Email` max length 256 (matches ASP.NET Identity default)
+- `Email` max length 256 (matches ASP.NET Identity default), nullable (not required)
 - `Roles`, `Claims`, `Metadata` max length 4000 to prevent unbounded growth
-- `Code`, `Email`, `Status`, `CreatedAt`, `ExpiresAt` marked as required
+- `Code`, `Status`, `CreatedAt`, `ExpiresAt` marked as required (`Email` is optional)
 
 ---
 

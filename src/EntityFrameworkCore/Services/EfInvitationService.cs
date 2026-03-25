@@ -45,12 +45,22 @@ public partial class EfInvitationService<TContext> : IInvitationService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// Default expiration duration used when <c>expiresIn</c> is not specified.
+    /// </summary>
+    private static readonly TimeSpan DefaultExpiration = TimeSpan.FromDays(30);
+
     /// <inheritdoc/>
-    public async Task<InvitationEntity> CreateAsync(string email, IReadOnlyList<string> roles,
-        IReadOnlyList<ClaimInfo> claims, TimeSpan expiresIn, string? metadata = null,
+    public async Task<InvitationEntity> CreateAsync(string? email = null,
+        IReadOnlyList<string>? roles = null, IReadOnlyList<ClaimInfo>? claims = null,
+        TimeSpan? expiresIn = null, string? metadata = null,
         InvitationStatus? status = null)
     {
         LogStarting();
+
+        var effectiveRoles = roles ?? [];
+        var effectiveClaims = claims ?? [];
+        var effectiveExpiresIn = expiresIn ?? DefaultExpiration;
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = new InvitationEntity
@@ -58,11 +68,11 @@ public partial class EfInvitationService<TContext> : IInvitationService
             Code = Guid.NewGuid(),
             Email = email,
             Status = status ?? InvitationStatus.Pending,
-            Roles = roles.Count > 0 ? JsonSerializer.Serialize(roles) : null,
-            Claims = claims.Count > 0 ? JsonSerializer.Serialize(claims) : null,
+            Roles = effectiveRoles.Count > 0 ? JsonSerializer.Serialize(effectiveRoles) : null,
+            Claims = effectiveClaims.Count > 0 ? JsonSerializer.Serialize(effectiveClaims) : null,
             Metadata = metadata,
             CreatedAt = now,
-            ExpiresAt = now.Add(expiresIn)
+            ExpiresAt = now.Add(effectiveExpiresIn)
         };
 
         _context.Set<InvitationEntity>().Add(entity);
