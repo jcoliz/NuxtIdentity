@@ -492,7 +492,8 @@ public class InvitationSignUpTests
         // Given: An invalid GUID string
 
         // When: Checking the status of an invalid code
-        var response = await _client.GetAsync("/api/auth/invitations/not-a-valid-guid/status");
+        var response = await _client.PutAsJsonAsync("/api/auth/invitations/validate",
+            new InvitationValidateRequest { Code = "not-a-valid-guid" });
 
         // Then: 200 OK should be returned
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -520,7 +521,8 @@ public class InvitationSignUpTests
         });
 
         // When: Checking the invitation status
-        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+        var response = await _client.PutAsJsonAsync("/api/auth/invitations/validate",
+            new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -545,7 +547,8 @@ public class InvitationSignUpTests
         });
 
         // When: Checking the invitation status
-        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+        var response = await _client.PutAsJsonAsync("/api/auth/invitations/validate",
+            new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -570,7 +573,8 @@ public class InvitationSignUpTests
         });
 
         // When: Checking the invitation status
-        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+        var response = await _client.PutAsJsonAsync("/api/auth/invitations/validate",
+            new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -595,7 +599,8 @@ public class InvitationSignUpTests
         });
 
         // When: Checking the invitation status
-        var response = await _client.GetAsync($"/api/auth/invitations/{invitation.Code}/status");
+        var response = await _client.PutAsJsonAsync("/api/auth/invitations/validate",
+            new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -613,7 +618,8 @@ public class InvitationSignUpTests
         // Given: A non-existent invitation code
 
         // When: Checking the status of an unknown code
-        var response = await _client.GetAsync($"/api/auth/invitations/{Guid.NewGuid()}/status");
+        var response = await _client.PutAsJsonAsync("/api/auth/invitations/validate",
+            new InvitationValidateRequest { Code = Guid.NewGuid().ToString() });
 
         // Then: 200 OK should be returned
         response.StatusCode.Should().Be(HttpStatusCode.OK);

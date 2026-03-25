@@ -5,7 +5,7 @@ namespace NuxtIdentity.Core.Models;
 /// </summary>
 /// <remarks>
 /// <see cref="NotFound"/> is included in the enum rather than being a null/missing concept
-/// because the <c>GET /api/auth/invitations/{code}/status</c> endpoint returns status for all cases
+/// because the <c>PUT /api/auth/invitations/validate</c> endpoint returns status for all cases
 /// including unknown codes. The endpoint always succeeds in answering "what is the status of this code?"
 /// <see cref="NotFound"/> is never stored in the database; it is only used in API responses.
 /// </remarks>

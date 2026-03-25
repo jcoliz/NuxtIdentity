@@ -48,7 +48,7 @@ Users need a way to sign up for an application, and administrators need a way to
 1. Administrator uses an application-specific admin interface that calls `IInvitationService.CreateAsync` to create an invitation, optionally specifying an email address, roles, claims, application-specific metadata, and expiration (all parameters are optional with sensible defaults)
 2. The developer delivers the invitation link to the prospective user through their own mechanism (email, in-app notification, etc.)
 3. New user navigates to the registration page with the invitation code
-4. Frontend validates the invitation code via `GET /api/auth/invitations/{code}` to display appropriate UI
+4. Frontend validates the invitation code via `PUT /api/auth/invitations/validate` to display appropriate UI
 5. User completes registration via `POST /api/auth/signup` with the invitation code
 6. NuxtIdentity assigns the roles and claims from the invitation to the new user
 7. Developer's `OnInvitationAcceptedAsync` hook runs with the full invitation entity (including metadata) for application-defined entitlement actions
@@ -87,7 +87,7 @@ Users need a way to sign up for an application, and administrators need a way to
 **So that** my frontend can render appropriate UI based on the invitation state
 
 **Acceptance Criteria**:
-- [ ] A `GET /api/auth/invitations/{code}` endpoint validates the invitation code
+- [ ] A `PUT /api/auth/invitations/validate` endpoint validates the invitation code (code sent in request body, not URL, because it is a credential)
 - [ ] All responses return 200 OK with an `InvitationStatus` enum value — the endpoint always succeeds in answering "what is the status of this code?"
 - [ ] For a valid, pending invitation: returns status `Pending` with the invitation email (so the frontend can pre-fill the registration form)
 - [ ] For a used (accepted) invitation: returns status `Accepted` — the frontend can suggest signing in instead
@@ -230,7 +230,7 @@ Invitation administration (create, list, revoke) is provided through an `IInvita
 | Method | Path | Auth Required | Description |
 |--------|------|---------------|-------------|
 | POST | `/api/auth/signup` | No | Extended: accepts optional `InvitationCode` |
-| GET | `/api/auth/invitations/{code}` | No | Validate invitation code (frontend pre-check) |
+| PUT | `/api/auth/invitations/validate` | No | Validate invitation code (frontend pre-check); code in request body |
 | POST | `/api/auth/confirm-email` | No | Confirm email address with code |
 
 **Developer-Built Endpoints** (using `IInvitationService`):

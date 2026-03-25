@@ -16,7 +16,7 @@ Phase 1 adds:
 - An `EfInvitationService` EF Core implementation
 - A `RegistrationMode` enum and `RegistrationOptions` property on the base controller
 - Extended `SignUp` endpoint to accept invitation codes
-- A new `GET /api/auth/invitations/{code}/status` validation endpoint
+- A new `PUT /api/auth/invitations/validate` endpoint that accepts the code in the request body
 - New lifecycle hooks: `OnInvitationAcceptedAsync` and `OnUserConfirmedAsync`
 
 All new controller methods are `virtual`, following the existing pattern in [`NuxtAuthControllerBase`](../../src/AspNetCore/Controllers/NuxtAuthControllerBase.cs).
@@ -31,7 +31,7 @@ All new controller methods are `virtual`, following the existing pattern in [`Nu
 
 Represents the lifecycle state of an invitation: `NotFound`, `Pending`, `Accepted`, `Expired`, `Revoked`.
 
-`NotFound` is included in the enum (rather than being a null/missing concept) because the `GET /api/auth/invitations/{code}/status` endpoint returns status for all cases including unknown codes (Story 3). This is a semantic distinction — the endpoint always succeeds in answering "what is the status of this code?"
+`NotFound` is included in the enum (rather than being a null/missing concept) because the `PUT /api/auth/invitations/validate` endpoint returns status for all cases including unknown codes (Story 3). This is a semantic distinction — the endpoint always succeeds in answering "what is the status of this code?"
 
 ---
 
@@ -80,6 +80,9 @@ Roles and Claims are stored as JSON strings rather than separate join tables, ke
 
 **Extend `SignUpRequest`**: Add an optional `InvitationCode` property (string?). This is backward-compatible — existing consumers that don't send it will have it defaulted to `null`.
 
+**New `InvitationValidateRequest`**: A request record for the invitation validation endpoint with:
+- `Code` (string) — The invitation code to validate
+
 **New `InvitationStatusResponse`**: A response record for the invitation validation endpoint with:
 - `Status` (InvitationStatus) — The lifecycle status of the invitation code
 - `Email` (string?) — The invitation email, returned only for `Pending` status so the frontend can pre-fill the registration form. Null for all other statuses to avoid information leakage
@@ -113,7 +116,7 @@ public interface IInvitationService
 Design decisions:
 - All `CreateAsync` parameters are optional with sensible defaults: `email` → null, `roles`/`claims` → null (treated as empty internally), `expiresIn` → 30 days, `metadata` → null, `status` → Pending. This lets developers create bare invitations (just a code) or fully-specified ones
 - `CreateAsync` uses `ClaimInfo` from the existing [`AuthModels.cs`](../../src/Core/Models/AuthModels.cs). The optional `status` parameter defaults to `Pending` and exists primarily for testing (e.g., creating expired or revoked invitations without manipulating time)
-- `ResolveStatusAsync` returns the effective status accounting for both stored status and time-based expiration. Needed by the `GET /api/auth/invitations/{code}/status` endpoint — avoids duplicating expiration logic in the controller
+- `ResolveStatusAsync` returns the effective status accounting for both stored status and time-based expiration. Needed by the `PUT /api/auth/invitations/validate` endpoint — avoids duplicating expiration logic in the controller
 - `ValidateAsync` returns the entity when usable (pending + not expired), or null. Used by the SignUp endpoint
 - `AcceptAsync` is split from `ValidateAsync` to give the controller control over when acceptance happens (after user creation succeeds). This avoids combining side effects with validation
 - `ListAsync` and `RevokeAsync` from the PRD are deferred to Phase 2 (Stories 6, 7). The interface covers only Phase 1 needs
@@ -206,7 +209,9 @@ Add `ProducesResponseType` attributes for 403 Forbidden and 404 Not Found to the
 
 #### 9.4. ValidateInvitation Endpoint (Story 3)
 
-New `GET /api/auth/invitations/{code}/status` virtual endpoint. Always returns 200 OK with `InvitationStatusResponse`. Does not require authentication. Delegates status resolution to `InvitationService.ResolveStatusAsync`. Returns `Email` only for Pending status.
+New `PUT /api/auth/invitations/validate` virtual endpoint. Accepts an `InvitationValidateRequest` body containing the invitation code. Always returns 200 OK with `InvitationStatusResponse`. Does not require authentication. Delegates status resolution to `InvitationService.ResolveStatusAsync`. Returns `Email` only for Pending status.
+
+The invitation code is a credential and must not appear in the URL path. Using PUT with a request body ensures the code is not logged by web servers, proxies, APM tools, or captured in browser history — consistent with how `POST /api/auth/login` and `POST /api/auth/signup` handle credentials. PUT is chosen over POST because the operation is idempotent (validating the same code always returns the same result with no side effects).
 
 #### 9.5. New Lifecycle Hooks (Story 10)
 

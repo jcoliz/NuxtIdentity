@@ -98,6 +98,17 @@ public record ResetPasswordRequest
 }
 
 /// <summary>
+/// Request data for validating an invitation code.
+/// </summary>
+public record InvitationValidateRequest
+{
+    /// <summary>
+    /// The invitation code to validate.
+    /// </summary>
+    public string Code { get; init; } = string.Empty;
+}
+
+/// <summary>
 /// Request data for changing a password while logged in.
 /// </summary>
 public record ChangePasswordRequest

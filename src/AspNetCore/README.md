@@ -26,7 +26,7 @@ This library provides ready-to-use ASP.NET Core components for JWT authenticatio
   - Virtual `SignUp()` endpoint with open or invitation-based registration
   - Virtual `RefreshTokens()` endpoint with token rotation
   - Virtual `Logout()` endpoint with token revocation
-  - Virtual `ValidateInvitation()` endpoint (`GET /api/auth/invitations/{code}/status`)
+  - Virtual `ValidateInvitation()` endpoint (`PUT /api/auth/invitations/validate`)
   - Virtual `RegistrationOptions` property to control registration mode
   - Lifecycle hooks: `OnUserCreatedAsync()`, `OnInvitationAcceptedAsync()`, `OnUserConfirmedAsync()`
   - Helper methods: `CreateLoginResponseAsync()`, `CreateRefreshResponseAsync()`
@@ -194,7 +194,7 @@ By inheriting from `NuxtAuthControllerBase<TUser>`, you automatically get:
 - **`GET /api/auth/user`** - Get current session info (requires auth)
 - **`POST /api/auth/refresh`** - Refresh access token with rotation
 - **`POST /api/auth/logout`** - Revoke refresh token
-- **`GET /api/auth/invitations/{code}/status`** - Validate invitation code
+- **`PUT /api/auth/invitations/validate`** - Validate invitation code (code in request body)
 
 ### ✅ Helper Methods
 

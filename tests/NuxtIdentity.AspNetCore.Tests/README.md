@@ -10,7 +10,7 @@ This test project covers:
 - [`NuxtAuthControllerBase<TUser>`](../../src/AspNetCore/Controllers/NuxtAuthControllerBase.cs) - Authentication endpoints
   - Login flow
   - Signup flow (open and invitation-based)
-  - Invitation validation (`GET /api/auth/invitations/{code}/status`)
+  - Invitation validation (`PUT /api/auth/invitations/validate`)
   - Invitation-only registration mode
   - Token refresh flow
   - Session retrieval
