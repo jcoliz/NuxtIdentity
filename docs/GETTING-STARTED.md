@@ -40,7 +40,8 @@ In `appsettings.json`, add JWT configuration:
     "Issuer": "https://localhost:5001",
     "Audience": "https://localhost:5001",
     "Lifespan": "01:00:00",
-    "RefreshTokenLifespan": "30.00:00:00"
+    "RefreshTokenLifespan": "30.00:00:00",
+    "ClockSkew": "00:00:30"
   },
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=app.db"
@@ -55,6 +56,7 @@ In `appsettings.json`, add JWT configuration:
 - **`Audience`** (required): Identifies who the token is intended for (e.g., your API URL).
 - **`Lifespan`** (optional): How long access tokens remain valid. Format: "HH:MM:SS" or "D.HH:MM:SS". Default: 1 hour.
 - **`RefreshTokenLifespan`** (optional): How long refresh tokens remain valid. Format: "D.HH:MM:SS". Default: 30 days.
+- **`ClockSkew`** (optional): Allowed clock drift for token lifetime validation. Must be between 0 and 5 minutes. Default: 30 seconds.
 
 ### Generating a Secure Key
 
@@ -80,7 +82,7 @@ Create a new file `Data/ApplicationDbContext.cs`:
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.Core.Models;
-using NuxtIdentity.EntityFrameworkCore;
+using NuxtIdentity.EntityFrameworkCore.Extensions;
 
 namespace MyApp.Data;
 
@@ -92,11 +94,13 @@ public class ApplicationDbContext : IdentityDbContext
     }
 
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
+    public DbSet<InvitationEntity> Invitations => Set<InvitationEntity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
         builder.ConfigureNuxtIdentityRefreshTokens();
+        builder.ConfigureNuxtIdentityInvitations();
     }
 }
 ```
@@ -109,7 +113,7 @@ Add these NuxtIdentity-specific configuration lines to your `Program.cs`:
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MyApp.Data;
-using NuxtIdentity.EntityFrameworkCore;
+using NuxtIdentity.EntityFrameworkCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -122,7 +126,7 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-// ⭐ Add NuxtIdentity services (JWT tokens, refresh tokens, authentication)
+// ⭐ Add NuxtIdentity services (JWT tokens, refresh tokens, invitations, authentication)
 builder.Services.AddNuxtIdentityWithEntityFramework<IdentityUser, ApplicationDbContext>(
     builder.Configuration);
 
@@ -138,9 +142,10 @@ app.MapControllers();
 app.Run();
 ```
 
-The `AddNuxtIdentity` extension method automatically configures:
+The `AddNuxtIdentityWithEntityFramework` extension method automatically configures:
 - JWT token generation and validation
-- Refresh token storage and rotation
+- Refresh token storage and rotation (Entity Framework Core)
+- Invitation management (Entity Framework Core)
 - JWT Bearer authentication
 - User claims providers
 
@@ -150,26 +155,35 @@ Create a new file `Controllers/AuthController.cs`:
 
 ```csharp
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using NuxtIdentity.Controllers;
-using NuxtIdentity.Services;
+using NuxtIdentity.AspNetCore.Controllers;
+using NuxtIdentity.Core.Abstractions;
 
 namespace MyApp.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class AuthController : NuxtIdentityController
+public class AuthController(
+    IJwtTokenService<IdentityUser> jwtTokenService,
+    IEnumerable<IUserClaimsProvider<IdentityUser>> userClaimsProviders,
+    IRefreshTokenService refreshTokenService,
+    UserManager<IdentityUser> userManager,
+    SignInManager<IdentityUser> signInManager,
+    IEnumerable<IUserNotifier<IdentityUser>> userNotifiers,
+    IEnumerable<IInvitationService> invitationServices,
+    ILogger<AuthController> logger)
+    : NuxtAuthControllerBase<IdentityUser>(
+        jwtTokenService,
+        userClaimsProviders,
+        refreshTokenService,
+        userManager,
+        signInManager,
+        userNotifiers,
+        invitationServices,
+        logger)
 {
-    public AuthController(
-        UserManager<IdentityUser> userManager,
-        SignInManager<IdentityUser> signInManager,
-        IRefreshTokenService refreshTokenService,
-        ILogger<AuthController> logger)
-        : base(userManager, signInManager, refreshTokenService, logger)
-    {
-    }
+    // No additional implementation needed; all functionality is in the base class.
 }
 ```
+
+The base controller uses primary constructor injection and requires all eight parameters. Services like `IUserNotifier<TUser>` and `IInvitationService` are injected as `IEnumerable<>` so they are optional — the controller works without any registered implementations, and throws `NuxtIdentityConfigurationException` only when an endpoint that requires them is actually called.
 
 ## Step 7: Create and apply database migrations
 
@@ -188,47 +202,48 @@ dotnet run
 
 ### Register a new user
 
-```bash
-POST https://localhost:5001/api/auth/register
+```http
+POST https://localhost:5001/api/auth/signup
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "Password123!",
-  "confirmPassword": "Password123!"
-}
-```
-
-### Login
-
-```bash
-POST https://localhost:5001/api/auth/login
-Content-Type: application/json
-
-{
+  "username": "newuser",
   "email": "user@example.com",
   "password": "Password123!"
 }
 ```
 
-You'll receive a response with `accessToken` and `refreshToken`.
+### Login
+
+```http
+POST https://localhost:5001/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "password": "Password123!"
+}
+```
+
+You'll receive a response with `token` (containing `accessToken` and `refreshToken`) and `user` information.
 
 ### Refresh the token
 
-```bash
+```http
 POST https://localhost:5001/api/auth/refresh
-Authorization: Bearer your-access-token-here
 Content-Type: application/json
+
 {
   "refreshToken": "your-refresh-token-here"
 }
 ```
 
+Note: The refresh endpoint validates the refresh token directly — no JWT Bearer authorization header is needed.
+
 ### Logout
 
-```bash
+```http
 POST https://localhost:5001/api/auth/logout
-Authorization: Bearer your-access-token-here
 Content-Type: application/json
 
 {
@@ -242,7 +257,7 @@ NuxtIdentity includes built-in password management endpoints: forgot-password, r
 
 ### Implement IUserNotifier
 
-The forgot-password flow requires an `IUserNotifier<TUser>` implementation to deliver reset codes to users. NuxtIdentity provides the reset token — you decide how to deliver it (email, SMS, etc.):
+The forgot-password flow requires at least one `IUserNotifier<TUser>` implementation to deliver reset codes to users. NuxtIdentity provides the reset token — you decide how to deliver it (email, SMS, etc.). Multiple notifiers can be registered and all will be called:
 
 ```csharp
 using NuxtIdentity.Core.Abstractions;
@@ -289,7 +304,7 @@ Once registered, the following endpoints are available automatically:
 
 | Endpoint | Method | Auth Required | Description |
 |---|---|---|---|
-| `/api/auth/forgot-password` | POST | No | Generates a reset code and calls your `IUserNotifier` |
+| `/api/auth/forgot-password` | POST | No | Generates a reset code and calls all registered `IUserNotifier` implementations |
 | `/api/auth/reset-password` | POST | No | Validates the reset code and sets a new password |
 | `/api/auth/change-password` | POST | Yes (JWT) | Changes password for the authenticated user |
 
@@ -297,8 +312,120 @@ Once registered, the following endpoints are available automatically:
 
 ### Security Notes
 
-- `forgot-password` always returns `200 OK` regardless of whether the user exists (prevents user enumeration)
+- `forgot-password` always returns `204 No Content` regardless of whether the user exists (prevents user enumeration)
 - Both `reset-password` and `change-password` revoke all existing refresh tokens after success — the client should log the user out and prompt re-authentication
+
+## Step 10: Add Invitation-Based Registration (Optional)
+
+NuxtIdentity supports invitation-based registration where users can only sign up with a valid invitation code. Invitations can carry pre-assigned roles and claims that are automatically applied to the new user.
+
+### How It Works
+
+By default, the `SignUp` endpoint uses **open registration** — anyone can register without an invitation. To restrict registration to invitation holders, override `RegistrationOptions` in your auth controller:
+
+```csharp
+    // ⭐ Require invitation codes for all registrations
+    protected override RegistrationOptions RegistrationOptions => new(RegistrationMode.InvitationOnly);
+```
+
+### Registration Modes
+
+| Mode | Behavior |
+|---|---|
+| `RegistrationMode.Open` (default) | Anyone can register. If an invitation code is provided, it's validated and roles/claims are assigned. |
+| `RegistrationMode.InvitationOnly` | An invitation code is required. Signup without a code returns `403 Forbidden`. |
+| `RegistrationMode.EmailConfirmation` | Not yet implemented (Phase 3). Setting this mode throws `NotImplementedException`. |
+
+### Managing Invitations
+
+The `IInvitationService` is registered automatically by `AddNuxtIdentityWithEntityFramework`. To create invitations, inject `IInvitationService` into your own admin controller:
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using NuxtIdentity.Core.Abstractions;
+using NuxtIdentity.Core.Models;
+
+namespace MyApp.Controllers;
+
+[ApiController]
+[Route("api/admin/invitations")]
+[Authorize(Roles = "Admin")]
+public class InvitationController(IInvitationService invitationService) : ControllerBase
+{
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request)
+    {
+        var invitation = await invitationService.CreateAsync(
+            email: request.Email,
+            roles: request.Roles,
+            claims: request.Claims,
+            expiresIn: TimeSpan.FromDays(7)
+        );
+
+        return Ok(new { code = invitation.Code, expiresAt = invitation.ExpiresAt });
+    }
+}
+
+public record CreateInvitationRequest(
+    string? Email = null,
+    List<string>? Roles = null,
+    List<ClaimInfo>? Claims = null
+);
+```
+
+### Signing Up with an Invitation
+
+Clients include the invitation code in the signup request:
+
+```http
+POST https://localhost:5001/api/auth/signup
+Content-Type: application/json
+
+{
+  "username": "inviteduser",
+  "email": "invited@example.com",
+  "password": "Password123!",
+  "invitationCode": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
+When an invitation code is provided:
+- The invitation is validated (must be pending and not expired)
+- Roles and claims from the invitation are assigned to the new user
+- The user's email is auto-confirmed
+- The invitation is marked as accepted
+
+### Validating an Invitation (Frontend)
+
+The frontend can check an invitation's status before showing the registration form:
+
+```http
+GET https://localhost:5001/api/auth/invitations/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status
+```
+
+Returns:
+```json
+{
+  "status": "Pending",
+  "email": "invited@example.com"
+}
+```
+
+The `email` field is only returned for `Pending` invitations (to pre-fill the registration form). For all other statuses (`Accepted`, `Expired`, `Revoked`, `NotFound`), `email` is null to prevent information leakage.
+
+### Invitation Lifecycle Hooks
+
+Override `OnInvitationAcceptedAsync` in your auth controller for custom post-acceptance logic:
+
+```csharp
+protected override async Task OnInvitationAcceptedAsync(
+    IdentityUser user, InvitationEntity invitation)
+{
+    // Custom logic after invitation acceptance
+    // e.g., send welcome email, create default resources, etc.
+}
+```
 
 ## Next Steps
 
@@ -306,7 +433,8 @@ Once registered, the following endpoints are available automatically:
 - **Add Authorization**: Use `[Authorize]` attribute on your controllers
 - **Configure CORS**: Enable CORS for your frontend application
 - **Use User Secrets**: Store sensitive configuration in development
-- **Add Email Confirmation**: Implement email verification for new users
+- **Add Custom Claims Providers**: Implement `IUserClaimsProvider<TUser>` for additional claims
+- **Override Endpoints**: All base controller methods are virtual — override for custom behavior
 
 ## Production Considerations
 
@@ -325,11 +453,17 @@ Once registered, the following endpoints are available automatically:
 - Ensure migrations have been applied: `dotnet ef database update`
 
 ### JWT validation errors
-- Check that `JwtOptions:SecretKey` is at least 32 characters long
+- Check that `Jwt:Key` is a valid Base64-encoded value of at least 32 bytes
 - Verify `Issuer` and `Audience` match between configuration and requests
+- Check that `ClockSkew` is between 0 and 5 minutes
 
 ### Identity validation errors
 - Review password requirements in `Program.cs`
 - Check that email format is valid
+
+### Invitation errors
+- Ensure `IInvitationService` is registered (included automatically with `AddNuxtIdentityWithEntityFramework`)
+- Verify that `InvitationEntity` is configured in your DbContext's `OnModelCreating`
+- Check invitation status — codes can only be used once and expire after the configured duration
 
 For more information, see the [API Reference](./API-REFERENCE.md) and the `local` sample project.
