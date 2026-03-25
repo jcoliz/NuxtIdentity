@@ -13,8 +13,8 @@ Why are we doing this instead of using something that's already out there?
 
 - 🎯 **Specific niche:** .NET Identity works great, but it doesn't "speak nuxt-auth" out of the box
 - 🧹 **Reduces boilerplate:** Developers won't need to figure out JWT token formats, refresh token flows, and endpoint structures that nuxt-auth expects
-- 🔌 **Pre-configured endpoints:** Will provide drop-in-ready API controllers that match what nuxt-auth providers expect
-- 🔒 **Type safety bridge:** Will include TypeScript types for the frontend that match the backend .NET models
+- 🔌 **Pre-configured endpoints:** Drop-in-ready API controllers that match what nuxt-auth providers expect
+- 🔒 **Type safety bridge:** TypeScript types for the frontend that match the backend .NET models
 
 ## Features
 
@@ -28,6 +28,7 @@ and @sidebase/nuxt-auth. Here's what it's doing:
 - 👤 **Role/claim visibility**: Surfacing user's roles and claims in auth tokens and in the user session.
 - 🔄 **Refresh tokens**: .NET Identity doesn't handle refresh tokens at all, so a big part of this libraries work is storing and validating those with automatic rotation.
 - 🔑 **Password management**: Forgot-password, reset-password, and change-password flows, built on ASP.NET Core Identity's token-based password reset. Consumers provide their own notification delivery via `IUserNotifier<TUser>`.
+- 📨 **Invitation-based registration**: Controlled access via invitation codes that carry pre-assigned roles, claims, and application-specific metadata. Supports open, email-confirmation, and invitation-only registration modes. Includes service interface for developers to build their own admin experience, plus test support for functional testing.
 
 ## High-Level Flow
 

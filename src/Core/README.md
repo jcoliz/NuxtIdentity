@@ -21,6 +21,8 @@ This library provides the core abstractions and implementations for JWT-based au
 - **`IJwtTokenService<TUser>`** - JWT token generation and validation
 - **`IRefreshTokenService`** - Refresh token storage and validation
 - **`IUserClaimsProvider<TUser>`** - Extract claims from user objects
+- **`IInvitationService`** - Invitation lifecycle management (create, validate, accept, test support)
+- **`IUserNotifier<TUser>`** - User notification abstraction (email confirmation, password reset)
 
 ### Implementations
 
@@ -31,10 +33,14 @@ This library provides the core abstractions and implementations for JWT-based au
 
 - **`JwtOptions`** - JWT configuration (secret key, issuer, audience, expiration)
 - **`RefreshTokenEntity`** - Refresh token entity for database storage
+- **`InvitationEntity`** - Invitation entity with code, email, roles, claims, metadata, and `IsTest` flag
+- **`InvitationStatus`** - Invitation lifecycle states (`NotFound`, `Pending`, `Accepted`, `Expired`, `Revoked`)
+- **`RegistrationMode`** / **`RegistrationOptions`** - Controls registration behavior (`Open`, `EmailConfirmation`, `InvitationOnly`)
 - **`AuthModels`** - Request/Response DTOs:
-  - `LoginRequest`, `LoginResponse`
+  - `LoginRequest`, `LoginResponse`, `SignUpRequest`
   - `RefreshRequest`, `RefreshResponse`
   - `SessionResponse`, `TokenPair`, `UserInfo`
+  - `InvitationStatusResponse`
 
 ## Installation
 

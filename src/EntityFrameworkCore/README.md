@@ -1,19 +1,21 @@
 # NuxtIdentity.EntityFrameworkCore
 
-Entity Framework Core integration for NuxtIdentity refresh token storage.
+Entity Framework Core integration for NuxtIdentity refresh token and invitation storage.
 
 ## Overview
 
-This library provides a production-ready implementation of `IRefreshTokenService` using Entity Framework Core for persistent storage of refresh tokens.
+This library provides production-ready implementations of `IRefreshTokenService` and `IInvitationService` using Entity Framework Core for persistent storage.
 
 ## Features
 
 - **Generic DbContext**: Works with any `DbContext` via `TContext` type parameter
-- **Secure Storage**: Tokens are hashed using SHA256 before storage
+- **Secure Storage**: Refresh tokens are hashed using SHA256 before storage
 - **Token Rotation**: Automatic revocation of old tokens when refreshing
-- **Configurable Expiration**: Default 30-day token lifetime
+- **Invitation Management**: Create, validate, accept, and clean up invitations
+- **Test Support**: `CreateTestAsync` and `DeleteTestInvitationsAsync` for functional test scenarios
+- **Configurable Expiration**: Default 30-day lifetime for tokens and invitations
 - **Structured Logging**: LoggerMessage support throughout
-- **Easy Configuration**: ModelBuilder extension for entity setup
+- **Easy Configuration**: ModelBuilder extensions for entity setup
 
 ## Components
 
@@ -25,9 +27,17 @@ This library provides a production-ready implementation of `IRefreshTokenService
   - Validates tokens against database
   - Supports token revocation (single token or all user tokens)
 
+- **`EfInvitationService<TContext>`** - EF Core implementation of `IInvitationService`
+  - Creates invitations with optional email, roles, claims, and metadata
+  - Validates invitation codes with time-based expiration
+  - Marks invitations as accepted with user ID tracking
+  - `CreateTestAsync` for functional test setup (full property control, `IsTest` flag)
+  - `DeleteTestInvitationsAsync` for bulk cleanup of test data
+
 ### Extensions
 
 - **`ConfigureNuxtIdentityRefreshTokens()`** - ModelBuilder extension to configure `RefreshTokenEntity`
+- **`ConfigureNuxtIdentityInvitations()`** - ModelBuilder extension to configure `InvitationEntity`
 - **`AddNuxtIdentityEntityFramework<TContext>()`** - Service registration extension
 
 ## Installation

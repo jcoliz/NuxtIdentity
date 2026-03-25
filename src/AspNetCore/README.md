@@ -8,7 +8,10 @@ This library provides ready-to-use ASP.NET Core components for JWT authenticatio
 
 ## Features
 
-- **Base Controller**: Generic `NuxtAuthControllerBase<TUser>` with virtual refresh and logout endpoints
+- **Base Controller**: Generic `NuxtAuthControllerBase<TUser>` with virtual endpoints for login, signup, refresh, logout, and invitation validation
+- **Invitation-Based Registration**: Signup with invitation codes that carry pre-assigned roles, claims, and metadata
+- **Registration Modes**: `Open`, `EmailConfirmation`, or `InvitationOnly` via overridable `RegistrationOptions`
+- **Lifecycle Hooks**: Virtual `OnUserCreatedAsync`, `OnInvitationAcceptedAsync`, `OnUserConfirmedAsync` for custom post-registration logic
 - **Identity Integration**: Ready-made claims provider for ASP.NET Core Identity
 - **JWT Bearer Setup**: Automatic configuration of JWT Bearer authentication
 - **Helper Methods**: Token generation, user claim extraction, and more
@@ -19,11 +22,15 @@ This library provides ready-to-use ASP.NET Core components for JWT authenticatio
 ### Controllers
 
 - **`NuxtAuthControllerBase<TUser>`** - Abstract base controller providing:
+  - Virtual `Login()` endpoint with username/password authentication
+  - Virtual `SignUp()` endpoint with open or invitation-based registration
   - Virtual `RefreshTokens()` endpoint with token rotation
   - Virtual `Logout()` endpoint with token revocation
+  - Virtual `ValidateInvitation()` endpoint (`GET /api/auth/invitations/{code}/status`)
+  - Virtual `RegistrationOptions` property to control registration mode
+  - Lifecycle hooks: `OnUserCreatedAsync()`, `OnInvitationAcceptedAsync()`, `OnUserConfirmedAsync()`
   - Helper methods: `CreateLoginResponseAsync()`, `CreateRefreshResponseAsync()`
   - User claim helpers: `GetCurrentUserId()`, `GetCurrentUsername()`
-  - Abstract `GetUserByIdAsync()` for derived classes to implement
 
 ### Services
 
@@ -182,8 +189,12 @@ By inheriting from `NuxtAuthControllerBase<TUser>`, you automatically get:
 
 ### ✅ Virtual Endpoints (Override if needed)
 
+- **`POST /api/auth/login`** - Authenticate with username/password
+- **`POST /api/auth/signup`** - Register (open or invitation-based)
+- **`GET /api/auth/user`** - Get current session info (requires auth)
 - **`POST /api/auth/refresh`** - Refresh access token with rotation
 - **`POST /api/auth/logout`** - Revoke refresh token
+- **`GET /api/auth/invitations/{code}/status`** - Validate invitation code
 
 ### ✅ Helper Methods
 

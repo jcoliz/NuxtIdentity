@@ -9,10 +9,13 @@ This test project covers:
 ### Controllers
 - [`NuxtAuthControllerBase<TUser>`](../../src/AspNetCore/Controllers/NuxtAuthControllerBase.cs) - Authentication endpoints
   - Login flow
-  - Signup flow
+  - Signup flow (open and invitation-based)
+  - Invitation validation (`GET /api/auth/invitations/{code}/status`)
+  - Invitation-only registration mode
   - Token refresh flow
   - Session retrieval
   - Logout
+  - Password management (forgot, reset, change)
 
 ### Configuration
 - [`JwtBearerOptionsSetup`](../../src/AspNetCore/Configuration/JwtBearerOptionsSetup.cs) - JWT Bearer authentication configuration

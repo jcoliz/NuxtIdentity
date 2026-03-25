@@ -6,6 +6,7 @@ Integration tests for the NuxtIdentity.EntityFrameworkCore library.
 
 This test project contains comprehensive integration tests for the EF Core implementation:
 - [`EfRefreshTokenService<TContext>`](../../src/EntityFrameworkCore/Services/EfRefreshTokenService.cs) - Database-backed refresh token management
+- [`EfInvitationService<TContext>`](../../src/EntityFrameworkCore/Services/EfInvitationService.cs) - Database-backed invitation management
 - [`ModelBuilderExtensions`](../../src/EntityFrameworkCore/Extensions/ModelBuilderExtensions.cs) - Entity configuration
 - [`ServiceCollectionExtensions`](../../src/EntityFrameworkCore/Extensions/ServiceCollectionExtensions.cs) - Dependency injection setup
 
@@ -13,7 +14,7 @@ This test project contains comprehensive integration tests for the EF Core imple
 
 ### Current Coverage
 
-**40 integration tests** covering database persistence, configuration, and service registration:
+**83 integration tests** covering database persistence, configuration, and service registration:
 
 #### EfRefreshTokenServiceTests (15 tests)
 Tests use **Gherkin-style comments** (Given/When/Then/And) for improved readability and an **in-memory database** for isolation:
@@ -56,6 +57,37 @@ Tests verify Entity Framework configuration:
 - ✅ Multiple entities get unique IDs
 - ✅ Update operations work correctly
 - ✅ Delete operations work correctly
+
+#### EfInvitationServiceTests (30 tests)
+Tests use **Gherkin-style comments** (Given/When/Then/And) and **in-memory database** for isolation:
+
+**Invitation Creation:**
+- ✅ Create with valid data returns entity with generated code
+- ✅ Create persists to database
+- ✅ Create always uses Pending status
+- ✅ Roles and claims are JSON-serialized
+- ✅ Empty roles/claims stored as null
+- ✅ Metadata is stored correctly
+- ✅ Expiration calculated correctly from duration
+- ✅ No parameters uses sensible defaults (30 day expiry)
+- ✅ Null roles/claims/email stored as null
+
+**Test Invitation Support:**
+- ✅ `CreateTestAsync` with all properties persists correctly
+- ✅ `CreateTestAsync` forces IsTest=true even if caller sets false
+- ✅ `CreateTestAsync` generates code when Guid.Empty
+- ✅ `CreateTestAsync` applies default timestamps
+- ✅ `CreateTestAsync` ignores caller-provided Id
+- ✅ `CreateTestAsync` with null email throws ArgumentException
+- ✅ `CreateTestAsync` with empty email throws ArgumentException
+- ✅ `CreateTestAsync` with null invitation throws ArgumentNullException
+- ✅ Generated code available on passed-in object
+- ✅ `DeleteTestInvitationsAsync` deletes test invitations only
+- ✅ `DeleteTestInvitationsAsync` returns zero when no test invitations
+- ✅ `DeleteTestInvitationsAsync` returns zero on empty database
+
+**Invitation Queries and Validation:**
+- ✅ GetByCodeAsync, ResolveStatusAsync, ValidateAsync, AcceptAsync
 
 #### ServiceCollectionExtensionsTests (13 tests)
 Tests verify dependency injection registration:
