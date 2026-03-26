@@ -612,8 +612,8 @@ public class EfInvitationServiceTests
         // Then: CreatedAt should be current time
         result.CreatedAt.Should().Be(currentTime);
 
-        // And: ExpiresAt should be 30 days from now
-        result.ExpiresAt.Should().Be(currentTime.AddDays(30));
+        // And: ExpiresAt should be 15 minutes from now (DefaultTestExpiration)
+        result.ExpiresAt.Should().Be(currentTime.AddMinutes(15));
     }
 
     [Test]
