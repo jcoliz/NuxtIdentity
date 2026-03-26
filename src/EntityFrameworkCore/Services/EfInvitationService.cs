@@ -49,6 +49,7 @@ public partial class EfInvitationService<TContext> : IInvitationService
     /// Default expiration duration used when <c>expiresIn</c> is not specified.
     /// </summary>
     private static readonly TimeSpan DefaultExpiration = TimeSpan.FromDays(30);
+    private static readonly TimeSpan DefaultTestExpiration = TimeSpan.FromMinutes(15);
 
     /// <inheritdoc/>
     public async Task<InvitationEntity> CreateAsync(string? email = null,
@@ -114,9 +115,10 @@ public partial class EfInvitationService<TContext> : IInvitationService
         {
             invitation.CreatedAt = now;
         }
-        if (invitation.ExpiresAt == default)
+        var expiry = now.Add(DefaultTestExpiration);
+        if (invitation.ExpiresAt == default || invitation.ExpiresAt > expiry)
         {
-            invitation.ExpiresAt = now.Add(DefaultExpiration);
+            invitation.ExpiresAt = expiry;
         }
 
         // Reset Id so EF auto-generates it
