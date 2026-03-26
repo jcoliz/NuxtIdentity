@@ -280,16 +280,16 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
     private partial void LogStarting([CallerMemberName] string? location = null);
 
-    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting {UserId}")]
+    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting User {UserId}")]
     private partial void LogStartingUserId(string userId, [CallerMemberName] string? location = null);
 
     [LoggerMessage(3, LogLevel.Information, "{Location}: OK")]
     private partial void LogOk([CallerMemberName] string? location = null);
 
-    [LoggerMessage(5, LogLevel.Information, "{Location}: OK {UserId} {Count}")]
+    [LoggerMessage(5, LogLevel.Information, "{Location}: OK User {UserId} Count {Count}")]
     private partial void LogOkUserIdCount(string userId, int count, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(6, LogLevel.Information, "{Location}: OK {Count}")]
+    [LoggerMessage(6, LogLevel.Information, "{Location}: OK Count {Count}")]
     private partial void LogOkCount(int count, [CallerMemberName] string? location = null);
 
     [LoggerMessage(11, LogLevel.Warning, "{Location}: Cleanup failed")]

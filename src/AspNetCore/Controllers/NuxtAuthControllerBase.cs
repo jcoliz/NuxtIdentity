@@ -22,7 +22,7 @@ namespace NuxtIdentity.AspNetCore.Controllers;
 /// <item><description><c>NuxtAuthControllerBase.cs</c> (this file) — Class declaration, properties, helper methods, hooks</description></item>
 /// <item><description><c>NuxtAuthControllerBase.Auth.cs</c> — Authentication endpoints: Login, SignUp, GetSession, RefreshTokens, Logout</description></item>
 /// <item><description><c>NuxtAuthControllerBase.Password.cs</c> — Password management: ForgotPassword, ResetPassword, ChangePassword, Base64URL encoding</description></item>
-/// <item><description><c>NuxtAuthControllerBase.Log.cs</c> — All LoggerMessage declarations (IDs 1–21)</description></item>
+/// <item><description><c>NuxtAuthControllerBase.Log.cs</c> — All LoggerMessage declarations (IDs 1–28)</description></item>
 /// </list>
 ///
 /// <para>
@@ -158,7 +158,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         TUser user,
         string oldRefreshToken)
     {
-        LogStartingUsername(user.UserName ?? "unknown");
+        LogStartingUserId(user.Id);
 
         // Revoke old token (token rotation)
         await RefreshTokenService.RevokeRefreshTokenAsync(oldRefreshToken);
@@ -166,7 +166,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
         var newAccessToken = await JwtTokenService.GenerateAccessTokenAsync(user);
         var newRefreshToken = await RefreshTokenService.GenerateRefreshTokenAsync(user.Id);
 
-        LogOkUsername(user.UserName ?? "unknown");
+        LogOkUserId(user.Id);
 
         return new RefreshResponse
         {
@@ -325,7 +325,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <summary>
     /// Assigns roles from a JSON-serialized role list to a user. Failures are logged but not fatal.
     /// </summary>
-    private async Task AssignInvitationRolesAsync(TUser user, string? rolesJson, string username)
+    private async Task AssignInvitationRolesAsync(TUser user, string? rolesJson)
     {
         if (string.IsNullOrEmpty(rolesJson))
             return;
@@ -338,21 +338,21 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
                 var roleResult = await UserManager.AddToRolesAsync(user, roles);
                 if (!roleResult.Succeeded)
                 {
-                    LogSignupRoleAssignmentFailed(username,
+                    LogSignupRoleAssignmentFailedUserId(user.Id,
                         string.Join(", ", roleResult.Errors.Select(e => e.Description)));
                 }
             }
         }
         catch (InvalidOperationException ex)
         {
-            LogSignupRoleAssignmentFailed(username, ex.Message);
+            LogSignupRoleAssignmentFailedUserId(user.Id, ex.Message);
         }
     }
 
     /// <summary>
     /// Assigns claims from a JSON-serialized claim list to a user. Failures are logged but not fatal.
     /// </summary>
-    private async Task AssignInvitationClaimsAsync(TUser user, string? claimsJson, string username)
+    private async Task AssignInvitationClaimsAsync(TUser user, string? claimsJson)
     {
         if (string.IsNullOrEmpty(claimsJson))
             return;
@@ -366,14 +366,14 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
                 var claimResult = await UserManager.AddClaimsAsync(user, claims);
                 if (!claimResult.Succeeded)
                 {
-                    LogSignupClaimAssignmentFailed(username,
+                    LogSignupClaimAssignmentFailedUserId(user.Id,
                         string.Join(", ", claimResult.Errors.Select(e => e.Description)));
                 }
             }
         }
         catch (InvalidOperationException ex)
         {
-            LogSignupClaimAssignmentFailed(username, ex.Message);
+            LogSignupClaimAssignmentFailedUserId(user.Id, ex.Message);
         }
     }
 

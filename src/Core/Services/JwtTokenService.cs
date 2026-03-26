@@ -68,9 +68,9 @@ public partial class JwtTokenService<TUser>(
             claims.AddRange(providerClaims);
         }
 
-        var username = claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value ?? "unknown";
+        var userId = claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value ?? "unknown";
 
-        LogStartingUsername(username);
+        LogStartingUserId(userId);
 
         // Add standard security claims
         var allClaims = claims.ToList();
@@ -100,7 +100,7 @@ public partial class JwtTokenService<TUser>(
             signingCredentials: credentials
         );
 
-        LogOkUsername(username);
+        LogOkUserId(userId);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
@@ -152,13 +152,13 @@ public partial class JwtTokenService<TUser>(
     [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
     private partial void LogStarting([CallerMemberName] string? location = null);
 
-    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting {Username}")]
+    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting User {Username}")]
     private partial void LogStartingUsername(string username, [CallerMemberName] string? location = null);
 
     [LoggerMessage(3, LogLevel.Information, "{Location}: OK")]
     private partial void LogOk([CallerMemberName] string? location = null);
 
-    [LoggerMessage(4, LogLevel.Information, "{Location}: OK {Username}")]
+    [LoggerMessage(4, LogLevel.Information, "{Location}: OK User {Username}")]
     private partial void LogOkUsername(string username, [CallerMemberName] string? location = null);
 
     [LoggerMessage(5, LogLevel.Warning, "{Location}: Validation failed")]
@@ -169,6 +169,12 @@ public partial class JwtTokenService<TUser>(
 
     [LoggerMessage(7, LogLevel.Warning, "{Location}: No principal extracted from token")]
     private partial void LogNoPrincipal([CallerMemberName] string? location = null);
+
+    [LoggerMessage(8, LogLevel.Information, "{Location}: OK User {UserId}")]
+    private partial void LogOkUserId(string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(9, LogLevel.Debug, "{Location}: Starting User {UserId}")]
+    private partial void LogStartingUserId(string userId, [CallerMemberName] string? location = null);
 
     #endregion
 }

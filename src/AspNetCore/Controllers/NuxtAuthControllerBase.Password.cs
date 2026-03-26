@@ -148,7 +148,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
 
         if (!result.Succeeded)
         {
-            LogChangePasswordFailed(username, string.Join(", ", result.Errors.Select(e => e.Description)));
+            LogChangePasswordFailedUserId(user.Id, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(
                 title: "Password Change Failed",
                 detail: string.Join("; ", result.Errors.Select(e => e.Description)),
@@ -159,7 +159,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         // Revoke all refresh tokens for security (Story 7)
         await RefreshTokenService.RevokeAllUserTokensAsync(user.Id);
 
-        LogOkUsername(username);
+        LogOkUserId(user.Id);
         return NoContent();
     }
 

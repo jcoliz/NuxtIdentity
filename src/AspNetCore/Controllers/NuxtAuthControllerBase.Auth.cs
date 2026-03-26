@@ -39,7 +39,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         var result = await SignInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
         if (!result.Succeeded)
         {
-            LogLoginFailedUsername(request.Username, "Invalid password");
+            LogLoginFailedUserId(user.Id, "Invalid password");
             return Problem(
                 title: "Authentication Failed",
                 detail: "Invalid credentials",
@@ -48,7 +48,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         }
 
         var response = await CreateLoginResponseAsync(user);
-        LogOkUsername(request.Username);
+        LogOkUserId(user.Id);
         return Ok(response);
     }
 
@@ -121,7 +121,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         await OnUserCreatedAsync(user);
 
         var response = await CreateLoginResponseAsync(user);
-        LogOkUsername(request.Username);
+        LogOkUserId(user.Id);
         return Ok(response);
     }
 
@@ -167,8 +167,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         }
 
         // Assign roles and claims from invitation (failures logged, not fatal)
-        await AssignInvitationRolesAsync(user, invitation!.Roles, request.Username);
-        await AssignInvitationClaimsAsync(user, invitation.Claims, request.Username);
+        await AssignInvitationRolesAsync(user, invitation!.Roles);
+        await AssignInvitationClaimsAsync(user, invitation.Claims);
 
         // Mark invitation as accepted and call lifecycle hooks
         await InvitationService.AcceptAsync(invitation, user.Id);
@@ -176,7 +176,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         await OnInvitationAcceptedAsync(user, invitation);
 
         var response = await CreateLoginResponseAsync(user);
-        LogOkUsername(request.Username);
+        LogOkUserId(user.Id);
         return Ok(response);
     }
 
@@ -207,7 +207,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         var user = await UserManager.FindByNameAsync(username);
         if (user == null)
         {
-            LogSessionUnauthorizedUsername($"User not found: {username}");
+            LogSessionUnauthorized("User not found");
             return Problem(
                 title: "User Not Found",
                 detail: "The authenticated user no longer exists",
@@ -216,7 +216,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         }
 
         var userInfo = await CreateUserInfoAsync(user);
-        LogOkUsername(username);
+        LogOkUserId(user.Id);
 
         return Ok(new SessionResponse
         {
@@ -262,7 +262,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
 
         var response = await CreateRefreshResponseAsync(user, request.RefreshToken);
 
-        LogOkUsername(user.UserName ?? "unknown");
+        LogOkUserId(user.Id);
 
         return Ok(response);
     }

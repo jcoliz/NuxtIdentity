@@ -258,16 +258,16 @@ public partial class EfInvitationService<TContext> : IInvitationService
     [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting")]
     private partial void LogStarting([CallerMemberName] string? location = null);
 
-    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting invitation {InvitationId}")]
+    [LoggerMessage(2, LogLevel.Debug, "{Location}: Starting Invitation {InvitationId}")]
     private partial void LogStartingInvitationId(int invitationId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(3, LogLevel.Information, "{Location}: OK invitation {InvitationId}")]
+    [LoggerMessage(3, LogLevel.Information, "{Location}: OK Invitation {InvitationId}")]
     private partial void LogOkInvitationId(int invitationId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(4, LogLevel.Information, "{Location}: OK invitation {InvitationId} status {Status}")]
+    [LoggerMessage(4, LogLevel.Information, "{Location}: OK Invitation {InvitationId} Status {Status}")]
     private partial void LogOkInvitationIdStatus(int invitationId, InvitationStatus status, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(5, LogLevel.Information, "{Location}: OK invitation {InvitationId} accepted by {UserId}")]
+    [LoggerMessage(5, LogLevel.Information, "{Location}: OK Invitation {InvitationId} accepted by {UserId}")]
     private partial void LogOkInvitationIdAccepted(int invitationId, string userId, [CallerMemberName] string? location = null);
 
     [LoggerMessage(6, LogLevel.Debug, "{Location}: Invalid code format")]
@@ -276,7 +276,7 @@ public partial class EfInvitationService<TContext> : IInvitationService
     [LoggerMessage(7, LogLevel.Debug, "{Location}: Code not found")]
     private partial void LogCodeNotFound([CallerMemberName] string? location = null);
 
-    [LoggerMessage(8, LogLevel.Debug, "{Location}: Invitation {InvitationId} not usable, status {Status}")]
+    [LoggerMessage(8, LogLevel.Debug, "{Location}: Invitation {InvitationId} not usable, Status {Status}")]
     private partial void LogInvitationNotUsable(int invitationId, InvitationStatus status, [CallerMemberName] string? location = null);
 
     [LoggerMessage(9, LogLevel.Information, "{Location}: Deleted {Count} test invitations")]
