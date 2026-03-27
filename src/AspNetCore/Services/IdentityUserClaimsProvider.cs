@@ -195,10 +195,10 @@ public partial class IdentityUserClaimsProvider<TUser> : IUserClaimsProvider<TUs
 
     #region Logger Messages
 
-    [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting {UserId}")]
+    [LoggerMessage(1, LogLevel.Debug, "{Location}: Starting User {UserId}")]
     private partial void LogStartingUserId(string userId, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(2, LogLevel.Information, "{Location}: OK {UserId} {Count}")]
+    [LoggerMessage(2, LogLevel.Information, "{Location}: OK User {UserId} {Count} results")]
     private partial void LogOkUserIdCount(string userId, int count, [CallerMemberName] string? location = null);
 
     #endregion
