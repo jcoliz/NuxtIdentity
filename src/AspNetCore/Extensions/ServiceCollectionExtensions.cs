@@ -27,25 +27,32 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration containing JWT options.</param>
-    /// <param name="environment">Optional hosting environment (used to determine if JWT key auto-generation is allowed). If null, defaults to treating environment as production.</param>
+    /// <param name="environment">Optional hosting environment (used to determine if JWT configuration auto-generation is allowed). If null, defaults to treating environment as production.</param>
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
     /// This configures JWT Bearer authentication as the default authentication scheme
     /// and automatically configures JWT options from the "Jwt" section in appsettings.json.
     ///
-    /// In non-production environments (Development, Staging, Testing), the JWT signing key will be
-    /// auto-generated if not configured, eliminating the need to manage test keys. In Production,
-    /// the JWT signing key is always required and must be configured.
+    /// <para><strong>Auto-Generation in Non-Production Environments:</strong></para>
+    /// In non-production environments (Development, Staging, Testing), JWT configuration will be
+    /// auto-generated if not provided, eliminating boilerplate configuration:
+    /// - <strong>Key:</strong> Auto-generates a secure 32-byte random key (tokens won't persist across restarts)
+    /// - <strong>Issuer:</strong> Defaults to "NuxtIdentity.{EnvironmentName}" (e.g., "NuxtIdentity.Development")
+    /// - <strong>Audience:</strong> Defaults to "NuxtIdentity.{EnvironmentName}" (e.g., "NuxtIdentity.Development")
+    ///
+    /// <para><strong>Production Requirements:</strong></para>
+    /// In Production, all JWT configuration must be explicitly provided in appsettings.json.
+    /// The application will fail to start with clear error messages if any required values are missing.
     ///
     /// Features included:
     /// - JWT options configuration from appsettings.json
+    /// - Auto-generation of missing JWT options in non-production environments
     /// - JWT options validation at startup (validates Key, Issuer, Audience)
     /// - JWT Bearer authentication configuration
     /// - Enhanced logging for authentication failures and successes
-    /// - Detailed error logging in development environments
-    /// - Automatic JWT key generation in non-production if not configured
+    /// - Startup warning when JWT options are auto-generated
     ///
-    /// Example appsettings.json:
+    /// Example appsettings.json (Production):
     /// <code>
     /// {
     ///   "Jwt": {
@@ -54,6 +61,13 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     ///     "Audience": "your-app-users",
     ///     "Lifespan": "01:00:00"
     ///   }
+    /// }
+    /// </code>
+    ///
+    /// Example appsettings.Development.json (Optional - will auto-generate if omitted):
+    /// <code>
+    /// {
+    ///   "Jwt": {}
     /// }
     /// </code>
     ///
@@ -74,13 +88,25 @@ public static partial class NuxtIdentityServiceCollectionExtensions
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .PostConfigure(options =>
             {
-                // Auto-generate JWT key in non-production environments if not configured
-                if (!isProduction && (options.Key == null || options.Key.Length == 0))
+                // Auto-generate JWT configuration in non-production environments if not configured
+                if (!isProduction)
                 {
-                    options.Key = RandomNumberGenerator.GetBytes(32);
+                    var environmentName = environment?.EnvironmentName ?? "Development";
                     
-                    // Use service provider to get logger for warning message
-                    // Note: This runs during options configuration, so we can't inject ILogger yet
+                    if (options.Key == null || options.Key.Length == 0)
+                    {
+                        options.Key = RandomNumberGenerator.GetBytes(32);
+                    }
+                    
+                    if (string.IsNullOrWhiteSpace(options.Issuer))
+                    {
+                        options.Issuer = $"NuxtIdentity.{environmentName}";
+                    }
+                    
+                    if (string.IsNullOrWhiteSpace(options.Audience))
+                    {
+                        options.Audience = $"NuxtIdentity.{environmentName}";
+                    }
                 }
             })
             .Validate(options =>
@@ -102,10 +128,32 @@ public static partial class NuxtIdentityServiceCollectionExtensions
                 return options.Key == null || options.Key.Length >= 32;
             }, "JWT signing key must be at least 32 bytes (256 bits) for HMAC-SHA256 security. " +
                "Generate a secure key using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Issuer),
-                "JWT Issuer is required. Configure Jwt:Issuer in appsettings.json with a unique value for your application.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Audience),
-                "JWT Audience is required. Configure Jwt:Audience in appsettings.json with a unique value for your application.")
+            .Validate(options =>
+            {
+                // In production, issuer is always required
+                if (isProduction)
+                {
+                    return !string.IsNullOrWhiteSpace(options.Issuer);
+                }
+                
+                // In non-production, issuer will be auto-generated if missing, so it should always exist
+                return !string.IsNullOrWhiteSpace(options.Issuer);
+            }, isProduction
+                ? "JWT Issuer is required in Production. Configure Jwt:Issuer in appsettings.json with a unique value for your application."
+                : "JWT Issuer validation failed unexpectedly in non-production environment.")
+            .Validate(options =>
+            {
+                // In production, audience is always required
+                if (isProduction)
+                {
+                    return !string.IsNullOrWhiteSpace(options.Audience);
+                }
+                
+                // In non-production, audience will be auto-generated if missing, so it should always exist
+                return !string.IsNullOrWhiteSpace(options.Audience);
+            }, isProduction
+                ? "JWT Audience is required in Production. Configure Jwt:Audience in appsettings.json with a unique value for your application."
+                : "JWT Audience validation failed unexpectedly in non-production environment.")
             .Validate(options => options.ClockSkew >= TimeSpan.Zero && options.ClockSkew <= TimeSpan.FromMinutes(5),
                 "JWT ClockSkew must be between 00:00:00 and 00:05:00. Use a small value (for example 00:00:30) to tolerate minor clock drift.")
             .ValidateOnStart();
@@ -243,25 +291,46 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Background service that logs a warning if JWT key was auto-generated in non-production environments.
+    /// Background service that logs a warning if JWT options were auto-generated in non-production environments.
     /// </summary>
     private class JwtKeyAutoGenerationWarningService(
         ILogger<JwtKeyAutoGenerationWarningService> logger,
-        IConfiguration configuration) : IHostedService
+        IConfiguration configuration,
+        IHostEnvironment environment) : IHostedService
     {
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            // Check if the key was configured in appsettings
+            // Check what was configured in appsettings
             var configSection = configuration.GetSection(JwtOptions.SectionName);
             var keyFromConfig = configSection.GetValue<string>("Key");
+            var issuerFromConfig = configSection.GetValue<string>("Issuer");
+            var audienceFromConfig = configSection.GetValue<string>("Audience");
+            
+            var autoGenerated = new List<string>();
             
             if (string.IsNullOrWhiteSpace(keyFromConfig))
             {
+                autoGenerated.Add("Key");
+            }
+            
+            if (string.IsNullOrWhiteSpace(issuerFromConfig))
+            {
+                autoGenerated.Add($"Issuer (using 'NuxtIdentity.{environment.EnvironmentName}')");
+            }
+            
+            if (string.IsNullOrWhiteSpace(audienceFromConfig))
+            {
+                autoGenerated.Add($"Audience (using 'NuxtIdentity.{environment.EnvironmentName}')");
+            }
+            
+            if (autoGenerated.Count > 0)
+            {
                 logger.LogWarning(
-                    "JWT signing key was not configured and has been auto-generated for this session. " +
+                    "JWT configuration auto-generated for non-production environment: {AutoGenerated}. " +
                     "This is acceptable for Development and Testing, but tokens will not persist across restarts. " +
-                    "For Production, configure Jwt:Key in appsettings.json with a Base64-encoded 32-byte value. " +
-                    "Generate one using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))");
+                    "For Production, configure Jwt:Key, Jwt:Issuer, and Jwt:Audience in appsettings.json. " +
+                    "Generate a key using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))",
+                    string.Join(", ", autoGenerated));
             }
             
             return Task.CompletedTask;
