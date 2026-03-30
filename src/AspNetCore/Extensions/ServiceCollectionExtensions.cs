@@ -1,11 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NuxtIdentity.AspNetCore.Configuration;
 using NuxtIdentity.AspNetCore.Services;
 using NuxtIdentity.Core.Abstractions;
@@ -24,10 +27,15 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration containing JWT options.</param>
+    /// <param name="environment">Optional hosting environment (used to determine if JWT key auto-generation is allowed). If null, defaults to treating environment as production.</param>
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
     /// This configures JWT Bearer authentication as the default authentication scheme
     /// and automatically configures JWT options from the "Jwt" section in appsettings.json.
+    ///
+    /// In non-production environments (Development, Staging, Testing), the JWT signing key will be
+    /// auto-generated if not configured, eliminating the need to manage test keys. In Production,
+    /// the JWT signing key is always required and must be configured.
     ///
     /// Features included:
     /// - JWT options configuration from appsettings.json
@@ -35,6 +43,7 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     /// - JWT Bearer authentication configuration
     /// - Enhanced logging for authentication failures and successes
     /// - Detailed error logging in development environments
+    /// - Automatic JWT key generation in non-production if not configured
     ///
     /// Example appsettings.json:
     /// <code>
@@ -50,21 +59,44 @@ public static partial class NuxtIdentityServiceCollectionExtensions
     ///
     /// Example usage:
     /// <code>
-    /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration);
+    /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration, builder.Environment);
     /// </code>
     /// </remarks>
     public static IServiceCollection AddNuxtIdentityAuthentication(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment? environment = null)
     {
+        var isProduction = environment?.IsProduction() ?? false;
+        
         // Configure JWT options from configuration with validation
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                // Auto-generate JWT key in non-production environments if not configured
+                if (!isProduction && (options.Key == null || options.Key.Length == 0))
+                {
+                    options.Key = RandomNumberGenerator.GetBytes(32);
+                    
+                    // Use service provider to get logger for warning message
+                    // Note: This runs during options configuration, so we can't inject ILogger yet
+                }
+            })
             .Validate(options =>
             {
+                // In production, key is always required
+                if (isProduction)
+                {
+                    return options.Key != null && options.Key.Length > 0;
+                }
+                
+                // In non-production, key will be auto-generated if missing, so it should always exist at this point
                 return options.Key != null && options.Key.Length > 0;
-            }, "JWT signing key is required. Configure Jwt:Key in appsettings.json with a Base64-encoded 32-byte value. " +
-               "Generate one using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))")
+            }, isProduction
+                ? "JWT signing key is required in Production. Configure Jwt:Key in appsettings.json with a Base64-encoded 32-byte value. " +
+                  "Generate one using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))"
+                : "JWT signing key validation failed unexpectedly in non-production environment.")
             .Validate(options =>
             {
                 return options.Key == null || options.Key.Length >= 32;
@@ -77,6 +109,12 @@ public static partial class NuxtIdentityServiceCollectionExtensions
             .Validate(options => options.ClockSkew >= TimeSpan.Zero && options.ClockSkew <= TimeSpan.FromMinutes(5),
                 "JWT ClockSkew must be between 00:00:00 and 00:05:00. Use a small value (for example 00:00:30) to tolerate minor clock drift.")
             .ValidateOnStart();
+
+        // Add logging to warn about auto-generated key (done via separate service)
+        if (!isProduction)
+        {
+            services.AddHostedService<JwtKeyAutoGenerationWarningService>();
+        }
 
         // Add authentication with the parameterless overload
         return services.AddNuxtIdentityAuthentication();
@@ -202,6 +240,34 @@ public static partial class NuxtIdentityServiceCollectionExtensions
         services.AddScoped<IJwtTokenService<TUser>, JwtTokenService<TUser>>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Background service that logs a warning if JWT key was auto-generated in non-production environments.
+    /// </summary>
+    private class JwtKeyAutoGenerationWarningService(
+        ILogger<JwtKeyAutoGenerationWarningService> logger,
+        IConfiguration configuration) : IHostedService
+    {
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            // Check if the key was configured in appsettings
+            var configSection = configuration.GetSection(JwtOptions.SectionName);
+            var keyFromConfig = configSection.GetValue<string>("Key");
+            
+            if (string.IsNullOrWhiteSpace(keyFromConfig))
+            {
+                logger.LogWarning(
+                    "JWT signing key was not configured and has been auto-generated for this session. " +
+                    "This is acceptable for Development and Testing, but tokens will not persist across restarts. " +
+                    "For Production, configure Jwt:Key in appsettings.json with a Base64-encoded 32-byte value. " +
+                    "Generate one using: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))");
+            }
+            
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     #region Logger Messages

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NuxtIdentity.AspNetCore.Extensions;
 using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.EntityFrameworkCore.Services;
@@ -20,39 +21,45 @@ public static class NuxtIdentityServiceCollectionExtensions
     /// <typeparam name="TContext">The DbContext type that contains RefreshTokens DbSet.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration containing JWT options.</param>
+    /// <param name="environment">Optional hosting environment for determining production vs non-production behavior.</param>
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
     /// This is a convenience method that combines:
     /// - NuxtIdentity core services (AddNuxtIdentity)
     /// - Entity Framework Core integration (AddNuxtIdentityEntityFramework)
     /// - JWT Bearer authentication with configuration (AddNuxtIdentityAuthentication)
-    /// 
+    ///
+    /// In non-production environments (Development, Staging, Testing), the JWT signing key will be
+    /// auto-generated if not configured, eliminating the need to manage test keys. In Production,
+    /// the JWT signing key is always required and must be configured.
+    ///
     /// Prerequisites:
     /// - ASP.NET Core Identity must be configured with AddIdentity&lt;TUser, TRole&gt;()
     /// - DbContext must have RefreshTokens DbSet and call modelBuilder.ConfigureNuxtIdentityRefreshTokens()
     /// - JWT options must be present in appsettings.json under "Jwt" section
-    /// 
+    ///
     /// Example usage:
     /// <code>
     /// builder.Services.AddIdentity&lt;IdentityUser, IdentityRole&gt;()
     ///     .AddEntityFrameworkStores&lt;ApplicationDbContext&gt;();
-    /// 
+    ///
     /// builder.Services.AddNuxtIdentityWithEntityFramework&lt;IdentityUser, ApplicationDbContext&gt;(
-    ///     builder.Configuration);
+    ///     builder.Configuration, builder.Environment);
     /// </code>
-    /// 
+    ///
     /// This replaces the following separate calls:
     /// <code>
     /// builder.Services.Configure&lt;JwtOptions&gt;(
     ///     builder.Configuration.GetSection(JwtOptions.SectionName));
     /// builder.Services.AddNuxtIdentity&lt;IdentityUser&gt;();
     /// builder.Services.AddNuxtIdentityEntityFramework&lt;ApplicationDbContext&gt;();
-    /// builder.Services.AddNuxtIdentityAuthentication();
+    /// builder.Services.AddNuxtIdentityAuthentication(builder.Configuration, builder.Environment);
     /// </code>
     /// </remarks>
     public static IServiceCollection AddNuxtIdentityWithEntityFramework<TUser, TContext>(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment? environment = null)
         where TUser : IdentityUser
         where TContext : DbContext
     {
@@ -63,7 +70,7 @@ public static class NuxtIdentityServiceCollectionExtensions
         services.AddNuxtIdentityEntityFramework<TContext>();
 
         // Add JWT Bearer authentication (includes JWT options configuration)
-        services.AddNuxtIdentityAuthentication(configuration);
+        services.AddNuxtIdentityAuthentication(configuration, environment);
 
         return services;
     }
