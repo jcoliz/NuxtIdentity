@@ -31,17 +31,39 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - Will NOT seed application-specific tables beyond the standard ASP.NET Identity tables and NuxtIdentity-owned tables (e.g., Invitations)
 - Will NOT handle database migrations — the database schema must already exist before seeding runs
 
----
-
 ## User Stories
 
-### Story 1: Developer - Seed roles from configuration
+### Story 1: Application Developer - Seed test fixture roles separate from environment configuration
+**As an** application developer using NuxtIdentity
+**I want** to define roles and data required by functional tests in application-level configuration
+**So that** my test fixtures remain consistent across all environments without being overwritten by environment-specific configuration
+
+**Acceptance Criteria**:
+- [ ] Can define roles in `IdentitySeeder:Application` section that persist across all environments
+- [ ] Application-level roles are seeded before environment-specific roles
+- [ ] Application-level configuration can include roles with fixed GUIDs for test stability
+- [ ] Environment-specific configuration in `appsettings.{Environment}.json` does not overwrite application-level fixtures
+- [ ] Works with any IConfiguration source including appsettings.json, TOML, and environment variables
+
+### Story 2: Site Administrator - Configure environment-specific seeding without overwriting test fixtures
+**As a** site administrator configuring a deployment environment
+**I want** to define environment-specific users, roles, and invitations
+**So that** I can seed environment-specific administrators and invitations without affecting application-level test fixtures
+
+**Acceptance Criteria**:
+- [ ] Can define environment-specific data in `IdentitySeeder:Environment` section
+- [ ] Environment-specific seeding adds to (not replaces) application-level seeding
+- [ ] Can seed site administrators with environment-specific credentials
+- [ ] Can seed invitation codes for onboarding new users in specific environments
+- [ ] Configuration in `appsettings.Production.json` seamlessly merges with application-level fixtures
+
+### Story 3: Developer - Seed roles from configuration
 **As a** developer using NuxtIdentity
 **I want** to define roles in my application configuration
 **So that** my application has the required roles available on every startup without writing custom code
 
 **Acceptance Criteria**:
-- [ ] Roles defined in configuration are created in the AspNetRoles table if they do not exist
+- [ ] Roles defined in either configuration section are created in the AspNetRoles table if they do not exist
 - [ ] If a role already exists by name, no error occurs and no duplicate is created
 - [ ] Works with any IConfiguration source including appsettings.json, TOML, and environment variables
 
