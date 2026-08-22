@@ -264,6 +264,24 @@ public class EfInvitationServiceTests
     }
 
     [Test]
+    public async Task CreateAsync_WithSpecificCode_UsesProvidedCode()
+    {
+        // Given: A specific code to use for the invitation
+        var specificCode = Guid.NewGuid();
+
+        // When: Creating an invitation with that code
+        var entity = await _service.CreateAsync(email: "user@test.com", code: specificCode);
+
+        // Then: The entity should have exactly the provided code
+        entity.Code.Should().Be(specificCode);
+
+        // And: The invitation should be retrievable by that code
+        var stored = await _service.GetByCodeAsync(specificCode.ToString());
+        stored.Should().NotBeNull();
+        stored!.Id.Should().Be(entity.Id);
+    }
+
+    [Test]
     public async Task CreateAsync_NullExpiresIn_DefaultsTo30Days()
     {
         // Given: No expiration specified

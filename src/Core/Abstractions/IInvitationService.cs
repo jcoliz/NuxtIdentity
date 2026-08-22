@@ -21,8 +21,11 @@ public interface IInvitationService
     /// <param name="claims">Optional claims to assign to the user upon acceptance. Defaults to empty.</param>
     /// <param name="expiresIn">Optional duration until the invitation expires. Defaults to 30 days.</param>
     /// <param name="metadata">Optional application-specific metadata stored with the invitation.</param>
+    /// <param name="code">Optional invitation code. If null, a new code is generated.</param>
+    /// <returns>The created invitation entity.</returns>
     Task<InvitationEntity> CreateAsync(string? email = null, IReadOnlyList<string>? roles = null,
-        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null, string? metadata = null);
+        IReadOnlyList<ClaimInfo>? claims = null, TimeSpan? expiresIn = null, string? metadata = null,
+        Guid? code = null);
 
     /// <summary>
     /// Creates an invitation for testing purposes with full control over storable properties.

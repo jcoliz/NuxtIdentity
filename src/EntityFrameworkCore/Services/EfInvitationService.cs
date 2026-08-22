@@ -54,18 +54,18 @@ public partial class EfInvitationService<TContext> : IInvitationService
     /// <inheritdoc/>
     public async Task<InvitationEntity> CreateAsync(string? email = null,
         IReadOnlyList<string>? roles = null, IReadOnlyList<ClaimInfo>? claims = null,
-        TimeSpan? expiresIn = null, string? metadata = null)
+        TimeSpan? expiresIn = null, string? metadata = null, Guid? code = null)
     {
         LogStarting();
 
-        var effectiveRoles = roles ?? [];
-        var effectiveClaims = claims ?? [];
+        var effectiveRoles = roles ?? Array.Empty<string>();
+        var effectiveClaims = claims ?? Array.Empty<ClaimInfo>();
         var effectiveExpiresIn = expiresIn ?? DefaultExpiration;
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = new InvitationEntity
         {
-            Code = Guid.NewGuid(),
+            Code = code ?? Guid.NewGuid(),
             Email = email,
             Status = InvitationStatus.Pending,
             Roles = effectiveRoles.Count > 0 ? JsonSerializer.Serialize(effectiveRoles) : null,
