@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
 using NUnit.Framework;
 using NuxtIdentity.AspNetCore.Services;
@@ -36,12 +35,12 @@ public class InMemoryUserNotifierTests
 
         // Then: The notification should be captured
         var notifications = await _notifier.GetNotificationsAsync();
-        notifications.Should().HaveCount(1);
+        Assert.That(notifications, Has.Count.EqualTo(1));
 
         // And: The notification should contain the correct data
-        notifications[0].Code.Should().Be(resetCode);
-        notifications[0].Type.Should().Be(NotificationType.PasswordReset);
-        notifications[0].Timestamp.Should().Be(_timeProvider.GetUtcNow().DateTime);
+        Assert.That(notifications[0].Code, Is.EqualTo(resetCode));
+        Assert.That(notifications[0].Type, Is.EqualTo(NotificationType.PasswordReset));
+        Assert.That(notifications[0].Timestamp, Is.EqualTo(_timeProvider.GetUtcNow().DateTime));
     }
 
     [Test]
@@ -56,8 +55,8 @@ public class InMemoryUserNotifierTests
 
         // Then: The notification should capture the user's identity
         var notifications = await _notifier.GetNotificationsAsync();
-        notifications[0].UserId.Should().Be("user1");
-        notifications[0].UserName.Should().Be("testuser");
+        Assert.That(notifications[0].UserId, Is.EqualTo("user1"));
+        Assert.That(notifications[0].UserName, Is.EqualTo("testuser"));
     }
 
     [Test]
@@ -72,11 +71,11 @@ public class InMemoryUserNotifierTests
 
         // Then: The notification should be captured
         var notifications = await _notifier.GetNotificationsAsync();
-        notifications.Should().HaveCount(1);
+        Assert.That(notifications, Has.Count.EqualTo(1));
 
         // And: The notification should contain the correct data
-        notifications[0].Code.Should().Be(confirmationCode);
-        notifications[0].Type.Should().Be(NotificationType.EmailConfirmation);
+        Assert.That(notifications[0].Code, Is.EqualTo(confirmationCode));
+        Assert.That(notifications[0].Type, Is.EqualTo(NotificationType.EmailConfirmation));
     }
 
     [Test]
@@ -91,8 +90,8 @@ public class InMemoryUserNotifierTests
 
         // Then: The notification should capture the user's identity
         var notifications = await _notifier.GetNotificationsAsync();
-        notifications[0].UserId.Should().Be("user2");
-        notifications[0].UserName.Should().Be("confirmuser");
+        Assert.That(notifications[0].UserId, Is.EqualTo("user2"));
+        Assert.That(notifications[0].UserName, Is.EqualTo("confirmuser"));
     }
 
     [Test]
@@ -108,13 +107,13 @@ public class InMemoryUserNotifierTests
         var notifications = await _notifier.GetNotificationsAsync();
 
         // Then: All notifications should be returned in order
-        notifications.Should().HaveCount(3);
-        notifications[0].Code.Should().Be("reset1");
-        notifications[0].Type.Should().Be(NotificationType.PasswordReset);
-        notifications[1].Code.Should().Be("confirm1");
-        notifications[1].Type.Should().Be(NotificationType.EmailConfirmation);
-        notifications[2].Code.Should().Be("reset2");
-        notifications[2].Type.Should().Be(NotificationType.PasswordReset);
+        Assert.That(notifications, Has.Count.EqualTo(3));
+        Assert.That(notifications[0].Code, Is.EqualTo("reset1"));
+        Assert.That(notifications[0].Type, Is.EqualTo(NotificationType.PasswordReset));
+        Assert.That(notifications[1].Code, Is.EqualTo("confirm1"));
+        Assert.That(notifications[1].Type, Is.EqualTo(NotificationType.EmailConfirmation));
+        Assert.That(notifications[2].Code, Is.EqualTo("reset2"));
+        Assert.That(notifications[2].Type, Is.EqualTo(NotificationType.PasswordReset));
     }
 
     [Test]
@@ -130,11 +129,11 @@ public class InMemoryUserNotifierTests
 
         // Then: Each notification should capture the correct user identity
         var notifications = await _notifier.GetNotificationsAsync();
-        notifications.Should().HaveCount(2);
-        notifications[0].UserId.Should().Be("id-alice");
-        notifications[0].UserName.Should().Be("alice");
-        notifications[1].UserId.Should().Be("id-bob");
-        notifications[1].UserName.Should().Be("bob");
+        Assert.That(notifications, Has.Count.EqualTo(2));
+        Assert.That(notifications[0].UserId, Is.EqualTo("id-alice"));
+        Assert.That(notifications[0].UserName, Is.EqualTo("alice"));
+        Assert.That(notifications[1].UserId, Is.EqualTo("id-bob"));
+        Assert.That(notifications[1].UserName, Is.EqualTo("bob"));
     }
 
     [Test]
@@ -150,6 +149,6 @@ public class InMemoryUserNotifierTests
 
         // Then: No notifications should remain
         var notifications = await _notifier.GetNotificationsAsync();
-        notifications.Should().BeEmpty();
+        Assert.That(notifications, Is.Empty);
     }
 }
