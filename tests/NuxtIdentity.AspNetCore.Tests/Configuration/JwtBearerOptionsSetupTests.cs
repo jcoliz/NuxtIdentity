@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -29,13 +28,14 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.Should().NotBeNull();
-        bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey.Should().BeTrue();
-        bearerOptions.TokenValidationParameters.IssuerSigningKey.Should().NotBeNull();
-        bearerOptions.TokenValidationParameters.IssuerSigningKey.Should().BeOfType<SymmetricSecurityKey>();
+        Assert.That(bearerOptions.TokenValidationParameters, Is.Not.Null);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey, Is.True);
+        Assert.That(bearerOptions.TokenValidationParameters.IssuerSigningKey, Is.Not.Null);
+        Assert.That(bearerOptions.TokenValidationParameters.IssuerSigningKey, Is.TypeOf<SymmetricSecurityKey>());
 
         var key = bearerOptions.TokenValidationParameters.IssuerSigningKey as SymmetricSecurityKey;
-        key!.Key.Should().BeEquivalentTo(jwtOptions.Key);
+        Assert.That(key, Is.Not.Null);
+        Assert.That(key!.Key, Is.EqualTo(jwtOptions.Key));
     }
 
     [Test]
@@ -51,8 +51,8 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.ValidateIssuer.Should().BeTrue();
-        bearerOptions.TokenValidationParameters.ValidIssuer.Should().Be(jwtOptions.Issuer);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateIssuer, Is.True);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidIssuer, Is.EqualTo(jwtOptions.Issuer));
     }
 
     [Test]
@@ -68,8 +68,8 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.ValidateAudience.Should().BeTrue();
-        bearerOptions.TokenValidationParameters.ValidAudience.Should().Be(jwtOptions.Audience);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateAudience, Is.True);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidAudience, Is.EqualTo(jwtOptions.Audience));
     }
 
     [Test]
@@ -85,7 +85,7 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.ValidateLifetime.Should().BeTrue();
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateLifetime, Is.True);
     }
 
     [Test]
@@ -101,7 +101,7 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.ClockSkew.Should().Be(jwtOptions.ClockSkew);
+        Assert.That(bearerOptions.TokenValidationParameters.ClockSkew, Is.EqualTo(jwtOptions.ClockSkew));
     }
 
     [Test]
@@ -117,8 +117,8 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(JwtBearerDefaults.AuthenticationScheme, bearerOptions);
 
         // Assert
-        bearerOptions.TokenValidationParameters.Should().NotBeNull();
-        bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey.Should().BeTrue();
+        Assert.That(bearerOptions.TokenValidationParameters, Is.Not.Null);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey, Is.True);
     }
 
     [Test]
@@ -134,9 +134,9 @@ public class JwtBearerOptionsSetupTests
         setup.Configure("DifferentScheme", bearerOptions);
 
         // Assert - Should not configure our custom parameters (IssuerSigningKey should remain null)
-        bearerOptions.TokenValidationParameters.Should().NotBeNull("default parameters are created");
-        bearerOptions.TokenValidationParameters.IssuerSigningKey.Should().BeNull("we didn't configure it");
-        bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey.Should().BeFalse("default is false");
+        Assert.That(bearerOptions.TokenValidationParameters, Is.Not.Null, "default parameters are created");
+        Assert.That(bearerOptions.TokenValidationParameters.IssuerSigningKey, Is.Null, "we didn't configure it");
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey, Is.False, "default is false");
     }
 
     [Test]
@@ -152,7 +152,7 @@ public class JwtBearerOptionsSetupTests
         setup.Configure(bearerOptions);
 
         // Assert - Should be configured (proves it called the named overload)
-        bearerOptions.TokenValidationParameters.Should().NotBeNull();
-        bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey.Should().BeTrue();
+        Assert.That(bearerOptions.TokenValidationParameters, Is.Not.Null);
+        Assert.That(bearerOptions.TokenValidationParameters.ValidateIssuerSigningKey, Is.True);
     }
 }
