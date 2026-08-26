@@ -52,6 +52,17 @@ public interface IInvitationService
     Task<int> DeleteTestInvitationsAsync();
 
     /// <summary>
+    /// Lists invitations with optional pagination, search, and status filtering.
+    /// </summary>
+    /// <param name="offset">The zero-based index of the first invitation to return.
+    /// Defaults to 0.</param>
+    /// <param name="count">The maximum number of invitations to return. Defaults to 20.</param>
+    /// <param name="searchTerm">Optional search term to filter invitations by email or metadata substring.</param>
+    /// <param name="statusFilter">Optional status filter to return only invitations with the specified status.</param>
+    /// <returns>A read-only list of invitations matching the specified criteria.</returns>
+    Task<IReadOnlyList<InvitationEntity>> ListAsync(int offset = 0, int count = 20, string? searchTerm = null, InvitationStatus? statusFilter = null);
+
+    /// <summary>
     /// Retrieves an invitation by its code.
     /// </summary>
     /// <param name="code">The invitation code as a string.</param>

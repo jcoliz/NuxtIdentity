@@ -230,6 +230,12 @@ public partial class EfInvitationService<TContext> : IInvitationService
         LogOkInvitationIdAccepted(invitation.Id, userId);
     }
 
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<InvitationEntity>> ListAsync(int offset = 0, int count = 20, string? searchTerm = null, InvitationStatus? statusFilter = null)
+    {
+        throw new NotImplementedException();
+    }
+
     /// <summary>
     /// Computes the effective status of an invitation, accounting for time-based expiration.
     /// </summary>

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
+using NuxtIdentity.Core.Abstractions;
 using NuxtIdentity.Core.Models;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
 using NuxtIdentity.EntityFrameworkCore.Services;
@@ -19,7 +20,7 @@ public class EfInvitationServiceTests
 {
     private TestDbContext _context = null!;
     private FakeTimeProvider _timeProvider = null!;
-    private EfInvitationService<TestDbContext> _service = null!;
+    private IInvitationService _service = null!;
 
     [SetUp]
     public void SetUp()
@@ -764,6 +765,217 @@ public class EfInvitationServiceTests
 
         // Then: Zero should be returned
         count.Should().Be(0);
+    }
+
+    #endregion
+
+    #region ListAsync
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_EmptyDatabase_ReturnsEmptyList()
+    {
+        // Given: No invitations exist in the database
+
+        // When: Listing invitations with default parameters
+        var result = await _service.ListAsync();
+
+        // Then: An empty list should be returned
+        result.Should().NotBeNull();
+        result.Should().BeEmpty();
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_MultipleInvitations_ReturnsAll()
+    {
+        // Given: Three invitations exist in the database
+        await _service.CreateAsync("user1@test.com");
+        await _service.CreateAsync("user2@test.com");
+        await _service.CreateAsync("user3@test.com");
+
+        // When: Listing invitations with default parameters
+        var result = await _service.ListAsync();
+
+        // Then: All three invitations should be returned
+        result.Should().HaveCount(3);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithOffset_SkipsFirstItems()
+    {
+        // Given: Three invitations exist in the database
+        await _service.CreateAsync("user1@test.com");
+        await _service.CreateAsync("user2@test.com");
+        await _service.CreateAsync("user3@test.com");
+
+        // When: Listing with offset of 1
+        var result = await _service.ListAsync(offset: 1);
+
+        // Then: Two invitations should be returned (skipping the first)
+        result.Should().HaveCount(2);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithCount_LimitsResults()
+    {
+        // Given: Three invitations exist in the database
+        await _service.CreateAsync("user1@test.com");
+        await _service.CreateAsync("user2@test.com");
+        await _service.CreateAsync("user3@test.com");
+
+        // When: Listing with count of 2
+        var result = await _service.ListAsync(count: 2);
+
+        // Then: Only two invitations should be returned
+        result.Should().HaveCount(2);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithOffsetAndCount_ReturnsPaginatedSlice()
+    {
+        // Given: Five invitations exist in the database
+        await _service.CreateAsync("user1@test.com");
+        await _service.CreateAsync("user2@test.com");
+        await _service.CreateAsync("user3@test.com");
+        await _service.CreateAsync("user4@test.com");
+        await _service.CreateAsync("user5@test.com");
+
+        // When: Listing page 2 with page size 2 (offset=2, count=2)
+        var result = await _service.ListAsync(offset: 2, count: 2);
+
+        // Then: Exactly two invitations should be returned
+        result.Should().HaveCount(2);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithSearchTerm_FiltersByEmail()
+    {
+        // Given: Invitations with different email addresses
+        await _service.CreateAsync("alice@example.com");
+        await _service.CreateAsync("bob@example.com");
+        await _service.CreateAsync("charlie@other.org");
+
+        // When: Searching for "example"
+        var result = await _service.ListAsync(searchTerm: "example");
+
+        // Then: Only the two example.com invitations should be returned
+        result.Should().HaveCount(2);
+        result.Should().AllSatisfy(e => e.Email.Should().Contain("example"));
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithSearchTerm_NoMatch_ReturnsEmpty()
+    {
+        // Given: Invitations that do not match the search term
+        await _service.CreateAsync("alice@example.com");
+        await _service.CreateAsync("bob@example.com");
+
+        // When: Searching for a term that matches nothing
+        var result = await _service.ListAsync(searchTerm: "zzznomatch");
+
+        // Then: An empty list should be returned
+        result.Should().BeEmpty();
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithStatusFilter_ReturnsPendingOnly()
+    {
+        // Given: A mix of pending and accepted invitations
+        var pending = await _service.CreateAsync("pending@test.com");
+        var accepted = await _service.CreateAsync("accepted@test.com");
+        await _service.AcceptAsync(accepted, "user-123");
+
+        // When: Filtering by Pending status
+        var result = await _service.ListAsync(statusFilter: InvitationStatus.Pending);
+
+        // Then: Only the pending invitation should be returned
+        result.Should().HaveCount(1);
+        result[0].Id.Should().Be(pending.Id);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithStatusFilter_ReturnsAcceptedOnly()
+    {
+        // Given: A mix of pending and accepted invitations
+        await _service.CreateAsync("pending@test.com");
+        var accepted = await _service.CreateAsync("accepted@test.com");
+        await _service.AcceptAsync(accepted, "user-123");
+
+        // When: Filtering by Accepted status
+        var result = await _service.ListAsync(statusFilter: InvitationStatus.Accepted);
+
+        // Then: Only the accepted invitation should be returned
+        result.Should().HaveCount(1);
+        result[0].Id.Should().Be(accepted.Id);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithStatusFilter_NoMatch_ReturnsEmpty()
+    {
+        // Given: Only pending invitations exist
+        await _service.CreateAsync("user@test.com");
+
+        // When: Filtering by Revoked status
+        var result = await _service.ListAsync(statusFilter: InvitationStatus.Revoked);
+
+        // Then: An empty list should be returned
+        result.Should().BeEmpty();
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_WithSearchTermAndStatusFilter_AppliesBothFilters()
+    {
+        // Given: Multiple invitations with varying emails and statuses
+        var pendingExample = await _service.CreateAsync("alice@example.com");
+        var acceptedExample = await _service.CreateAsync("bob@example.com");
+        await _service.AcceptAsync(acceptedExample, "user-123");
+        await _service.CreateAsync("charlie@other.org");
+
+        // When: Filtering by "example" email and Pending status
+        var result = await _service.ListAsync(searchTerm: "example", statusFilter: InvitationStatus.Pending);
+
+        // Then: Only the pending example.com invitation should be returned
+        result.Should().HaveCount(1);
+        result[0].Id.Should().Be(pendingExample.Id);
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_OffsetBeyondTotal_ReturnsEmpty()
+    {
+        // Given: Two invitations exist
+        await _service.CreateAsync("user1@test.com");
+        await _service.CreateAsync("user2@test.com");
+
+        // When: Requesting with an offset beyond the total count
+        var result = await _service.ListAsync(offset: 10);
+
+        // Then: An empty list should be returned
+        result.Should().BeEmpty();
+    }
+
+    [Test]
+    [Explicit("ListAsync is not yet implemented in EfInvitationService.")]
+    public async Task ListAsync_ReturnsReadOnlyList()
+    {
+        // Given: One invitation exists
+        await _service.CreateAsync("user@test.com");
+
+        // When: Listing invitations
+        var result = await _service.ListAsync();
+
+        // Then: The result should implement IReadOnlyList<InvitationEntity>
+        result.Should().BeAssignableTo<IReadOnlyList<InvitationEntity>>();
     }
 
     #endregion
