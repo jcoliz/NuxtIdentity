@@ -231,9 +231,32 @@ public partial class EfInvitationService<TContext> : IInvitationService
     }
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<InvitationEntity>> ListAsync(int offset = 0, int count = 20, string? searchTerm = null, InvitationStatus? statusFilter = null)
+    public async Task<IReadOnlyList<InvitationEntity>> ListAsync(int offset = 0, int count = 20, string? searchTerm = null, InvitationStatus? statusFilter = null)
     {
-        throw new NotImplementedException();
+        LogStarting();
+
+        var query = _context.Set<InvitationEntity>().AsQueryable();
+
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            query = query.Where(e =>
+                (e.Email != null && e.Email.Contains(searchTerm)) ||
+                (e.Metadata != null && e.Metadata.Contains(searchTerm)));
+        }
+
+        if (statusFilter.HasValue)
+        {
+            query = query.Where(e => e.Status == statusFilter.Value);
+        }
+
+        var results = await query
+            .OrderBy(e => e.Id)
+            .Skip(offset)
+            .Take(count)
+            .ToListAsync();
+
+        LogOkCount(results.Count);
+        return results;
     }
 
     /// <summary>
@@ -287,6 +310,9 @@ public partial class EfInvitationService<TContext> : IInvitationService
 
     [LoggerMessage(9, LogLevel.Information, "{Location}: Deleted {Count} test invitations")]
     private partial void LogDeletedTestInvitations(int count, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(10, LogLevel.Information, "{Location}: OK Count {Count}")]
+    private partial void LogOkCount(int count, [CallerMemberName] string? location = null);
 
     #endregion
 }
