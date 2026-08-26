@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -63,11 +62,11 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().NotBeEmpty();
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.Id);
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.UserName);
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email);
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Jti);
+        Assert.That(claims, Is.Not.Empty);
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.Id));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.UserName));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Jti));
     }
 
     [Test]
@@ -86,8 +85,8 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Admin");
-        claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "User");
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == ClaimTypes.Role && c.Value == "Admin"));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == ClaimTypes.Role && c.Value == "User"));
     }
 
     [Test]
@@ -110,8 +109,8 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().Contain(c => c.Type == "subscription" && c.Value == "premium");
-        claims.Should().Contain(c => c.Type == "department" && c.Value == "engineering");
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == "subscription" && c.Value == "premium"));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == "department" && c.Value == "engineering"));
     }
 
     [Test]
@@ -140,8 +139,8 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().Contain(c => c.Type == "permission" && c.Value == "manage_users");
-        claims.Should().Contain(c => c.Type == "permission" && c.Value == "view_reports");
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == "permission" && c.Value == "manage_users"));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == "permission" && c.Value == "view_reports"));
     }
 
     [Test]
@@ -176,7 +175,7 @@ public class IdentityUserClaimsProviderTests
 
         // Assert
         var permissionClaims = claims.Where(c => c.Type == "permission" && c.Value == "read").ToList();
-        permissionClaims.Should().HaveCount(1, "duplicate claims should be removed");
+        Assert.That(permissionClaims, Has.Count.EqualTo(1), "duplicate claims should be removed");
     }
 
     // Removed test: GetClaimsAsync_UserClaimsTakePrecedence_OverRoleClaims
@@ -206,10 +205,10 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().NotBeEmpty();
-        claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == roleName);
+        Assert.That(claims, Is.Not.Empty);
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == ClaimTypes.Role && c.Value == roleName));
         // Should still have standard claims even though role wasn't found
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub);
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Sub));
     }
 
     [Test]
@@ -240,8 +239,8 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().Contain(c => c.Type == "permission" && c.Value == "admin");
-        claims.Should().Contain(c => c.Type == "permission" && c.Value == "basic");
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == "permission" && c.Value == "admin"));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == "permission" && c.Value == "basic"));
     }
 
     [Test]
@@ -259,10 +258,10 @@ public class IdentityUserClaimsProviderTests
         var claims = (await _claimsProvider.GetClaimsAsync(user)).ToList();
 
         // Assert
-        claims.Should().NotBeEmpty();
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == "");
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == "");
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == "user123");
+        Assert.That(claims, Is.Not.Empty);
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == ""));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == ""));
+        Assert.That(claims, Has.Some.Matches<Claim>(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == "user123"));
     }
 
     [Test]
@@ -284,6 +283,6 @@ public class IdentityUserClaimsProviderTests
         var jti1 = claims1.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
         var jti2 = claims2.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
 
-        jti1.Should().NotBe(jti2, "each token should have a unique JTI");
+        Assert.That(jti1, Is.Not.EqualTo(jti2), "each token should have a unique JTI");
     }
 }
