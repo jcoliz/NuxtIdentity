@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -65,13 +64,13 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 200 OK should be returned with tokens and user info
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        loginResponse.Should().NotBeNull();
-        loginResponse!.Token.AccessToken.Should().NotBeNullOrEmpty();
-        loginResponse.Token.RefreshToken.Should().NotBeNullOrEmpty();
-        loginResponse.User.Name.Should().Be("inviteuser");
+        Assert.That(loginResponse, Is.Not.Null);
+        Assert.That(loginResponse!.Token.AccessToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.Token.RefreshToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.User.Name, Is.EqualTo("inviteuser"));
     }
 
     [Test]
@@ -98,9 +97,9 @@ public class InvitationSignUpTests
 
         // Then: User should have the assigned roles
         var user = await _userManager.FindByNameAsync("roleuser");
-        user.Should().NotBeNull();
+        Assert.That(user, Is.Not.Null);
         var roles = await _userManager.GetRolesAsync(user!);
-        roles.Should().Contain("Admin");
+        Assert.That(roles, Does.Contain("Admin"));
     }
 
     [Test]
@@ -127,9 +126,9 @@ public class InvitationSignUpTests
 
         // Then: User should have the assigned claims
         var user = await _userManager.FindByNameAsync("claimuser");
-        user.Should().NotBeNull();
+        Assert.That(user, Is.Not.Null);
         var claims = await _userManager.GetClaimsAsync(user!);
-        claims.Should().Contain(c => c.Type == "department" && c.Value == "engineering");
+        Assert.That(claims.Any(c => c.Type == "department" && c.Value == "engineering"), Is.True);
     }
 
     [Test]
@@ -158,7 +157,7 @@ public class InvitationSignUpTests
         var verifyScope = _factory.Services.CreateScope();
         var verifyService = verifyScope.ServiceProvider.GetRequiredService<IInvitationService>();
         var status = await verifyService.ResolveStatusAsync(invitationCode);
-        status.Should().Be(InvitationStatus.Accepted);
+        Assert.That(status, Is.EqualTo(InvitationStatus.Accepted));
     }
 
     [Test]
@@ -184,8 +183,8 @@ public class InvitationSignUpTests
 
         // Then: User's email should be auto-confirmed
         var user = await _userManager.FindByNameAsync("confirmuser");
-        user.Should().NotBeNull();
-        user!.EmailConfirmed.Should().BeTrue();
+        Assert.That(user, Is.Not.Null);
+        Assert.That(user!.EmailConfirmed, Is.True);
     }
 
     [Test]
@@ -204,7 +203,7 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 404 Not Found should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 
     [Test]
@@ -230,10 +229,10 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 400 Bad Request should be returned with "already been used" message
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("already been used");
+        Assert.That(content, Does.Contain("already been used"));
     }
 
     [Test]
@@ -259,10 +258,10 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 400 Bad Request should be returned with "expired" message
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("expired");
+        Assert.That(content, Does.Contain("expired"));
     }
 
     [Test]
@@ -288,10 +287,10 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 400 Bad Request should be returned with "revoked" message
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("revoked");
+        Assert.That(content, Does.Contain("revoked"));
     }
 
     [Test]
@@ -309,11 +308,11 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        loginResponse.Should().NotBeNull();
-        loginResponse!.User.Name.Should().Be("openuser");
+        Assert.That(loginResponse, Is.Not.Null);
+        Assert.That(loginResponse!.User.Name, Is.EqualTo("openuser"));
     }
 
     [Test]
@@ -338,10 +337,10 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 400 Bad Request should be returned with "email mismatch" message
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("email must match");
+        Assert.That(content, Does.Contain("email must match"));
     }
 
     [Test]
@@ -360,7 +359,7 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 404 Not Found should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 
     [Test]
@@ -389,10 +388,10 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 400 Bad Request should be returned with Registration Failed
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("Registration Failed");
+        Assert.That(content, Does.Contain("Registration Failed"));
     }
 
     [Test]
@@ -417,10 +416,10 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 400 Bad Request should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("Registration Failed");
+        Assert.That(content, Does.Contain("Registration Failed"));
     }
 
     [Test]
@@ -446,13 +445,13 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 200 OK should still be returned (role failure is logged, not fatal)
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: User should be created but without the nonexistent role
         var verifyUser = await _userManager.FindByNameAsync("badroleuser");
-        verifyUser.Should().NotBeNull();
+        Assert.That(verifyUser, Is.Not.Null);
         var roles = await _userManager.GetRolesAsync(verifyUser!);
-        roles.Should().NotContain("NonExistentRole");
+        Assert.That(roles, Does.Not.Contain("NonExistentRole"));
     }
 
     [Test]
@@ -477,13 +476,13 @@ public class InvitationSignUpTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: User should have no extra roles or claims
         var verifyUser = await _userManager.FindByNameAsync("norolesuser");
-        verifyUser.Should().NotBeNull();
+        Assert.That(verifyUser, Is.Not.Null);
         var roles = await _userManager.GetRolesAsync(verifyUser!);
-        roles.Should().BeEmpty();
+        Assert.That(roles, Is.Empty);
     }
 
     [Test]
@@ -496,13 +495,13 @@ public class InvitationSignUpTests
             new InvitationValidateRequest { Code = "not-a-valid-guid" });
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: Status should be NotFound
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(InvitationStatus.NotFound);
-        result.Email.Should().BeNull();
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Status, Is.EqualTo(InvitationStatus.NotFound));
+        Assert.That(result.Email, Is.Null);
     }
 
     #endregion
@@ -525,13 +524,13 @@ public class InvitationSignUpTests
             new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: Status should be Pending with email visible
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(InvitationStatus.Pending);
-        result.Email.Should().Be("validate@test.com");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Status, Is.EqualTo(InvitationStatus.Pending));
+        Assert.That(result.Email, Is.EqualTo("validate@test.com"));
     }
 
     [Test]
@@ -551,13 +550,13 @@ public class InvitationSignUpTests
             new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: Status should be Accepted with no email
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(InvitationStatus.Accepted);
-        result.Email.Should().BeNull();
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Status, Is.EqualTo(InvitationStatus.Accepted));
+        Assert.That(result.Email, Is.Null);
     }
 
     [Test]
@@ -577,13 +576,13 @@ public class InvitationSignUpTests
             new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: Status should be Expired with no email
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(InvitationStatus.Expired);
-        result.Email.Should().BeNull();
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Status, Is.EqualTo(InvitationStatus.Expired));
+        Assert.That(result.Email, Is.Null);
     }
 
     [Test]
@@ -603,13 +602,13 @@ public class InvitationSignUpTests
             new InvitationValidateRequest { Code = invitation.Code.ToString() });
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: Status should be Revoked with no email
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(InvitationStatus.Revoked);
-        result.Email.Should().BeNull();
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Status, Is.EqualTo(InvitationStatus.Revoked));
+        Assert.That(result.Email, Is.Null);
     }
 
     [Test]
@@ -622,13 +621,13 @@ public class InvitationSignUpTests
             new InvitationValidateRequest { Code = Guid.NewGuid().ToString() });
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // And: Status should be NotFound with no email
         var result = await response.Content.ReadFromJsonAsync<InvitationStatusResponse>();
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(InvitationStatus.NotFound);
-        result.Email.Should().BeNull();
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Status, Is.EqualTo(InvitationStatus.NotFound));
+        Assert.That(result.Email, Is.Null);
     }
 
     #endregion
@@ -673,11 +672,11 @@ public class InvitationOnlyModeTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 403 Forbidden should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
 
         // And: Response should contain "invitation required" message
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("invitation code is required");
+        Assert.That(content, Does.Contain("invitation code is required"));
     }
 
     [Test]
@@ -702,11 +701,11 @@ public class InvitationOnlyModeTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Then: 200 OK should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        loginResponse.Should().NotBeNull();
-        loginResponse!.Token.AccessToken.Should().NotBeNullOrEmpty();
-        loginResponse.User.Name.Should().Be("invonlyuser");
+        Assert.That(loginResponse, Is.Not.Null);
+        Assert.That(loginResponse!.Token.AccessToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.User.Name, Is.EqualTo("invonlyuser"));
     }
 }

@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,7 +59,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
         // Then: 204 No Content should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -77,7 +76,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
         // Then: 204 No Content should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -90,7 +89,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
         // Then: 204 No Content should still be returned to prevent user enumeration
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -103,7 +102,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
         // Then: 204 No Content should still be returned to prevent user enumeration
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -120,19 +119,19 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", request);
 
         // Then: The request should succeed
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
 
         // And: The notifier should have captured a reset code
         var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
         var notifications = await notifier.GetNotificationsAsync();
-        notifications.Should().HaveCount(1);
-        notifications[0].Code.Should().NotBeNullOrEmpty();
-        notifications[0].Type.Should().Be(NotificationType.PasswordReset);
+        Assert.That(notifications, Has.Count.EqualTo(1));
+        Assert.That(notifications[0].Code, Is.Not.Null.And.Not.Empty);
+        Assert.That(notifications[0].Type, Is.EqualTo(NotificationType.PasswordReset));
 
         // And: The code should be Base64URL-safe (no +, /, or = characters)
-        notifications[0].Code.Should().NotContain("+", "code should use Base64URL encoding");
-        notifications[0].Code.Should().NotContain("/", "code should use Base64URL encoding");
-        notifications[0].Code.Should().NotContain("=", "code should use Base64URL encoding");
+        Assert.That(notifications[0].Code, Does.Not.Contain("+"));
+        Assert.That(notifications[0].Code, Does.Not.Contain("/"));
+        Assert.That(notifications[0].Code, Does.Not.Contain("="));
     }
 
     [Test]
@@ -165,9 +164,8 @@ public class PasswordManagementTests
         var request = new ForgotPasswordRequest { Username = "testuser" };
 
         // Then: A NuxtIdentityConfigurationException should be thrown
-        var act = () => controller.ForgotPassword(request);
-        await act.Should().ThrowAsync<NuxtIdentityConfigurationException>()
-            .Where(ex => ex.MissingService.Contains("IUserNotifier"));
+        var exception = Assert.ThrowsAsync<NuxtIdentityConfigurationException>(async () => await controller.ForgotPassword(request));
+        Assert.That(exception!.MissingService, Does.Contain("IUserNotifier"));
     }
 
     #endregion
@@ -202,7 +200,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
 
         // Then: 204 No Content should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -236,7 +234,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
 
         // Then: Login should succeed
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
     [Test]
@@ -270,7 +268,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
 
         // Then: Login should fail
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -292,7 +290,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
 
         // Then: 400 Bad Request should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     [Test]
@@ -310,7 +308,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
 
         // Then: 400 Bad Request should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     [Test]
@@ -339,7 +337,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/reset-password", resetRequest);
 
         // Then: 400 Bad Request should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     [Test]
@@ -376,7 +374,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Then: Refresh should fail because tokens were revoked
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     #endregion
@@ -409,7 +407,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
 
         // Then: 204 No Content should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -443,7 +441,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", newLoginRequest);
 
         // Then: Login should succeed
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
     [Test]
@@ -477,7 +475,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", oldLoginRequest);
 
         // Then: Login should fail
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -505,7 +503,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
 
         // Then: 400 Bad Request should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     [Test]
@@ -522,7 +520,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
 
         // Then: 401 Unauthorized should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -556,7 +554,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Then: Refresh should fail because tokens were revoked
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -587,7 +585,7 @@ public class PasswordManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/change-password", changeRequest);
 
         // Then: 401 Unauthorized should be returned
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -639,13 +637,13 @@ public class PasswordManagementTests
         var result = await controller.ChangePassword(changeRequest);
 
         // Then: 401 Unauthorized should be returned
-        result.Should().BeOfType<Microsoft.AspNetCore.Mvc.ObjectResult>();
+        Assert.That(result, Is.TypeOf<Microsoft.AspNetCore.Mvc.ObjectResult>());
         var objectResult = result as Microsoft.AspNetCore.Mvc.ObjectResult;
-        objectResult!.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        Assert.That(objectResult!.StatusCode, Is.EqualTo(StatusCodes.Status401Unauthorized));
 
         var problemDetails = objectResult.Value as Microsoft.AspNetCore.Mvc.ProblemDetails;
-        problemDetails.Should().NotBeNull();
-        problemDetails!.Title.Should().Be("Authentication Required");
+        Assert.That(problemDetails, Is.Not.Null);
+        Assert.That(problemDetails!.Title, Is.EqualTo("Authentication Required"));
     }
 
     #endregion

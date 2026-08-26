@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -73,17 +72,17 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var refreshResponse = await response.Content.ReadFromJsonAsync<RefreshResponse>();
-        refreshResponse.Should().NotBeNull();
-        refreshResponse!.Token.Should().NotBeNull();
-        refreshResponse.Token.AccessToken.Should().NotBeNullOrEmpty();
-        refreshResponse.Token.RefreshToken.Should().NotBeNullOrEmpty();
+        Assert.That(refreshResponse, Is.Not.Null);
+        Assert.That(refreshResponse!.Token, Is.Not.Null);
+        Assert.That(refreshResponse.Token.AccessToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(refreshResponse.Token.RefreshToken, Is.Not.Null.And.Not.Empty);
 
         // New tokens should be different from original
-        refreshResponse.Token.AccessToken.Should().NotBe(originalAccessToken);
-        refreshResponse.Token.RefreshToken.Should().NotBe(originalRefreshToken);
+        Assert.That(refreshResponse.Token.AccessToken, Is.Not.EqualTo(originalAccessToken));
+        Assert.That(refreshResponse.Token.RefreshToken, Is.Not.EqualTo(originalRefreshToken));
     }
 
     [Test]
@@ -99,7 +98,7 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -151,14 +150,14 @@ public class TokenManagementTests
         var result = await controller.RefreshTokens(refreshRequest);
 
         // Assert
-        result.Should().BeOfType<Microsoft.AspNetCore.Mvc.ObjectResult>();
+        Assert.That(result, Is.TypeOf<Microsoft.AspNetCore.Mvc.ObjectResult>());
         var objectResult = result as Microsoft.AspNetCore.Mvc.ObjectResult;
-        objectResult!.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        Assert.That(objectResult!.StatusCode, Is.EqualTo(StatusCodes.Status401Unauthorized));
 
         var problemDetails = objectResult.Value as Microsoft.AspNetCore.Mvc.ProblemDetails;
-        problemDetails.Should().NotBeNull();
-        problemDetails!.Title.Should().Be("Token Refresh Failed");
-        problemDetails.Detail.Should().Be("Invalid or expired refresh token");
+        Assert.That(problemDetails, Is.Not.Null);
+        Assert.That(problemDetails!.Title, Is.EqualTo("Token Refresh Failed"));
+        Assert.That(problemDetails.Detail, Is.EqualTo("Invalid or expired refresh token"));
     }
 
     [Test]
@@ -187,7 +186,7 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -213,13 +212,13 @@ public class TokenManagementTests
 
         // First refresh - should succeed
         var firstRefresh = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
-        firstRefresh.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(firstRefresh.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // Try to reuse the old refresh token - should fail (token rotation)
         var secondRefresh = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        secondRefresh.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(secondRefresh.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     #endregion
@@ -251,7 +250,7 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/logout", logoutRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -267,7 +266,7 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/logout", logoutRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
     }
 
     [Test]
@@ -299,7 +298,7 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     #endregion
@@ -337,14 +336,14 @@ public class TokenManagementTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var sessionResponse = await response.Content.ReadFromJsonAsync<SessionResponse>();
-        sessionResponse.Should().NotBeNull();
-        sessionResponse!.User.Should().NotBeNull();
-        sessionResponse.User!.Roles.Should().Contain("Admin");
-        sessionResponse.User.Roles.Should().Contain("User");
-        sessionResponse.User.Roles.Should().HaveCount(2);
+        Assert.That(sessionResponse, Is.Not.Null);
+        Assert.That(sessionResponse!.User, Is.Not.Null);
+        Assert.That(sessionResponse.User!.Roles, Does.Contain("Admin"));
+        Assert.That(sessionResponse.User.Roles, Does.Contain("User"));
+        Assert.That(sessionResponse.User.Roles, Has.Length.EqualTo(2));
     }
 
     [Test]
@@ -372,13 +371,13 @@ public class TokenManagementTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var sessionResponse = await response.Content.ReadFromJsonAsync<SessionResponse>();
-        sessionResponse.Should().NotBeNull();
-        sessionResponse!.User.Should().NotBeNull();
-        sessionResponse.User!.Claims.Should().Contain(c => c.Type == "department" && c.Value == "engineering");
-        sessionResponse.User.Claims.Should().Contain(c => c.Type == "level" && c.Value == "senior");
+        Assert.That(sessionResponse, Is.Not.Null);
+        Assert.That(sessionResponse!.User, Is.Not.Null);
+        Assert.That(sessionResponse.User!.Claims.Any(c => c.Type == "department" && c.Value == "engineering"), Is.True);
+        Assert.That(sessionResponse.User.Claims.Any(c => c.Type == "level" && c.Value == "senior"), Is.True);
     }
 
     [Test]
@@ -409,12 +408,12 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        loginResponse.Should().NotBeNull();
-        loginResponse!.User.Roles.Should().Contain("Manager");
-        loginResponse.User.Claims.Should().Contain(c => c.Type == "region" && c.Value == "west");
+        Assert.That(loginResponse, Is.Not.Null);
+        Assert.That(loginResponse!.User.Roles, Does.Contain("Manager"));
+        Assert.That(loginResponse.User.Claims.Any(c => c.Type == "region" && c.Value == "west"), Is.True);
     }
 
     #endregion
@@ -454,9 +453,9 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("User Not Found");
+        Assert.That(content, Does.Contain("User Not Found"));
     }
 
     #endregion
@@ -494,7 +493,7 @@ public class TokenManagementTests
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
     #endregion

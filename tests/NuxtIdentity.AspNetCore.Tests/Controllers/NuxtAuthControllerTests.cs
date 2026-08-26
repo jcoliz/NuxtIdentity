@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,16 +62,16 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        loginResponse.Should().NotBeNull();
-        loginResponse!.Token.Should().NotBeNull();
-        loginResponse.Token.AccessToken.Should().NotBeNullOrEmpty();
-        loginResponse.Token.RefreshToken.Should().NotBeNullOrEmpty();
-        loginResponse.User.Should().NotBeNull();
-        loginResponse.User.Name.Should().Be(username);
-        loginResponse.User.Email.Should().Be($"{username}@test.com");
+        Assert.That(loginResponse, Is.Not.Null);
+        Assert.That(loginResponse!.Token, Is.Not.Null);
+        Assert.That(loginResponse.Token.AccessToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.Token.RefreshToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.User, Is.Not.Null);
+        Assert.That(loginResponse.User.Name, Is.EqualTo(username));
+        Assert.That(loginResponse.User.Email, Is.EqualTo($"{username}@test.com"));
     }
 
     [Test]
@@ -89,10 +88,10 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("Authentication Failed");
+        Assert.That(content, Does.Contain("Authentication Failed"));
     }
 
     [Test]
@@ -114,10 +113,10 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("Authentication Failed");
+        Assert.That(content, Does.Contain("Authentication Failed"));
     }
 
     [Test]
@@ -134,7 +133,7 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     #endregion
@@ -156,20 +155,20 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        loginResponse.Should().NotBeNull();
-        loginResponse!.Token.Should().NotBeNull();
-        loginResponse.Token.AccessToken.Should().NotBeNullOrEmpty();
-        loginResponse.Token.RefreshToken.Should().NotBeNullOrEmpty();
-        loginResponse.User.Should().NotBeNull();
-        loginResponse.User.Name.Should().Be(request.Username);
-        loginResponse.User.Email.Should().Be(request.Email);
+        Assert.That(loginResponse, Is.Not.Null);
+        Assert.That(loginResponse!.Token, Is.Not.Null);
+        Assert.That(loginResponse.Token.AccessToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.Token.RefreshToken, Is.Not.Null.And.Not.Empty);
+        Assert.That(loginResponse.User, Is.Not.Null);
+        Assert.That(loginResponse.User.Name, Is.EqualTo(request.Username));
+        Assert.That(loginResponse.User.Email, Is.EqualTo(request.Email));
 
         // Verify user was created in database
         var user = await _userManager.FindByNameAsync(request.Username);
-        user.Should().NotBeNull();
+        Assert.That(user, Is.Not.Null);
     }
 
     [Test]
@@ -191,10 +190,10 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("Registration Failed");
+        Assert.That(content, Does.Contain("Registration Failed"));
     }
 
     [Test]
@@ -214,7 +213,7 @@ public class NuxtAuthControllerTests
         // Assert
         // Note: Since we disabled email validation in test setup, this may pass
         // In production, this would fail with proper email validation
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.AnyOf(HttpStatusCode.OK, HttpStatusCode.BadRequest));
     }
 
     [Test]
@@ -232,7 +231,7 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     #endregion
@@ -261,13 +260,13 @@ public class NuxtAuthControllerTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var sessionResponse = await response.Content.ReadFromJsonAsync<SessionResponse>();
-        sessionResponse.Should().NotBeNull();
-        sessionResponse!.User.Should().NotBeNull();
-        sessionResponse.User!.Name.Should().Be(username);
-        sessionResponse.User.Email.Should().Be($"{username}@test.com");
+        Assert.That(sessionResponse, Is.Not.Null);
+        Assert.That(sessionResponse!.User, Is.Not.Null);
+        Assert.That(sessionResponse.User!.Name, Is.EqualTo(username));
+        Assert.That(sessionResponse.User.Email, Is.EqualTo($"{username}@test.com"));
     }
 
     [Test]
@@ -277,7 +276,7 @@ public class NuxtAuthControllerTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -291,7 +290,7 @@ public class NuxtAuthControllerTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -345,14 +344,14 @@ public class NuxtAuthControllerTests
         var result = await controller.GetSession();
 
         // Assert
-        result.Should().BeOfType<Microsoft.AspNetCore.Mvc.ObjectResult>();
+        Assert.That(result, Is.TypeOf<Microsoft.AspNetCore.Mvc.ObjectResult>());
         var objectResult = result as Microsoft.AspNetCore.Mvc.ObjectResult;
-        objectResult!.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        Assert.That(objectResult!.StatusCode, Is.EqualTo(StatusCodes.Status401Unauthorized));
 
         var problemDetails = objectResult.Value as Microsoft.AspNetCore.Mvc.ProblemDetails;
-        problemDetails.Should().NotBeNull();
-        problemDetails!.Title.Should().Be("Authentication Required");
-        problemDetails.Detail.Should().Be("No valid authentication token provided");
+        Assert.That(problemDetails, Is.Not.Null);
+        Assert.That(problemDetails!.Title, Is.EqualTo("Authentication Required"));
+        Assert.That(problemDetails.Detail, Is.EqualTo("No valid authentication token provided"));
     }
 
     [Test]
@@ -380,7 +379,7 @@ public class NuxtAuthControllerTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     #endregion
@@ -405,13 +404,13 @@ public class NuxtAuthControllerTests
         var response = await _client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // Verify user was created (the hook was called successfully)
         var user = await _userManager.FindByNameAsync(request.Username);
-        user.Should().NotBeNull();
-        user!.UserName.Should().Be(request.Username);
-        user.Email.Should().Be(request.Email);
+        Assert.That(user, Is.Not.Null);
+        Assert.That(user!.UserName, Is.EqualTo(request.Username));
+        Assert.That(user.Email, Is.EqualTo(request.Email));
     }
 
     #endregion
@@ -439,11 +438,11 @@ public class NuxtAuthControllerTests
         var response = await _client.GetAsync("/api/auth/user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var sessionResponse = await response.Content.ReadFromJsonAsync<SessionResponse>();
-        sessionResponse.Should().NotBeNull();
-        sessionResponse!.User!.Email.Should().Be(string.Empty);
+        Assert.That(sessionResponse, Is.Not.Null);
+        Assert.That(sessionResponse!.User!.Email, Is.EqualTo(string.Empty));
     }
 
     #endregion
