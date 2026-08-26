@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NuxtIdentity.Core.Models;
 using NuxtIdentity.EntityFrameworkCore.Extensions;
@@ -40,7 +39,7 @@ public class ModelBuilderExtensionsTests
 
         // Then the query should be executable without errors
         Action act = () => query.ToList();
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
     [Test]
@@ -62,10 +61,10 @@ public class ModelBuilderExtensionsTests
 
         // Then the entity should be retrievable
         var retrieved = await _context.RefreshTokens.FirstOrDefaultAsync();
-        retrieved.Should().NotBeNull();
-        retrieved!.TokenHash.Should().Be("test-hash");
-        retrieved.UserId.Should().Be("user123");
-        retrieved.IsRevoked.Should().BeFalse();
+        Assert.That(retrieved, Is.Not.Null);
+        Assert.That(retrieved!.TokenHash, Is.EqualTo("test-hash"));
+        Assert.That(retrieved.UserId, Is.EqualTo("user123"));
+        Assert.That(retrieved.IsRevoked, Is.False);
     }
 
     [Test]
@@ -108,8 +107,8 @@ public class ModelBuilderExtensionsTests
             .FirstOrDefaultAsync(t => t.TokenHash == "hash2");
 
         // Then the correct token should be found
-        result.Should().NotBeNull();
-        result!.UserId.Should().Be("user2");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.UserId, Is.EqualTo("user2"));
     }
 
     [Test]
@@ -153,8 +152,8 @@ public class ModelBuilderExtensionsTests
             .ToListAsync();
 
         // Then all tokens for that user should be found
-        results.Should().HaveCount(2);
-        results.Should().AllSatisfy(t => t.UserId.Should().Be("user1"));
+        Assert.That(results, Has.Count.EqualTo(2));
+        Assert.That(results.All(t => t.UserId == "user1"), Is.True);
     }
 
     [Test]
@@ -177,8 +176,8 @@ public class ModelBuilderExtensionsTests
 
         // Then it should throw because TokenHash is required
         // EF Core 10 InMemory provider enforces nullability constraints
-        await act.Should().ThrowAsync<DbUpdateException>()
-            .WithMessage("*TokenHash*");
+        var ex = Assert.ThrowsAsync<DbUpdateException>(async () => await act());
+        Assert.That(ex!.Message, Does.Contain("TokenHash"));
     }
 
     [Test]
@@ -201,8 +200,8 @@ public class ModelBuilderExtensionsTests
 
         // Then it should throw because UserId is required
         // EF Core 10 InMemory provider enforces nullability constraints
-        await act.Should().ThrowAsync<DbUpdateException>()
-            .WithMessage("*UserId*");
+        var ex = Assert.ThrowsAsync<DbUpdateException>(async () => await act());
+        Assert.That(ex!.Message, Does.Contain("UserId"));
     }
 
     [Test]
@@ -223,12 +222,12 @@ public class ModelBuilderExtensionsTests
         await _context.SaveChangesAsync();
 
         // Then the Id should be auto-generated
-        entity.Id.Should().NotBe(0);
+        Assert.That(entity.Id, Is.Not.EqualTo(0));
 
         // And it should be retrievable by Id
         var retrieved = await _context.RefreshTokens.FindAsync(entity.Id);
-        retrieved.Should().NotBeNull();
-        retrieved!.TokenHash.Should().Be("test-hash");
+        Assert.That(retrieved, Is.Not.Null);
+        Assert.That(retrieved!.TokenHash, Is.EqualTo("test-hash"));
     }
 
     [Test]
@@ -269,8 +268,8 @@ public class ModelBuilderExtensionsTests
 
         // Then each should have a unique Id
         var ids = entities.Select(e => e.Id).ToList();
-        ids.Should().OnlyHaveUniqueItems();
-        ids.Should().AllSatisfy(id => id.Should().NotBe(0));
+        Assert.That(ids, Is.Unique);
+        Assert.That(ids.All(id => id != 0), Is.True);
     }
 
     [Test]
@@ -296,9 +295,9 @@ public class ModelBuilderExtensionsTests
 
         // Then the changes should be persisted
         var retrieved = await _context.RefreshTokens.FindAsync(entity.Id);
-        retrieved.Should().NotBeNull();
-        retrieved!.IsRevoked.Should().BeTrue();
-        retrieved.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddDays(1), TimeSpan.FromSeconds(1));
+        Assert.That(retrieved, Is.Not.Null);
+        Assert.That(retrieved!.IsRevoked, Is.True);
+        Assert.That(retrieved.ExpiresAt, Is.EqualTo(DateTime.UtcNow.AddDays(1)).Within(TimeSpan.FromSeconds(1)));
     }
 
     [Test]
@@ -324,7 +323,7 @@ public class ModelBuilderExtensionsTests
 
         // Then the entity should no longer exist
         var retrieved = await _context.RefreshTokens.FindAsync(entityId);
-        retrieved.Should().BeNull();
+        Assert.That(retrieved, Is.Null);
     }
 
     #region Invitation Entity Tests
@@ -339,7 +338,7 @@ public class ModelBuilderExtensionsTests
 
         // Then: The query should be executable without errors
         Action act = () => query.ToList();
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
     [Test]
@@ -361,9 +360,9 @@ public class ModelBuilderExtensionsTests
 
         // Then: The entity should be retrievable
         var retrieved = await _context.Invitations.FirstOrDefaultAsync();
-        retrieved.Should().NotBeNull();
-        retrieved!.Email.Should().Be("user@test.com");
-        retrieved.Status.Should().Be(InvitationStatus.Pending);
+        Assert.That(retrieved, Is.Not.Null);
+        Assert.That(retrieved!.Email, Is.EqualTo("user@test.com"));
+        Assert.That(retrieved.Status, Is.EqualTo(InvitationStatus.Pending));
     }
 
     [Test]
@@ -391,16 +390,16 @@ public class ModelBuilderExtensionsTests
         var retrieved = await _context.Invitations.FirstAsync();
 
         // Then: All properties should round-trip correctly
-        retrieved.Code.Should().Be(entity.Code);
-        retrieved.Email.Should().Be("user@test.com");
-        retrieved.Status.Should().Be(InvitationStatus.Pending);
-        retrieved.Roles.Should().Be("""["Admin","User"]""");
-        retrieved.Claims.Should().Be("""[{"Type":"dept","Value":"eng"}]""");
-        retrieved.Metadata.Should().Be("""{"source":"test"}""");
-        retrieved.CreatedAt.Should().Be(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        retrieved.ExpiresAt.Should().Be(new DateTime(2025, 1, 8, 0, 0, 0, DateTimeKind.Utc));
-        retrieved.AcceptedAt.Should().Be(new DateTime(2025, 1, 2, 0, 0, 0, DateTimeKind.Utc));
-        retrieved.AcceptedByUserId.Should().Be("user-123");
+        Assert.That(retrieved.Code, Is.EqualTo(entity.Code));
+        Assert.That(retrieved.Email, Is.EqualTo("user@test.com"));
+        Assert.That(retrieved.Status, Is.EqualTo(InvitationStatus.Pending));
+        Assert.That(retrieved.Roles, Is.EqualTo("""["Admin","User"]"""));
+        Assert.That(retrieved.Claims, Is.EqualTo("""[{"Type":"dept","Value":"eng"}]"""));
+        Assert.That(retrieved.Metadata, Is.EqualTo("""{"source":"test"}"""));
+        Assert.That(retrieved.CreatedAt, Is.EqualTo(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.That(retrieved.ExpiresAt, Is.EqualTo(new DateTime(2025, 1, 8, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.That(retrieved.AcceptedAt, Is.EqualTo(new DateTime(2025, 1, 2, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.That(retrieved.AcceptedByUserId, Is.EqualTo("user-123"));
     }
 
     #endregion

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -57,8 +56,8 @@ public class ServiceCollectionExtensionsTests
 
         // Then the IRefreshTokenService should be registered
         var service = serviceProvider.GetService<IRefreshTokenService>();
-        service.Should().NotBeNull();
-        service.Should().BeOfType<EfRefreshTokenService<TestDbContext>>();
+        Assert.That(service, Is.Not.Null);
+        Assert.That(service, Is.TypeOf<EfRefreshTokenService<TestDbContext>>());
     }
 
     [Test]
@@ -79,9 +78,9 @@ public class ServiceCollectionExtensionsTests
         var service3 = scope2.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         // Same scope should return same instance
-        service1.Should().BeSameAs(service2);
+        Assert.That(service1, Is.SameAs(service2));
         // Different scope should return different instance
-        service1.Should().NotBeSameAs(service3);
+        Assert.That(service1, Is.Not.SameAs(service3));
     }
 
     [Test]
@@ -101,14 +100,14 @@ public class ServiceCollectionExtensionsTests
 
         // Then all NuxtIdentity services should be registered
         var refreshTokenService = serviceProvider.GetService<IRefreshTokenService>();
-        refreshTokenService.Should().NotBeNull();
-        refreshTokenService.Should().BeOfType<EfRefreshTokenService<TestDbContext>>();
+        Assert.That(refreshTokenService, Is.Not.Null);
+        Assert.That(refreshTokenService, Is.TypeOf<EfRefreshTokenService<TestDbContext>>());
 
         var jwtTokenService = serviceProvider.GetService<IJwtTokenService<IdentityUser>>();
-        jwtTokenService.Should().NotBeNull();
+        Assert.That(jwtTokenService, Is.Not.Null);
 
         var userClaimsProvider = serviceProvider.GetService<IUserClaimsProvider<IdentityUser>>();
-        userClaimsProvider.Should().NotBeNull();
+        Assert.That(userClaimsProvider, Is.Not.Null);
     }
 
     [Test]
@@ -128,10 +127,10 @@ public class ServiceCollectionExtensionsTests
 
         // Then JWT options should be configured from configuration
         var jwtOptions = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtOptions>>();
-        jwtOptions.Value.Should().NotBeNull();
-        jwtOptions.Value.Key.Should().NotBeNull();
-        jwtOptions.Value.Issuer.Should().Be("TestIssuer");
-        jwtOptions.Value.Audience.Should().Be("TestAudience");
+        Assert.That(jwtOptions.Value, Is.Not.Null);
+        Assert.That(jwtOptions.Value.Key, Is.Not.Null);
+        Assert.That(jwtOptions.Value.Issuer, Is.EqualTo("TestIssuer"));
+        Assert.That(jwtOptions.Value.Audience, Is.EqualTo("TestAudience"));
     }
 
     [Test]
@@ -151,7 +150,7 @@ public class ServiceCollectionExtensionsTests
 
         // Then authentication services should be registered
         var authenticationService = serviceProvider.GetService<Microsoft.AspNetCore.Authentication.IAuthenticationService>();
-        authenticationService.Should().NotBeNull();
+        Assert.That(authenticationService, Is.Not.Null);
     }
 
     [Test]
@@ -165,7 +164,7 @@ public class ServiceCollectionExtensionsTests
 
         // Then the service should use the correct context type
         var service = serviceProvider.GetRequiredService<IRefreshTokenService>();
-        service.Should().BeOfType<EfRefreshTokenService<TestDbContext>>();
+        Assert.That(service, Is.TypeOf<EfRefreshTokenService<TestDbContext>>());
     }
 
     [Test]
@@ -180,7 +179,7 @@ public class ServiceCollectionExtensionsTests
 
         // Then the service should be resolvable within the scope
         var service = scope.ServiceProvider.GetService<IRefreshTokenService>();
-        service.Should().NotBeNull();
+        Assert.That(service, Is.Not.Null);
     }
 
     [Test]
@@ -206,10 +205,10 @@ public class ServiceCollectionExtensionsTests
 
         // Then the service should be functional
         var token = await service.GenerateRefreshTokenAsync("testUser");
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
 
         var returnedUserId = await service.ValidateRefreshTokenAsync(token);
-        returnedUserId.Should().Be("testUser");
+        Assert.That(returnedUserId, Is.EqualTo("testUser"));
     }
 
     [Test]
@@ -227,7 +226,7 @@ public class ServiceCollectionExtensionsTests
         var returnedServices = _services.AddNuxtIdentityWithEntityFramework<IdentityUser, TestDbContext>(_configuration);
 
         // Then it should return the same service collection for chaining
-        returnedServices.Should().BeSameAs(originalServices);
+        Assert.That(returnedServices, Is.SameAs(originalServices));
     }
 
     [Test]
@@ -240,7 +239,7 @@ public class ServiceCollectionExtensionsTests
         var returnedServices = _services.AddNuxtIdentityEntityFramework<TestDbContext>();
 
         // Then it should return the same service collection for chaining
-        returnedServices.Should().BeSameAs(originalServices);
+        Assert.That(returnedServices, Is.SameAs(originalServices));
     }
 
     [Test]
@@ -253,12 +252,12 @@ public class ServiceCollectionExtensionsTests
 
         // Then it should not throw
         Action act = () => _services.BuildServiceProvider();
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
 
         // And the service should still be resolvable
         var serviceProvider = _services.BuildServiceProvider();
         var service = serviceProvider.GetService<IRefreshTokenService>();
-        service.Should().NotBeNull();
+        Assert.That(service, Is.Not.Null);
     }
 
     [Test]
@@ -272,7 +271,7 @@ public class ServiceCollectionExtensionsTests
 
         // Then: The IInvitationService should be registered
         var service = serviceProvider.GetService<IInvitationService>();
-        service.Should().NotBeNull();
-        service.Should().BeOfType<EfInvitationService<TestDbContext>>();
+        Assert.That(service, Is.Not.Null);
+        Assert.That(service, Is.TypeOf<EfInvitationService<TestDbContext>>());
     }
 }
