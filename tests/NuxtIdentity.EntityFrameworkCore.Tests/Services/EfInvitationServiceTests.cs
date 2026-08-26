@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
@@ -65,10 +64,10 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email, roles, claims, expiresIn);
 
         // Then: The entity should have a non-empty Code
-        entity.Code.Should().NotBe(Guid.Empty);
+        Assert.That(entity.Code, Is.Not.EqualTo(Guid.Empty));
 
         // And: The email should match
-        entity.Email.Should().Be(email);
+        Assert.That(entity.Email, Is.EqualTo(email));
     }
 
     [Test]
@@ -85,7 +84,7 @@ public class EfInvitationServiceTests
 
         // Then: The invitation should be stored in the database
         var count = await _context.Invitations.CountAsync();
-        count.Should().Be(1);
+        Assert.That(count, Is.EqualTo(1));
     }
 
     [Test]
@@ -101,7 +100,7 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email, roles, claims, expiresIn);
 
         // Then: The status should be Pending
-        entity.Status.Should().Be(InvitationStatus.Pending);
+        Assert.That(entity.Status, Is.EqualTo(InvitationStatus.Pending));
     }
 
     [Test]
@@ -121,14 +120,14 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email, roles, claims, expiresIn);
 
         // Then: Roles should be JSON-serialized
-        entity.Roles.Should().NotBeNull();
-        entity.Roles.Should().Contain("Admin");
-        entity.Roles.Should().Contain("User");
+        Assert.That(entity.Roles, Is.Not.Null);
+        Assert.That(entity.Roles, Does.Contain("Admin"));
+        Assert.That(entity.Roles, Does.Contain("User"));
 
         // And: Claims should be JSON-serialized
-        entity.Claims.Should().NotBeNull();
-        entity.Claims.Should().Contain("department");
-        entity.Claims.Should().Contain("engineering");
+        Assert.That(entity.Claims, Is.Not.Null);
+        Assert.That(entity.Claims, Does.Contain("department"));
+        Assert.That(entity.Claims, Does.Contain("engineering"));
     }
 
     [Test]
@@ -144,8 +143,8 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email, roles, claims, expiresIn);
 
         // Then: Roles and Claims should be null
-        entity.Roles.Should().BeNull();
-        entity.Claims.Should().BeNull();
+        Assert.That(entity.Roles, Is.Null);
+        Assert.That(entity.Claims, Is.Null);
     }
 
     [Test]
@@ -162,7 +161,7 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email, roles, claims, expiresIn, metadata);
 
         // Then: Metadata should be stored
-        entity.Metadata.Should().Be(metadata);
+        Assert.That(entity.Metadata, Is.EqualTo(metadata));
     }
 
     [Test]
@@ -177,10 +176,10 @@ public class EfInvitationServiceTests
             new List<ClaimInfo>(), expiresIn);
 
         // Then: ExpiresAt should be current time + expiration duration
-        entity.ExpiresAt.Should().Be(currentTime.Add(expiresIn));
+        Assert.That(entity.ExpiresAt, Is.EqualTo(currentTime.Add(expiresIn)));
 
         // And: CreatedAt should be the current time
-        entity.CreatedAt.Should().Be(currentTime);
+        Assert.That(entity.CreatedAt, Is.EqualTo(currentTime));
     }
 
     [Test]
@@ -193,7 +192,7 @@ public class EfInvitationServiceTests
             new List<ClaimInfo>(), TimeSpan.FromDays(7));
 
         // Then: The status should always be Pending
-        entity.Status.Should().Be(InvitationStatus.Pending);
+        Assert.That(entity.Status, Is.EqualTo(InvitationStatus.Pending));
     }
 
     [Test]
@@ -205,24 +204,24 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync();
 
         // Then: The entity should have a non-empty Code
-        entity.Code.Should().NotBe(Guid.Empty);
+        Assert.That(entity.Code, Is.Not.EqualTo(Guid.Empty));
 
         // And: Email should be null
-        entity.Email.Should().BeNull();
+        Assert.That(entity.Email, Is.Null);
 
         // And: Status should be Pending
-        entity.Status.Should().Be(InvitationStatus.Pending);
+        Assert.That(entity.Status, Is.EqualTo(InvitationStatus.Pending));
 
         // And: Roles and Claims should be null (empty collections stored as null)
-        entity.Roles.Should().BeNull();
-        entity.Claims.Should().BeNull();
+        Assert.That(entity.Roles, Is.Null);
+        Assert.That(entity.Claims, Is.Null);
 
         // And: Metadata should be null
-        entity.Metadata.Should().BeNull();
+        Assert.That(entity.Metadata, Is.Null);
 
         // And: ExpiresAt should be 30 days from creation
         var expectedExpiry = entity.CreatedAt.AddDays(30);
-        entity.ExpiresAt.Should().Be(expectedExpiry);
+        Assert.That(entity.ExpiresAt, Is.EqualTo(expectedExpiry));
     }
 
     [Test]
@@ -238,10 +237,10 @@ public class EfInvitationServiceTests
             expiresIn: TimeSpan.FromDays(7));
 
         // Then: Roles should be null
-        entity.Roles.Should().BeNull();
+        Assert.That(entity.Roles, Is.Null);
 
         // And: Claims should be null
-        entity.Claims.Should().BeNull();
+        Assert.That(entity.Claims, Is.Null);
     }
 
     [Test]
@@ -256,12 +255,12 @@ public class EfInvitationServiceTests
             expiresIn: TimeSpan.FromDays(7));
 
         // Then: Email should be null
-        entity.Email.Should().BeNull();
+        Assert.That(entity.Email, Is.Null);
 
         // And: The invitation should be persisted
         var stored = await _context.Invitations.FindAsync(entity.Id);
-        stored.Should().NotBeNull();
-        stored!.Email.Should().BeNull();
+        Assert.That(stored, Is.Not.Null);
+        Assert.That(stored!.Email, Is.Null);
     }
 
     [Test]
@@ -274,12 +273,12 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email: "user@test.com", code: specificCode);
 
         // Then: The entity should have exactly the provided code
-        entity.Code.Should().Be(specificCode);
+        Assert.That(entity.Code, Is.EqualTo(specificCode));
 
         // And: The invitation should be retrievable by that code
         var stored = await _service.GetByCodeAsync(specificCode.ToString());
-        stored.Should().NotBeNull();
-        stored!.Id.Should().Be(entity.Id);
+        Assert.That(stored, Is.Not.Null);
+        Assert.That(stored!.Id, Is.EqualTo(entity.Id));
     }
 
     [Test]
@@ -292,7 +291,7 @@ public class EfInvitationServiceTests
         var entity = await _service.CreateAsync(email: "user@test.com");
 
         // Then: ExpiresAt should be 30 days from creation
-        entity.ExpiresAt.Should().Be(currentTime.AddDays(30));
+        Assert.That(entity.ExpiresAt, Is.EqualTo(currentTime.AddDays(30)));
     }
 
     #endregion
@@ -310,9 +309,9 @@ public class EfInvitationServiceTests
         var entity = await _service.GetByCodeAsync(created.Code.ToString());
 
         // Then: The entity should be returned
-        entity.Should().NotBeNull();
-        entity!.Id.Should().Be(created.Id);
-        entity.Email.Should().Be("user@test.com");
+        Assert.That(entity, Is.Not.Null);
+        Assert.That(entity!.Id, Is.EqualTo(created.Id));
+        Assert.That(entity.Email, Is.EqualTo("user@test.com"));
     }
 
     [Test]
@@ -324,7 +323,7 @@ public class EfInvitationServiceTests
         var entity = await _service.GetByCodeAsync(Guid.NewGuid().ToString());
 
         // Then: Null should be returned
-        entity.Should().BeNull();
+        Assert.That(entity, Is.Null);
     }
 
     [Test]
@@ -336,7 +335,7 @@ public class EfInvitationServiceTests
         var entity = await _service.GetByCodeAsync("not-a-guid");
 
         // Then: Null should be returned
-        entity.Should().BeNull();
+        Assert.That(entity, Is.Null);
     }
 
     #endregion
@@ -354,7 +353,7 @@ public class EfInvitationServiceTests
         var status = await _service.ResolveStatusAsync(created.Code.ToString());
 
         // Then: Status should be Pending
-        status.Should().Be(InvitationStatus.Pending);
+        Assert.That(status, Is.EqualTo(InvitationStatus.Pending));
     }
 
     [Test]
@@ -369,7 +368,7 @@ public class EfInvitationServiceTests
         var status = await _service.ResolveStatusAsync(created.Code.ToString());
 
         // Then: Status should be Accepted
-        status.Should().Be(InvitationStatus.Accepted);
+        Assert.That(status, Is.EqualTo(InvitationStatus.Accepted));
     }
 
     [Test]
@@ -386,7 +385,7 @@ public class EfInvitationServiceTests
         var status = await _service.ResolveStatusAsync(created.Code.ToString());
 
         // Then: Status should be Revoked
-        status.Should().Be(InvitationStatus.Revoked);
+        Assert.That(status, Is.EqualTo(InvitationStatus.Revoked));
     }
 
     [Test]
@@ -403,7 +402,7 @@ public class EfInvitationServiceTests
         var status = await _service.ResolveStatusAsync(created.Code.ToString());
 
         // Then: Status should be Expired
-        status.Should().Be(InvitationStatus.Expired);
+        Assert.That(status, Is.EqualTo(InvitationStatus.Expired));
     }
 
     [Test]
@@ -415,7 +414,7 @@ public class EfInvitationServiceTests
         var status = await _service.ResolveStatusAsync(Guid.NewGuid().ToString());
 
         // Then: Status should be NotFound
-        status.Should().Be(InvitationStatus.NotFound);
+        Assert.That(status, Is.EqualTo(InvitationStatus.NotFound));
     }
 
     #endregion
@@ -433,8 +432,8 @@ public class EfInvitationServiceTests
         var entity = await _service.ValidateAsync(created.Code.ToString());
 
         // Then: The entity should be returned
-        entity.Should().NotBeNull();
-        entity!.Id.Should().Be(created.Id);
+        Assert.That(entity, Is.Not.Null);
+        Assert.That(entity!.Id, Is.EqualTo(created.Id));
     }
 
     [Test]
@@ -451,7 +450,7 @@ public class EfInvitationServiceTests
         var entity = await _service.ValidateAsync(created.Code.ToString());
 
         // Then: Null should be returned
-        entity.Should().BeNull();
+        Assert.That(entity, Is.Null);
     }
 
     [Test]
@@ -466,7 +465,7 @@ public class EfInvitationServiceTests
         var entity = await _service.ValidateAsync(created.Code.ToString());
 
         // Then: Null should be returned
-        entity.Should().BeNull();
+        Assert.That(entity, Is.Null);
     }
 
     [Test]
@@ -483,7 +482,7 @@ public class EfInvitationServiceTests
         var entity = await _service.ValidateAsync(created.Code.ToString());
 
         // Then: Null should be returned
-        entity.Should().BeNull();
+        Assert.That(entity, Is.Null);
     }
 
     [Test]
@@ -495,7 +494,7 @@ public class EfInvitationServiceTests
         var entity = await _service.ValidateAsync(Guid.NewGuid().ToString());
 
         // Then: Null should be returned
-        entity.Should().BeNull();
+        Assert.That(entity, Is.Null);
     }
 
     #endregion
@@ -514,7 +513,7 @@ public class EfInvitationServiceTests
 
         // Then: The status should be Accepted
         var stored = await _context.Invitations.FindAsync(created.Id);
-        stored!.Status.Should().Be(InvitationStatus.Accepted);
+        Assert.That(stored!.Status, Is.EqualTo(InvitationStatus.Accepted));
     }
 
     [Test]
@@ -530,10 +529,10 @@ public class EfInvitationServiceTests
 
         // Then: AcceptedAt should be set to current time
         var stored = await _context.Invitations.FindAsync(created.Id);
-        stored!.AcceptedAt.Should().Be(currentTime);
+        Assert.That(stored!.AcceptedAt, Is.EqualTo(currentTime));
 
         // And: AcceptedByUserId should be set
-        stored.AcceptedByUserId.Should().Be("user-123");
+        Assert.That(stored.AcceptedByUserId, Is.EqualTo("user-123"));
     }
 
     #endregion
@@ -563,22 +562,22 @@ public class EfInvitationServiceTests
         var result = await _service.CreateTestAsync(invitation);
 
         // Then: All caller-set properties should be persisted
-        result.Code.Should().Be(code);
-        result.Email.Should().Be("test@test.com");
-        result.Status.Should().Be(InvitationStatus.Accepted);
-        result.Roles.Should().Be("""["Admin"]""");
-        result.Claims.Should().Be("""[{"Type":"dept","Value":"eng"}]""");
-        result.Metadata.Should().Be("""{"key":"value"}""");
-        result.CreatedAt.Should().Be(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        result.ExpiresAt.Should().Be(new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc));
-        result.AcceptedAt.Should().Be(new DateTime(2025, 1, 15, 0, 0, 0, DateTimeKind.Utc));
-        result.AcceptedByUserId.Should().Be("user-456");
+        Assert.That(result.Code, Is.EqualTo(code));
+        Assert.That(result.Email, Is.EqualTo("test@test.com"));
+        Assert.That(result.Status, Is.EqualTo(InvitationStatus.Accepted));
+        Assert.That(result.Roles, Is.EqualTo("""["Admin"]"""));
+        Assert.That(result.Claims, Is.EqualTo("""[{"Type":"dept","Value":"eng"}]"""));
+        Assert.That(result.Metadata, Is.EqualTo("""{"key":"value"}"""));
+        Assert.That(result.CreatedAt, Is.EqualTo(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.That(result.ExpiresAt, Is.EqualTo(new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.That(result.AcceptedAt, Is.EqualTo(new DateTime(2025, 1, 15, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.That(result.AcceptedByUserId, Is.EqualTo("user-456"));
 
         // And: IsTest should be true
-        result.IsTest.Should().BeTrue();
+        Assert.That(result.IsTest, Is.True);
 
         // And: Id should be auto-generated (non-zero)
-        result.Id.Should().BeGreaterThan(0);
+        Assert.That(result.Id, Is.GreaterThan(0));
     }
 
     [Test]
@@ -595,7 +594,7 @@ public class EfInvitationServiceTests
         var result = await _service.CreateTestAsync(invitation);
 
         // Then: IsTest should be true regardless of caller's value
-        result.IsTest.Should().BeTrue();
+        Assert.That(result.IsTest, Is.True);
     }
 
     [Test]
@@ -612,7 +611,7 @@ public class EfInvitationServiceTests
         var result = await _service.CreateTestAsync(invitation);
 
         // Then: A non-empty code should be generated
-        result.Code.Should().NotBe(Guid.Empty);
+        Assert.That(result.Code, Is.Not.EqualTo(Guid.Empty));
     }
 
     [Test]
@@ -629,10 +628,10 @@ public class EfInvitationServiceTests
         var result = await _service.CreateTestAsync(invitation);
 
         // Then: CreatedAt should be current time
-        result.CreatedAt.Should().Be(currentTime);
+        Assert.That(result.CreatedAt, Is.EqualTo(currentTime));
 
         // And: ExpiresAt should be 15 minutes from now (DefaultTestExpiration)
-        result.ExpiresAt.Should().Be(currentTime.AddMinutes(15));
+        Assert.That(result.ExpiresAt, Is.EqualTo(currentTime.AddMinutes(15)));
     }
 
     [Test]
@@ -649,8 +648,8 @@ public class EfInvitationServiceTests
         var result = await _service.CreateTestAsync(invitation);
 
         // Then: Id should be auto-generated, not the caller's value
-        result.Id.Should().NotBe(999);
-        result.Id.Should().BeGreaterThan(0);
+        Assert.That(result.Id, Is.Not.EqualTo(999));
+        Assert.That(result.Id, Is.GreaterThan(0));
     }
 
     [Test]
@@ -664,9 +663,8 @@ public class EfInvitationServiceTests
 
         // When: Creating a test invitation
         // Then: ArgumentException should be thrown
-        var act = () => _service.CreateTestAsync(invitation);
-        act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*Email*required*");
+        var ex = Assert.ThrowsAsync<ArgumentException>(async () => await _service.CreateTestAsync(invitation));
+        Assert.That(ex!.Message, Does.Match("Email.*required"));
     }
 
     [Test]
@@ -680,9 +678,8 @@ public class EfInvitationServiceTests
 
         // When: Creating a test invitation
         // Then: ArgumentException should be thrown
-        var act = () => _service.CreateTestAsync(invitation);
-        act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*Email*required*");
+        var ex = Assert.ThrowsAsync<ArgumentException>(async () => await _service.CreateTestAsync(invitation));
+        Assert.That(ex!.Message, Does.Match("Email.*required"));
     }
 
     [Test]
@@ -692,8 +689,7 @@ public class EfInvitationServiceTests
 
         // When: Creating a test invitation
         // Then: ArgumentNullException should be thrown
-        var act = () => _service.CreateTestAsync(null!);
-        act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await _service.CreateTestAsync(null!));
     }
 
     [Test]
@@ -710,7 +706,7 @@ public class EfInvitationServiceTests
         await _service.CreateTestAsync(invitation);
 
         // Then: The generated code should be available on the original object
-        invitation.Code.Should().NotBe(Guid.Empty);
+        Assert.That(invitation.Code, Is.Not.EqualTo(Guid.Empty));
     }
 
     #endregion
@@ -729,13 +725,13 @@ public class EfInvitationServiceTests
         var count = await _service.DeleteTestInvitationsAsync();
 
         // Then: Two invitations should be deleted
-        count.Should().Be(2);
+        Assert.That(count, Is.EqualTo(2));
 
         // And: Only the production invitation should remain
         var remaining = await _context.Invitations.ToListAsync();
-        remaining.Should().HaveCount(1);
-        remaining[0].Email.Should().Be("prod@test.com");
-        remaining[0].IsTest.Should().BeFalse();
+        Assert.That(remaining, Has.Count.EqualTo(1));
+        Assert.That(remaining[0].Email, Is.EqualTo("prod@test.com"));
+        Assert.That(remaining[0].IsTest, Is.False);
     }
 
     [Test]
@@ -748,11 +744,11 @@ public class EfInvitationServiceTests
         var count = await _service.DeleteTestInvitationsAsync();
 
         // Then: Zero should be returned
-        count.Should().Be(0);
+        Assert.That(count, Is.EqualTo(0));
 
         // And: The production invitation should still exist
         var remaining = await _context.Invitations.CountAsync();
-        remaining.Should().Be(1);
+        Assert.That(remaining, Is.EqualTo(1));
     }
 
     [Test]
@@ -764,7 +760,7 @@ public class EfInvitationServiceTests
         var count = await _service.DeleteTestInvitationsAsync();
 
         // Then: Zero should be returned
-        count.Should().Be(0);
+        Assert.That(count, Is.EqualTo(0));
     }
 
     #endregion
@@ -781,8 +777,8 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync();
 
         // Then: An empty list should be returned
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result, Is.Empty);
     }
 
     [Test]
@@ -798,7 +794,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync();
 
         // Then: All three invitations should be returned
-        result.Should().HaveCount(3);
+        Assert.That(result, Has.Count.EqualTo(3));
     }
 
     [Test]
@@ -814,7 +810,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(offset: 1);
 
         // Then: Two invitations should be returned (skipping the first)
-        result.Should().HaveCount(2);
+        Assert.That(result, Has.Count.EqualTo(2));
     }
 
     [Test]
@@ -830,7 +826,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(count: 2);
 
         // Then: Only two invitations should be returned
-        result.Should().HaveCount(2);
+        Assert.That(result, Has.Count.EqualTo(2));
     }
 
     [Test]
@@ -848,7 +844,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(offset: 2, count: 2);
 
         // Then: Exactly two invitations should be returned
-        result.Should().HaveCount(2);
+        Assert.That(result, Has.Count.EqualTo(2));
     }
 
     [Test]
@@ -864,8 +860,8 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(searchTerm: "example");
 
         // Then: Only the two example.com invitations should be returned
-        result.Should().HaveCount(2);
-        result.Should().AllSatisfy(e => e.Email.Should().Contain("example"));
+        Assert.That(result, Has.Count.EqualTo(2));
+        Assert.That(result.All(e => e.Email!.Contains("example")), Is.True);
     }
 
     [Test]
@@ -880,7 +876,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(searchTerm: "zzznomatch");
 
         // Then: An empty list should be returned
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
     [Test]
@@ -896,8 +892,8 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(statusFilter: InvitationStatus.Pending);
 
         // Then: Only the pending invitation should be returned
-        result.Should().HaveCount(1);
-        result[0].Id.Should().Be(pending.Id);
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].Id, Is.EqualTo(pending.Id));
     }
 
     [Test]
@@ -913,8 +909,8 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(statusFilter: InvitationStatus.Accepted);
 
         // Then: Only the accepted invitation should be returned
-        result.Should().HaveCount(1);
-        result[0].Id.Should().Be(accepted.Id);
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].Id, Is.EqualTo(accepted.Id));
     }
 
     [Test]
@@ -928,7 +924,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(statusFilter: InvitationStatus.Revoked);
 
         // Then: An empty list should be returned
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
     [Test]
@@ -945,8 +941,8 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(searchTerm: "example", statusFilter: InvitationStatus.Pending);
 
         // Then: Only the pending example.com invitation should be returned
-        result.Should().HaveCount(1);
-        result[0].Id.Should().Be(pendingExample.Id);
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].Id, Is.EqualTo(pendingExample.Id));
     }
 
     [Test]
@@ -961,7 +957,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync(offset: 10);
 
         // Then: An empty list should be returned
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
     [Test]
@@ -975,7 +971,7 @@ public class EfInvitationServiceTests
         var result = await _service.ListAsync();
 
         // Then: The result should implement IReadOnlyList<InvitationEntity>
-        result.Should().BeAssignableTo<IReadOnlyList<InvitationEntity>>();
+        Assert.That(result, Is.AssignableTo<IReadOnlyList<InvitationEntity>>());
     }
 
     #endregion

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -64,7 +63,7 @@ public class EfRefreshTokenServiceTests
         var token = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then the token should not be empty
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
     }
 
     [Test]
@@ -78,12 +77,12 @@ public class EfRefreshTokenServiceTests
 
         // Then a token entity should be stored in the database
         var tokenCount = await _context.RefreshTokens.CountAsync();
-        tokenCount.Should().Be(1);
+        Assert.That(tokenCount, Is.EqualTo(1));
 
         // And the stored token should be for the correct user
         var storedToken = await _context.RefreshTokens.FirstAsync();
-        storedToken.UserId.Should().Be(userId);
-        storedToken.IsRevoked.Should().BeFalse();
+        Assert.That(storedToken.UserId, Is.EqualTo(userId));
+        Assert.That(storedToken.IsRevoked, Is.False);
     }
 
     [Test]
@@ -100,7 +99,7 @@ public class EfRefreshTokenServiceTests
         var storedToken = await _context.RefreshTokens.FirstAsync();
         var expectedExpiration = currentTime.Add(_jwtOptions.RefreshTokenLifespan);
 
-        storedToken.ExpiresAt.Should().Be(expectedExpiration);
+        Assert.That(storedToken.ExpiresAt, Is.EqualTo(expectedExpiration));
     }
 
     [Test]
@@ -115,13 +114,13 @@ public class EfRefreshTokenServiceTests
         var token3 = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then each token should be unique
-        token1.Should().NotBe(token2);
-        token2.Should().NotBe(token3);
-        token1.Should().NotBe(token3);
+        Assert.That(token1, Is.Not.EqualTo(token2));
+        Assert.That(token2, Is.Not.EqualTo(token3));
+        Assert.That(token1, Is.Not.EqualTo(token3));
 
         // And all tokens should be stored in the database
         var tokenCount = await _context.RefreshTokens.CountAsync();
-        tokenCount.Should().Be(3);
+        Assert.That(tokenCount, Is.EqualTo(3));
     }
 
     [Test]
@@ -136,7 +135,7 @@ public class EfRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
         // Then validation should return the user ID
-        returnedUserId.Should().Be(userId);
+        Assert.That(returnedUserId, Is.EqualTo(userId));
     }
 
     [Test]
@@ -149,7 +148,7 @@ public class EfRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(nonExistentToken);
 
         // Then validation should return null
-        returnedUserId.Should().BeNull();
+        Assert.That(returnedUserId, Is.Null);
     }
 
     [Test]
@@ -162,18 +161,18 @@ public class EfRefreshTokenServiceTests
 
         // And the token is valid before revocation
         var userIdBefore = await _service.ValidateRefreshTokenAsync(token);
-        userIdBefore.Should().Be(userId);
+        Assert.That(userIdBefore, Is.EqualTo(userId));
 
         // When revoking the token
         await _service.RevokeRefreshTokenAsync(token);
 
         // Then the token should become invalid
         var userIdAfter = await _service.ValidateRefreshTokenAsync(token);
-        userIdAfter.Should().BeNull();
+        Assert.That(userIdAfter, Is.Null);
 
         // And the token should be marked as revoked in the database
         var storedToken = await _context.RefreshTokens.FirstAsync();
-        storedToken.IsRevoked.Should().BeTrue();
+        Assert.That(storedToken.IsRevoked, Is.True);
     }
 
     [Test]
@@ -187,21 +186,21 @@ public class EfRefreshTokenServiceTests
         var token3 = await _service.GenerateRefreshTokenAsync(userId);
 
         // And all tokens are valid before revocation
-        (await _service.ValidateRefreshTokenAsync(token1)).Should().Be(userId);
-        (await _service.ValidateRefreshTokenAsync(token2)).Should().Be(userId);
-        (await _service.ValidateRefreshTokenAsync(token3)).Should().Be(userId);
+        Assert.That((await _service.ValidateRefreshTokenAsync(token1)), Is.EqualTo(userId));
+        Assert.That((await _service.ValidateRefreshTokenAsync(token2)), Is.EqualTo(userId));
+        Assert.That((await _service.ValidateRefreshTokenAsync(token3)), Is.EqualTo(userId));
 
         // When revoking all tokens for the user
         await _service.RevokeAllUserTokensAsync(userId);
 
         // Then all tokens should become invalid
-        (await _service.ValidateRefreshTokenAsync(token1)).Should().BeNull();
-        (await _service.ValidateRefreshTokenAsync(token2)).Should().BeNull();
-        (await _service.ValidateRefreshTokenAsync(token3)).Should().BeNull();
+        Assert.That((await _service.ValidateRefreshTokenAsync(token1)), Is.Null);
+        Assert.That((await _service.ValidateRefreshTokenAsync(token2)), Is.Null);
+        Assert.That((await _service.ValidateRefreshTokenAsync(token3)), Is.Null);
 
         // And all tokens should be marked as revoked in the database
         var allTokens = await _context.RefreshTokens.ToListAsync();
-        allTokens.Should().AllSatisfy(t => t.IsRevoked.Should().BeTrue());
+        Assert.That(allTokens.All(t => t.IsRevoked), Is.True);
     }
 
     [Test]
@@ -218,16 +217,16 @@ public class EfRefreshTokenServiceTests
         await _service.RevokeAllUserTokensAsync(user1Id);
 
         // Then the first user's token should be invalid
-        (await _service.ValidateRefreshTokenAsync(user1Token)).Should().BeNull();
+        Assert.That((await _service.ValidateRefreshTokenAsync(user1Token)), Is.Null);
         // And the second user's token should still be valid
-        (await _service.ValidateRefreshTokenAsync(user2Token)).Should().Be(user2Id);
+        Assert.That((await _service.ValidateRefreshTokenAsync(user2Token)), Is.EqualTo(user2Id));
 
         // And only the first user's tokens should be marked as revoked
         var user1Tokens = await _context.RefreshTokens.Where(t => t.UserId == user1Id).ToListAsync();
         var user2Tokens = await _context.RefreshTokens.Where(t => t.UserId == user2Id).ToListAsync();
 
-        user1Tokens.Should().AllSatisfy(t => t.IsRevoked.Should().BeTrue());
-        user2Tokens.Should().AllSatisfy(t => t.IsRevoked.Should().BeFalse());
+        Assert.That(user1Tokens.All(t => t.IsRevoked), Is.True);
+        Assert.That(user2Tokens.All(t => !t.IsRevoked), Is.True);
     }
 
     [Test]
@@ -242,8 +241,8 @@ public class EfRefreshTokenServiceTests
 
         // When validating each token
         // Then each token should return its associated user ID
-        (await _service.ValidateRefreshTokenAsync(user1Token)).Should().Be(user1Id);
-        (await _service.ValidateRefreshTokenAsync(user2Token)).Should().Be(user2Id);
+        Assert.That((await _service.ValidateRefreshTokenAsync(user1Token)), Is.EqualTo(user1Id));
+        Assert.That((await _service.ValidateRefreshTokenAsync(user2Token)), Is.EqualTo(user2Id));
     }
 
     #region Error Cases
@@ -264,7 +263,7 @@ public class EfRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
         // Then validation should return null
-        returnedUserId.Should().BeNull();
+        Assert.That(returnedUserId, Is.Null);
     }
 
     [Test]
@@ -277,11 +276,11 @@ public class EfRefreshTokenServiceTests
         Func<Task> act = async () => await _service.RevokeRefreshTokenAsync(nonExistentToken);
 
         // Then no exception should be thrown
-        await act.Should().NotThrowAsync();
+        Assert.DoesNotThrowAsync(async () => await act());
 
         // And no tokens should exist in the database
         var tokenCount = await _context.RefreshTokens.CountAsync();
-        tokenCount.Should().Be(0);
+        Assert.That(tokenCount, Is.EqualTo(0));
     }
 
     [Test]
@@ -296,7 +295,7 @@ public class EfRefreshTokenServiceTests
 
         // Verify tokens are in database (should be 2)
         var tokenCountBefore = await _context.RefreshTokens.CountAsync();
-        tokenCountBefore.Should().Be(2);
+        Assert.That(tokenCountBefore, Is.EqualTo(2));
 
         // When advancing time beyond the tokens' expiration
         _timeProvider.Advance(_jwtOptions.RefreshTokenLifespan.Add(TimeSpan.FromMinutes(1)));
@@ -308,12 +307,12 @@ public class EfRefreshTokenServiceTests
         var tokensAfter = await _context.RefreshTokens.ToListAsync();
 
         // The expired tokens should be gone, only the new one remains
-        tokensAfter.Should().HaveCount(1);
-        tokensAfter[0].UserId.Should().Be(userId);
-        tokensAfter[0].IsRevoked.Should().BeFalse();
+        Assert.That(tokensAfter, Has.Count.EqualTo(1));
+        Assert.That(tokensAfter[0].UserId, Is.EqualTo(userId));
+        Assert.That(tokensAfter[0].IsRevoked, Is.False);
 
         // And the new token should be valid
-        (await _service.ValidateRefreshTokenAsync(newToken)).Should().Be(userId);
+        Assert.That((await _service.ValidateRefreshTokenAsync(newToken)), Is.EqualTo(userId));
     }
 
     [Test]
@@ -337,9 +336,9 @@ public class EfRefreshTokenServiceTests
         var tokenAfter = await _context.RefreshTokens.FirstAsync();
         var expectedExpiration = currentTime.AddDays(7);
 
-        tokenAfter.ExpiresAt.Should().Be(expectedExpiration);
+        Assert.That(tokenAfter.ExpiresAt, Is.EqualTo(expectedExpiration));
         // Use BeOnOrAfter since revocation happens at the same fake time
-        tokenAfter.ExpiresAt.Should().BeOnOrAfter(originalExpiration);
+        Assert.That(tokenAfter.ExpiresAt, Is.GreaterThanOrEqualTo(originalExpiration));
     }
 
     [Test]
@@ -357,11 +356,11 @@ public class EfRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
         // Then validation should return null
-        returnedUserId.Should().BeNull();
+        Assert.That(returnedUserId, Is.Null);
 
         // And the token should be marked as revoked in the database
         var storedToken = await _context.RefreshTokens.FirstAsync();
-        storedToken.IsRevoked.Should().BeTrue();
+        Assert.That(storedToken.IsRevoked, Is.True);
     }
 
     [Test]
@@ -375,10 +374,10 @@ public class EfRefreshTokenServiceTests
 
         // Then the stored token hash should not match the plaintext token
         var storedToken = await _context.RefreshTokens.FirstAsync();
-        storedToken.TokenHash.Should().NotBe(plainTextToken);
+        Assert.That(storedToken.TokenHash, Is.Not.EqualTo(plainTextToken));
 
         // And the token hash should be base64 encoded (characteristic of SHA256)
-        storedToken.TokenHash.Should().MatchRegex("^[A-Za-z0-9+/=]+$");
+        Assert.That(storedToken.TokenHash, Does.Match("^[A-Za-z0-9+/=]+$"));
     }
 
     [Test]
@@ -391,20 +390,20 @@ public class EfRefreshTokenServiceTests
         var token = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then the token should not be empty
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
 
         // And it should be in the format {GUID}.{base64}
         var dotIndex = token.IndexOf('.');
-        dotIndex.Should().Be(36, "GUID is 36 characters, followed by a period");
+        Assert.That(dotIndex, Is.EqualTo(36), "GUID is 36 characters, followed by a period");
 
         // And the first part should be a valid GUID
         var guidPart = token[..36];
-        Guid.TryParse(guidPart, out _).Should().BeTrue("first part should be a valid GUID");
+        Assert.That(Guid.TryParse(guidPart, out _), Is.True, "first part should be a valid GUID");
 
         // And the second part should be a valid base64 string
         var secretPart = token[(dotIndex + 1)..];
         Action act = () => Convert.FromBase64String(secretPart);
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
     [Test]
@@ -417,7 +416,7 @@ public class EfRefreshTokenServiceTests
         Func<Task> act = async () => await _service.RevokeAllUserTokensAsync(nonExistentUserId);
 
         // Then no exception should be thrown
-        await act.Should().NotThrowAsync();
+        Assert.DoesNotThrowAsync(async () => await act());
     }
 
     /// <summary>
@@ -455,7 +454,7 @@ public class EfRefreshTokenServiceTests
 
         // Verify the expired token is in the database
         var expiredCount = await faultyContext.RefreshTokens.CountAsync();
-        expiredCount.Should().Be(1, "we should have 1 expired token before generating a new one");
+        Assert.That(expiredCount, Is.EqualTo(1), "we should have 1 expired token before generating a new one");
 
         var optionsMock = new Mock<IOptions<JwtOptions>>();
         optionsMock.Setup(o => o.Value).Returns(_jwtOptions);
@@ -472,16 +471,16 @@ public class EfRefreshTokenServiceTests
         var token = await serviceWithFaultyContext.GenerateRefreshTokenAsync(userId);
 
         // Then the token should still be generated successfully despite cleanup failure
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
 
         // And the new token should be stored in the database
         var newTokenCount = await faultyContext.RefreshTokens.CountAsync();
-        newTokenCount.Should().Be(2, "new token should be saved even though cleanup failed");
+        Assert.That(newTokenCount, Is.EqualTo(2), "new token should be saved even though cleanup failed");
 
         // And the expired token should still exist (cleanup failed)
         var expiredTokenEntity = await faultyContext.RefreshTokens
             .FirstOrDefaultAsync(t => t.ExpiresAt < _timeProvider.GetUtcNow().DateTime);
-        expiredTokenEntity.Should().NotBeNull("expired token should still exist because cleanup failed");
+        Assert.That(expiredTokenEntity, Is.Not.Null, "expired token should still exist because cleanup failed");
     }
 
     #endregion
