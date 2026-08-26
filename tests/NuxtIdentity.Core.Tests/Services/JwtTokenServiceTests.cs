@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -58,11 +57,11 @@ public class JwtTokenServiceTests
         var token = await _service.GenerateAccessTokenAsync(user);
 
         // Then the token should not be empty
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
 
         // And it should be a valid JWT token
         var handler = new JwtSecurityTokenHandler();
-        handler.CanReadToken(token).Should().BeTrue();
+        Assert.That(handler.CanReadToken(token), Is.True);
     }
 
     [Test]
@@ -84,11 +83,11 @@ public class JwtTokenServiceTests
         var jwtToken = handler.ReadJwtToken(token);
 
         // And it should have the user ID claim
-        jwtToken.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.Id);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == user.Id), Is.True);
         // And the username claim
-        jwtToken.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.Username);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.Username), Is.True);
         // And the email claim
-        jwtToken.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email), Is.True);
     }
 
     [Test]
@@ -110,13 +109,13 @@ public class JwtTokenServiceTests
         var jwtToken = handler.ReadJwtToken(token);
 
         // And it should have the issued-at claim
-        jwtToken.Claims.Should().Contain(c => c.Type == "iat");
+        Assert.That(jwtToken.Claims.Any(c => c.Type == "iat"), Is.True);
         // And the not-before claim
-        jwtToken.Claims.Should().Contain(c => c.Type == "nbf");
+        Assert.That(jwtToken.Claims.Any(c => c.Type == "nbf"), Is.True);
         // And the correct issuer
-        jwtToken.Issuer.Should().Be(_jwtOptions.Issuer);
+        Assert.That(jwtToken.Issuer, Is.EqualTo(_jwtOptions.Issuer));
         // And the correct audience
-        jwtToken.Audiences.Should().Contain(_jwtOptions.Audience);
+        Assert.That(jwtToken.Audiences, Does.Contain(_jwtOptions.Audience));
     }
 
     [Test]
@@ -143,7 +142,7 @@ public class JwtTokenServiceTests
         var expectedExpiration = currentTime.Add(_jwtOptions.Lifespan);
         var actualExpiration = new DateTimeOffset(jwtToken.ValidTo, TimeSpan.Zero).ToUnixTimeSeconds();
         var expectedTimestamp = new DateTimeOffset(expectedExpiration, TimeSpan.Zero).ToUnixTimeSeconds();
-        actualExpiration.Should().Be(expectedTimestamp);
+        Assert.That(actualExpiration, Is.EqualTo(expectedTimestamp));
     }
 
     [Test]
@@ -163,11 +162,11 @@ public class JwtTokenServiceTests
         var principal = await _service.ValidateTokenAsync(token);
 
         // Then the principal should not be null
-        principal.Should().NotBeNull();
+        Assert.That(principal, Is.Not.Null);
         // And it should contain the user ID claim
-        principal!.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
+        Assert.That(principal!.Claims.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id), Is.True);
         // And the username claim
-        principal.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.Username);
+        Assert.That(principal.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == user.Username), Is.True);
     }
 
     [Test]
@@ -187,13 +186,13 @@ public class JwtTokenServiceTests
         var principal = await _service.ValidateTokenAsync(token);
 
         // Then the principal should not be null
-        principal.Should().NotBeNull();
+        Assert.That(principal, Is.Not.Null);
         var claims = principal!.Claims.ToList();
 
         // And it should contain all the user claims
-        claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
-        claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == "testuser");
-        claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
+        Assert.That(claims.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123"), Is.True);
+        Assert.That(claims.Any(c => c.Type == JwtRegisteredClaimNames.Name && c.Value == "testuser"), Is.True);
+        Assert.That(claims.Any(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com"), Is.True);
     }
 
     [Test]
@@ -203,19 +202,19 @@ public class JwtTokenServiceTests
         var parameters = _service.GetTokenValidationParameters();
 
         // Then the parameters should not be null
-        parameters.Should().NotBeNull();
+        Assert.That(parameters, Is.Not.Null);
         // And issuer signing key validation should be enabled
-        parameters.ValidateIssuerSigningKey.Should().BeTrue();
+        Assert.That(parameters.ValidateIssuerSigningKey, Is.True);
         // And issuer validation should be enabled
-        parameters.ValidateIssuer.Should().BeTrue();
-        parameters.ValidIssuer.Should().Be(_jwtOptions.Issuer);
+        Assert.That(parameters.ValidateIssuer, Is.True);
+        Assert.That(parameters.ValidIssuer, Is.EqualTo(_jwtOptions.Issuer));
         // And audience validation should be enabled
-        parameters.ValidateAudience.Should().BeTrue();
-        parameters.ValidAudience.Should().Be(_jwtOptions.Audience);
+        Assert.That(parameters.ValidateAudience, Is.True);
+        Assert.That(parameters.ValidAudience, Is.EqualTo(_jwtOptions.Audience));
         // And lifetime validation should be enabled
-        parameters.ValidateLifetime.Should().BeTrue();
+        Assert.That(parameters.ValidateLifetime, Is.True);
         // And clock skew should come from options
-        parameters.ClockSkew.Should().Be(_jwtOptions.ClockSkew);
+        Assert.That(parameters.ClockSkew, Is.EqualTo(_jwtOptions.ClockSkew));
     }
 
     [Test]
@@ -230,15 +229,15 @@ public class JwtTokenServiceTests
         var token2 = await _service.GenerateAccessTokenAsync(user2);
 
         // Then the tokens should be different
-        token1.Should().NotBe(token2);
+        Assert.That(token1, Is.Not.EqualTo(token2));
 
         // And each token should contain the correct user ID
         var handler = new JwtSecurityTokenHandler();
         var jwt1 = handler.ReadJwtToken(token1);
         var jwt2 = handler.ReadJwtToken(token2);
 
-        jwt1.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value.Should().Be("user1");
-        jwt2.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value.Should().Be("user2");
+        Assert.That(jwt1.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value, Is.EqualTo("user1"));
+        Assert.That(jwt2.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value, Is.EqualTo("user2"));
     }
 
     [Test]
@@ -251,7 +250,7 @@ public class JwtTokenServiceTests
         var principal = await _service.ValidateTokenAsync(invalidToken);
 
         // Then validation should return null
-        principal.Should().BeNull();
+        Assert.That(principal, Is.Null);
     }
 
     [Test]
@@ -287,7 +286,7 @@ public class JwtTokenServiceTests
         var principal = await serviceWithFakeTime.ValidateTokenAsync(token);
 
         // Then validation should return null
-        principal.Should().BeNull();
+        Assert.That(principal, Is.Null);
     }
 
     [Test]
@@ -320,7 +319,7 @@ public class JwtTokenServiceTests
         var principal = await differentKeyService.ValidateTokenAsync(token);
 
         // Then validation should return null
-        principal.Should().BeNull();
+        Assert.That(principal, Is.Null);
     }
 
     [Test]
@@ -357,13 +356,13 @@ public class JwtTokenServiceTests
         var token = await serviceWithNoName.GenerateAccessTokenAsync(user);
 
         // Then the token should be generated successfully
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
 
         // And the token should contain the other claims
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
+        Assert.That(jwtToken.Claims.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123"), Is.True);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com"), Is.True);
     }
 
     [Test]
@@ -413,7 +412,7 @@ public class JwtTokenServiceTests
         var expectedExpiration = currentTime.AddHours(2);
         var actualExpiration = new DateTimeOffset(jwtToken.ValidTo, TimeSpan.Zero).ToUnixTimeSeconds();
         var expectedTimestamp = new DateTimeOffset(expectedExpiration, TimeSpan.Zero).ToUnixTimeSeconds();
-        actualExpiration.Should().Be(expectedTimestamp);
+        Assert.That(actualExpiration, Is.EqualTo(expectedTimestamp));
     }
 
     [Test]
@@ -461,10 +460,10 @@ public class JwtTokenServiceTests
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
 
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123");
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Name && c.Value == "testuser");
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
-        jwtToken.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Admin");
+        Assert.That(jwtToken.Claims.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user123"), Is.True);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == ClaimTypes.Name && c.Value == "testuser"), Is.True);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com"), Is.True);
+        Assert.That(jwtToken.Claims.Any(c => c.Type == ClaimTypes.Role && c.Value == "Admin"), Is.True);
     }
 
     [Test]
@@ -529,11 +528,9 @@ public class JwtTokenServiceTests
         await serviceWithMultipleProviders.GenerateAccessTokenAsync(user);
 
         // Then: No overlapping execution should have occurred
-        overlapsDetected.Should().Be(0, "claims providers should not execute in parallel");
+        Assert.That(overlapsDetected, Is.EqualTo(0), "claims providers should not execute in parallel");
 
         // And: Provider 1 should complete before provider 2 starts
-        executionLog.Should().Equal(
-            "provider1-start", "provider1-end",
-            "provider2-start", "provider2-end");
+        Assert.That(executionLog, Is.EqualTo(new[] { "provider1-start", "provider1-end", "provider2-start", "provider2-end" }));
     }
 }

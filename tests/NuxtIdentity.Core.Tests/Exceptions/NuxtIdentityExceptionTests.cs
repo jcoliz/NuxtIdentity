@@ -1,4 +1,3 @@
-using FluentAssertions;
 using NUnit.Framework;
 using NuxtIdentity.Core.Exceptions;
 
@@ -21,9 +20,9 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityException();
 
         // Then: Exception should be created with null message
-        exception.Should().BeAssignableTo<Exception>();
-        exception.Message.Should().NotBeNullOrEmpty();
-        exception.InnerException.Should().BeNull();
+        Assert.That(exception, Is.AssignableTo<Exception>());
+        Assert.That(exception.Message, Is.Not.Null.And.Not.Empty);
+        Assert.That(exception.InnerException, Is.Null);
     }
 
     [Test]
@@ -36,8 +35,8 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityException(message);
 
         // Then: The message should be preserved
-        exception.Message.Should().Be(message);
-        exception.InnerException.Should().BeNull();
+        Assert.That(exception.Message, Is.EqualTo(message));
+        Assert.That(exception.InnerException, Is.Null);
     }
 
     [Test]
@@ -51,8 +50,8 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityException(message, inner);
 
         // Then: Both message and inner exception should be preserved
-        exception.Message.Should().Be(message);
-        exception.InnerException.Should().BeSameAs(inner);
+        Assert.That(exception.Message, Is.EqualTo(message));
+        Assert.That(exception.InnerException, Is.SameAs(inner));
     }
 
     [Test]
@@ -64,7 +63,7 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityException("test");
 
         // Then: It should be assignable to Exception
-        exception.Should().BeAssignableTo<Exception>();
+        Assert.That(exception, Is.AssignableTo<Exception>());
     }
 
     #endregion
@@ -81,10 +80,10 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityConfigurationException(missingService);
 
         // Then: MissingService property should be set
-        exception.MissingService.Should().Be(missingService);
+        Assert.That(exception.MissingService, Is.EqualTo(missingService));
 
         // And: Message should contain the service name
-        exception.Message.Should().Contain(missingService);
+        Assert.That(exception.Message, Does.Contain(missingService));
     }
 
     [Test]
@@ -98,8 +97,8 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityConfigurationException(missingService, customMessage);
 
         // Then: Both should be preserved
-        exception.MissingService.Should().Be(missingService);
-        exception.Message.Should().Be(customMessage);
+        Assert.That(exception.MissingService, Is.EqualTo(missingService));
+        Assert.That(exception.Message, Is.EqualTo(customMessage));
     }
 
     [Test]
@@ -114,9 +113,9 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityConfigurationException(missingService, customMessage, inner);
 
         // Then: All properties should be preserved
-        exception.MissingService.Should().Be(missingService);
-        exception.Message.Should().Be(customMessage);
-        exception.InnerException.Should().BeSameAs(inner);
+        Assert.That(exception.MissingService, Is.EqualTo(missingService));
+        Assert.That(exception.Message, Is.EqualTo(customMessage));
+        Assert.That(exception.InnerException, Is.SameAs(inner));
     }
 
     [Test]
@@ -128,10 +127,10 @@ public class NuxtIdentityExceptionTests
         var exception = new NuxtIdentityConfigurationException("TestService");
 
         // Then: It should be assignable to NuxtIdentityException
-        exception.Should().BeAssignableTo<NuxtIdentityException>();
+        Assert.That(exception, Is.AssignableTo<NuxtIdentityException>());
 
         // And: It should be catchable as NuxtIdentityException
-        exception.Should().BeAssignableTo<Exception>();
+        Assert.That(exception, Is.AssignableTo<Exception>());
     }
 
     [Test]
@@ -151,12 +150,12 @@ public class NuxtIdentityExceptionTests
         }
 
         // Then: It should be caught and preserve its type
-        caught.Should().NotBeNull();
-        caught.Should().BeOfType<NuxtIdentityConfigurationException>();
+        Assert.That(caught, Is.Not.Null);
+        Assert.That(caught, Is.TypeOf<NuxtIdentityConfigurationException>());
 
         // And: The MissingService property should be accessible after casting
-        var configException = caught as NuxtIdentityConfigurationException;
-        configException!.MissingService.Should().Be("IUserNotifier<TUser>");
+        var configException = (NuxtIdentityConfigurationException)caught!;
+        Assert.That(configException.MissingService, Is.EqualTo("IUserNotifier<TUser>"));
     }
 
     #endregion

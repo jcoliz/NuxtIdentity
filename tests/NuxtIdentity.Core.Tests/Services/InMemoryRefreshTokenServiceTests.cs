@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -38,7 +37,7 @@ public class InMemoryRefreshTokenServiceTests
         var token = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then the token should not be empty
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
     }
 
     [Test]
@@ -51,20 +50,19 @@ public class InMemoryRefreshTokenServiceTests
         var token = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then the token should not be empty
-        token.Should().NotBeNullOrEmpty();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
 
         // And it should be in the format {GUID}.{base64}
         var dotIndex = token.IndexOf('.');
-        dotIndex.Should().Be(36, "GUID is 36 characters, followed by a period");
+        Assert.That(dotIndex, Is.EqualTo(36), "GUID is 36 characters, followed by a period");
 
         // And the first part should be a valid GUID
         var guidPart = token[..36];
-        Guid.TryParse(guidPart, out _).Should().BeTrue("first part should be a valid GUID");
+        Assert.That(Guid.TryParse(guidPart, out _), Is.True, "first part should be a valid GUID");
 
         // And the second part should be a valid base64 string
         var secretPart = token[(dotIndex + 1)..];
-        Action act = () => Convert.FromBase64String(secretPart);
-        act.Should().NotThrow();
+        Assert.That(() => Convert.FromBase64String(secretPart), Throws.Nothing);
     }
 
     [Test]
@@ -79,9 +77,9 @@ public class InMemoryRefreshTokenServiceTests
         var token3 = await _service.GenerateRefreshTokenAsync(userId);
 
         // Then each token should be unique
-        token1.Should().NotBe(token2);
-        token2.Should().NotBe(token3);
-        token1.Should().NotBe(token3);
+        Assert.That(token1, Is.Not.EqualTo(token2));
+        Assert.That(token2, Is.Not.EqualTo(token3));
+        Assert.That(token1, Is.Not.EqualTo(token3));
     }
 
     [Test]
@@ -96,7 +94,7 @@ public class InMemoryRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
         // Then validation should return the user ID
-        returnedUserId.Should().Be(userId);
+        Assert.That(returnedUserId, Is.EqualTo(userId));
     }
 
     [Test]
@@ -109,7 +107,7 @@ public class InMemoryRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(nonExistentToken);
 
         // Then validation should return null
-        returnedUserId.Should().BeNull();
+        Assert.That(returnedUserId, Is.Null);
     }
 
     [Test]
@@ -126,7 +124,7 @@ public class InMemoryRefreshTokenServiceTests
         var returnedUserId = await _service.ValidateRefreshTokenAsync(token);
 
         // Then validation should return null
-        returnedUserId.Should().BeNull();
+        Assert.That(returnedUserId, Is.Null);
     }
 
     [Test]
@@ -150,7 +148,7 @@ public class InMemoryRefreshTokenServiceTests
         var returnedUserId = await serviceWithFakeTime.ValidateRefreshTokenAsync(token);
 
         // Then validation should return null
-        returnedUserId.Should().BeNull();
+        Assert.That(returnedUserId, Is.Null);
     }
 
     [Test]
@@ -163,18 +161,18 @@ public class InMemoryRefreshTokenServiceTests
 
         // And the token is valid before revocation
         var userIdBefore = await _service.ValidateRefreshTokenAsync(token);
-        userIdBefore.Should().Be(userId);
+        Assert.That(userIdBefore, Is.EqualTo(userId));
 
         // When revoking the token
         await _service.RevokeRefreshTokenAsync(token);
 
         // Then the token should become invalid
         var userIdAfter = await _service.ValidateRefreshTokenAsync(token);
-        userIdAfter.Should().BeNull();
+        Assert.That(userIdAfter, Is.Null);
     }
 
     [Test]
-    public async Task RevokeRefreshTokenAsync_NonExistentToken_DoesNotThrow()
+    public void RevokeRefreshTokenAsync_NonExistentToken_DoesNotThrow()
     {
         // Given a token that was never generated
         var nonExistentToken = Convert.ToBase64String(new byte[64]);
@@ -183,7 +181,7 @@ public class InMemoryRefreshTokenServiceTests
         Func<Task> act = async () => await _service.RevokeRefreshTokenAsync(nonExistentToken);
 
         // Then no exception should be thrown
-        await act.Should().NotThrowAsync();
+        Assert.That(act, Throws.Nothing);
     }
 
     [Test]
@@ -197,17 +195,17 @@ public class InMemoryRefreshTokenServiceTests
         var token3 = await _service.GenerateRefreshTokenAsync(userId);
 
         // And all tokens are valid before revocation
-        (await _service.ValidateRefreshTokenAsync(token1)).Should().Be(userId);
-        (await _service.ValidateRefreshTokenAsync(token2)).Should().Be(userId);
-        (await _service.ValidateRefreshTokenAsync(token3)).Should().Be(userId);
+        Assert.That(await _service.ValidateRefreshTokenAsync(token1), Is.EqualTo(userId));
+        Assert.That(await _service.ValidateRefreshTokenAsync(token2), Is.EqualTo(userId));
+        Assert.That(await _service.ValidateRefreshTokenAsync(token3), Is.EqualTo(userId));
 
         // When revoking all tokens for the user
         await _service.RevokeAllUserTokensAsync(userId);
 
         // Then all tokens should become invalid
-        (await _service.ValidateRefreshTokenAsync(token1)).Should().BeNull();
-        (await _service.ValidateRefreshTokenAsync(token2)).Should().BeNull();
-        (await _service.ValidateRefreshTokenAsync(token3)).Should().BeNull();
+        Assert.That(await _service.ValidateRefreshTokenAsync(token1), Is.Null);
+        Assert.That(await _service.ValidateRefreshTokenAsync(token2), Is.Null);
+        Assert.That(await _service.ValidateRefreshTokenAsync(token3), Is.Null);
     }
 
     [Test]
@@ -224,13 +222,13 @@ public class InMemoryRefreshTokenServiceTests
         await _service.RevokeAllUserTokensAsync(user1Id);
 
         // Then the first user's token should be invalid
-        (await _service.ValidateRefreshTokenAsync(user1Token)).Should().BeNull();
+        Assert.That(await _service.ValidateRefreshTokenAsync(user1Token), Is.Null);
         // And the second user's token should still be valid
-        (await _service.ValidateRefreshTokenAsync(user2Token)).Should().Be(user2Id);
+        Assert.That(await _service.ValidateRefreshTokenAsync(user2Token), Is.EqualTo(user2Id));
     }
 
     [Test]
-    public async Task RevokeAllUserTokensAsync_NonExistentUser_DoesNotThrow()
+    public void RevokeAllUserTokensAsync_NonExistentUser_DoesNotThrow()
     {
         // Given a user ID that has no tokens
         var nonExistentUserId = "nonexistent";
@@ -239,7 +237,7 @@ public class InMemoryRefreshTokenServiceTests
         Func<Task> act = async () => await _service.RevokeAllUserTokensAsync(nonExistentUserId);
 
         // Then no exception should be thrown
-        await act.Should().NotThrowAsync();
+        Assert.That(act, Throws.Nothing);
     }
 
     [Test]
@@ -254,7 +252,7 @@ public class InMemoryRefreshTokenServiceTests
 
         // When validating each token
         // Then each token should return its associated user ID
-        (await _service.ValidateRefreshTokenAsync(user1Token)).Should().Be(user1Id);
-        (await _service.ValidateRefreshTokenAsync(user2Token)).Should().Be(user2Id);
+        Assert.That(await _service.ValidateRefreshTokenAsync(user1Token), Is.EqualTo(user1Id));
+        Assert.That(await _service.ValidateRefreshTokenAsync(user2Token), Is.EqualTo(user2Id));
     }
 }
