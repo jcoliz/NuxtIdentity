@@ -245,6 +245,30 @@ public class EfRefreshTokenServiceTests
         Assert.That((await _service.ValidateRefreshTokenAsync(user2Token)), Is.EqualTo(user2Id));
     }
 
+    [Test]
+    public async Task GetUsersLoggedInRecentlyAsync_ReturnsUsersOrderedByMostRecentLogin()
+    {
+        // Given two users with multiple login events at different times
+        var user1Id = "user123";
+        var user2Id = "user456";
+
+        await _service.GenerateRefreshTokenAsync(user1Id);
+        _timeProvider.Advance(TimeSpan.FromMinutes(5));
+        await _service.GenerateRefreshTokenAsync(user2Id);
+        _timeProvider.Advance(TimeSpan.FromMinutes(5));
+        var expectedUser1LastLogin = _timeProvider.GetUtcNow().UtcDateTime;
+        await _service.GenerateRefreshTokenAsync(user1Id);
+
+        // When querying users logged in recently
+        var recentUsers = await _service.GetUsersLoggedInRecentlyAsync();
+
+        // Then users should be deduplicated and ordered by recency
+        Assert.That(recentUsers.Count, Is.EqualTo(2));
+        Assert.That(recentUsers[0].UserId, Is.EqualTo(user1Id));
+        Assert.That(recentUsers[0].LastLoginAt, Is.EqualTo(expectedUser1LastLogin));
+        Assert.That(recentUsers[1].UserId, Is.EqualTo(user2Id));
+    }
+
     #region Error Cases
 
     [Test]

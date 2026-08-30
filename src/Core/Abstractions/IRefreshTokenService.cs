@@ -1,5 +1,7 @@
 namespace NuxtIdentity.Core.Abstractions;
 
+using NuxtIdentity.Core.Models;
+
 /// <summary>
 /// Service for managing refresh tokens.
 /// </summary>
@@ -34,4 +36,13 @@ public interface IRefreshTokenService
     /// </summary>
     /// <param name="userId">The user ID whose tokens should be revoked.</param>
     Task RevokeAllUserTokensAsync(string userId);
+
+    /// <summary>
+    /// Gets users with refresh token activity ordered by most recent login first.
+    /// </summary>
+    /// <returns>
+    /// A sequence containing one item per user with their latest refresh token creation time.
+    /// </returns>
+    Task<IReadOnlyList<RecentUserLogin>> GetUsersLoggedInRecentlyAsync();
+
 }

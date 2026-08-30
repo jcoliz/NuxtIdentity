@@ -179,6 +179,23 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
         LogOkUserIdCount(userId, userTokens.Count);
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<RecentUserLogin>> GetUsersLoggedInRecentlyAsync()
+    {
+        LogStarting();
+
+        var recentLogins = await _context.Set<RefreshTokenEntity>()
+            .GroupBy(token => token.UserId)
+            .Select(group => new RecentUserLogin(
+                group.Key,
+                group.Max(token => token.CreatedAt)))
+            .OrderByDescending(login => login.LastLoginAt)
+            .ToListAsync();
+
+        LogOkCount(recentLogins.Count);
+        return recentLogins;
+    }
+
     /// <summary>
     /// Deletes all expired refresh tokens from the database.
     /// </summary>

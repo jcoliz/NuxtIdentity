@@ -132,6 +132,26 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<RecentUserLogin>> GetUsersLoggedInRecentlyAsync()
+    {
+        await _lock.WaitAsync();
+        try
+        {
+            return _tokens
+                .GroupBy(t => t.UserId)
+                .Select(group => new RecentUserLogin(
+                    group.Key,
+                    group.Max(t => t.CreatedAt)))
+                .OrderByDescending(login => login.LastLoginAt)
+                .ToList();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     /// <summary>
     /// Formats a token key and secret into the composite token string.
     /// </summary>
