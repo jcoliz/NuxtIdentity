@@ -133,17 +133,42 @@ public class InMemoryRefreshTokenService : IRefreshTokenService
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<RecentUserLogin>> GetUsersLoggedInRecentlyAsync()
+    public async Task<IReadOnlyList<RecentUserLogin<TUser>>> GetUsersLoggedInRecentlyAsync<TUser>(
+        IQueryable<TUser> users,
+        string userIdPropertyName = "Id") where TUser : class
     {
         await _lock.WaitAsync();
         try
         {
+            var userIdProperty = typeof(TUser).GetProperty(userIdPropertyName);
+            if (userIdProperty == null)
+            {
+                throw new ArgumentException($"Property '{userIdPropertyName}' was not found on type '{typeof(TUser).Name}'.", nameof(userIdPropertyName));
+            }
+
+            if (userIdProperty.PropertyType != typeof(string))
+            {
+                throw new ArgumentException($"Property '{userIdPropertyName}' on type '{typeof(TUser).Name}' must be a string.", nameof(userIdPropertyName));
+            }
+
+            var usersById = users
+                .ToDictionary(
+                    user => (string)(userIdProperty.GetValue(user) ?? string.Empty),
+                    user => user,
+                    StringComparer.Ordinal);
+
             return _tokens
                 .GroupBy(t => t.UserId)
-                .Select(group => new RecentUserLogin(
-                    group.Key,
-                    group.Max(t => t.CreatedAt)))
-                .OrderByDescending(login => login.LastLoginAt)
+                .Select(group => new
+                {
+                    UserId = group.Key,
+                    LastLoginAt = group.Max(t => t.CreatedAt)
+                })
+                .Where(login => usersById.ContainsKey(login.UserId))
+                .Select(login => new RecentUserLogin<TUser>(
+                    usersById[login.UserId],
+                    login.LastLoginAt))
+                .OrderByDescending(x => x.LastLoginAt)
                 .ToList();
         }
         finally

@@ -180,16 +180,30 @@ public partial class EfRefreshTokenService<TContext> : IRefreshTokenService
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<RecentUserLogin>> GetUsersLoggedInRecentlyAsync()
+    public async Task<IReadOnlyList<RecentUserLogin<TUser>>> GetUsersLoggedInRecentlyAsync<TUser>(
+        IQueryable<TUser> users,
+        string userIdPropertyName = "Id") where TUser : class
     {
         LogStarting();
 
         var recentLogins = await _context.Set<RefreshTokenEntity>()
             .GroupBy(token => token.UserId)
-            .Select(group => new RecentUserLogin(
-                group.Key,
-                group.Max(token => token.CreatedAt)))
-            .OrderByDescending(login => login.LastLoginAt)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                LastLoginAt = group.Max(token => token.CreatedAt)
+            })
+            .Join(
+                users,
+                login => login.UserId,
+                user => EF.Property<string>(user, userIdPropertyName),
+                (login, user) => new
+                {
+                    User = user,
+                    login.LastLoginAt
+                })
+            .OrderByDescending(x => x.LastLoginAt)
+            .Select(x => new RecentUserLogin<TUser>(x.User, x.LastLoginAt))
             .ToListAsync();
 
         LogOkCount(recentLogins.Count);

@@ -40,9 +40,18 @@ public interface IRefreshTokenService
     /// <summary>
     /// Gets users with refresh token activity ordered by most recent login first.
     /// </summary>
+    /// <typeparam name="TUser">The user type.</typeparam>
+    /// <param name="users">
+    /// Queryable users source used to join with refresh tokens by user ID.
+    /// </param>
+    /// <param name="userIdPropertyName">
+    /// The property name on <typeparamref name="TUser"/> containing the user ID. Defaults to <c>Id</c>.
+    /// </param>
     /// <returns>
-    /// A sequence containing one item per user with their latest refresh token creation time.
+    /// A sequence containing one item per user with their user object and latest refresh token creation time.
     /// </returns>
-    Task<IReadOnlyList<RecentUserLogin>> GetUsersLoggedInRecentlyAsync();
+    Task<IReadOnlyList<RecentUserLogin<TUser>>> GetUsersLoggedInRecentlyAsync<TUser>(
+        IQueryable<TUser> users,
+        string userIdPropertyName = "Id") where TUser : class;
 
 }

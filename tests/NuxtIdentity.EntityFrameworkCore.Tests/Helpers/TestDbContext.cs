@@ -16,6 +16,8 @@ public class TestDbContext : DbContext
 
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
 
+    public DbSet<TestUserEntity> Users => Set<TestUserEntity>();
+
     public DbSet<InvitationEntity> Invitations => Set<InvitationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -24,4 +26,14 @@ public class TestDbContext : DbContext
         modelBuilder.ConfigureNuxtIdentityRefreshTokens();
         modelBuilder.ConfigureNuxtIdentityInvitations();
     }
+}
+
+/// <summary>
+/// Minimal user shape used in EF integration tests for joins by user ID.
+/// </summary>
+public class TestUserEntity
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string UserName { get; set; } = string.Empty;
 }

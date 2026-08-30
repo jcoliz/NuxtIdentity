@@ -262,6 +262,11 @@ public class InMemoryRefreshTokenServiceTests
         // Given two users with multiple login events at different times
         var user1Id = "user123";
         var user2Id = "user456";
+        var users = new[]
+        {
+            new TestUserEntity { Id = user1Id, UserName = "alice" },
+            new TestUserEntity { Id = user2Id, UserName = "bob" }
+        }.AsQueryable();
 
         await _service.GenerateRefreshTokenAsync(user1Id);
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
@@ -271,12 +276,19 @@ public class InMemoryRefreshTokenServiceTests
         await _service.GenerateRefreshTokenAsync(user1Id);
 
         // When querying users logged in recently
-        var recentUsers = await _service.GetUsersLoggedInRecentlyAsync();
+        var recentUsers = await _service.GetUsersLoggedInRecentlyAsync(users);
 
         // Then users should be deduplicated and ordered by recency
         Assert.That(recentUsers.Count, Is.EqualTo(2));
-        Assert.That(recentUsers[0].UserId, Is.EqualTo(user1Id));
+        Assert.That(recentUsers[0].User.Id, Is.EqualTo(user1Id));
         Assert.That(recentUsers[0].LastLoginAt, Is.EqualTo(expectedUser1LastLogin));
-        Assert.That(recentUsers[1].UserId, Is.EqualTo(user2Id));
+        Assert.That(recentUsers[1].User.Id, Is.EqualTo(user2Id));
+    }
+
+    private sealed class TestUserEntity
+    {
+        public string Id { get; init; } = string.Empty;
+
+        public string UserName { get; init; } = string.Empty;
     }
 }

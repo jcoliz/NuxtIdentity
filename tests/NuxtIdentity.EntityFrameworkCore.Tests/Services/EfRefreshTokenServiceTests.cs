@@ -252,6 +252,11 @@ public class EfRefreshTokenServiceTests
         var user1Id = "user123";
         var user2Id = "user456";
 
+        _context.Users.AddRange(
+            new TestUserEntity { Id = user1Id, UserName = "alice" },
+            new TestUserEntity { Id = user2Id, UserName = "bob" });
+        await _context.SaveChangesAsync();
+
         await _service.GenerateRefreshTokenAsync(user1Id);
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
         await _service.GenerateRefreshTokenAsync(user2Id);
@@ -260,13 +265,13 @@ public class EfRefreshTokenServiceTests
         await _service.GenerateRefreshTokenAsync(user1Id);
 
         // When querying users logged in recently
-        var recentUsers = await _service.GetUsersLoggedInRecentlyAsync();
+        var recentUsers = await _service.GetUsersLoggedInRecentlyAsync(_context.Users);
 
         // Then users should be deduplicated and ordered by recency
         Assert.That(recentUsers.Count, Is.EqualTo(2));
-        Assert.That(recentUsers[0].UserId, Is.EqualTo(user1Id));
+        Assert.That(recentUsers[0].User.Id, Is.EqualTo(user1Id));
         Assert.That(recentUsers[0].LastLoginAt, Is.EqualTo(expectedUser1LastLogin));
-        Assert.That(recentUsers[1].UserId, Is.EqualTo(user2Id));
+        Assert.That(recentUsers[1].User.Id, Is.EqualTo(user2Id));
     }
 
     #region Error Cases
