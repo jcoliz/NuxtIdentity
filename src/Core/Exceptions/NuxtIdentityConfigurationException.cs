@@ -6,7 +6,7 @@ namespace NuxtIdentity.Core.Exceptions;
 /// <remarks>
 /// This exception indicates a configuration error — the consumer forgot to register a
 /// required service. For example, the forgot-password endpoint requires an
-/// <c>IUserNotifier&lt;TUser&gt;</c> implementation to deliver reset codes. If none is
+/// <c>IUserNotifier</c> implementation to deliver reset codes. If none is
 /// registered, this exception is thrown so the misconfiguration is immediately visible
 /// rather than silently failing.
 /// </remarks>

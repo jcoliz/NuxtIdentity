@@ -74,7 +74,7 @@ public class NuxtIdentityExceptionTests
     public void ConfigurationException_WithMissingService_SetsProperties()
     {
         // Given: A missing service name
-        var missingService = "IUserNotifier<TUser>";
+        var missingService = "IUserNotifier";
 
         // When: Creating the configuration exception
         var exception = new NuxtIdentityConfigurationException(missingService);
@@ -90,7 +90,7 @@ public class NuxtIdentityExceptionTests
     public void ConfigurationException_WithCustomMessage_PreservesMessageAndService()
     {
         // Given: A missing service name and custom message
-        var missingService = "IUserNotifier<TUser>";
+        var missingService = "IUserNotifier";
         var customMessage = "Please register the notifier.";
 
         // When: Creating the exception with both
@@ -105,7 +105,7 @@ public class NuxtIdentityExceptionTests
     public void ConfigurationException_WithInnerException_PreservesAll()
     {
         // Given: A missing service, custom message, and inner exception
-        var missingService = "IUserNotifier<TUser>";
+        var missingService = "IUserNotifier";
         var customMessage = "Configuration error";
         var inner = new ArgumentException("bad arg");
 
@@ -142,7 +142,7 @@ public class NuxtIdentityExceptionTests
         // When: Catching it as the base NuxtIdentityException type
         try
         {
-            throw new NuxtIdentityConfigurationException("IUserNotifier<TUser>");
+            throw new NuxtIdentityConfigurationException("IUserNotifier");
         }
         catch (NuxtIdentityException ex)
         {
@@ -155,7 +155,7 @@ public class NuxtIdentityExceptionTests
 
         // And: The MissingService property should be accessible after casting
         var configException = (NuxtIdentityConfigurationException)caught!;
-        Assert.That(configException.MissingService, Is.EqualTo("IUserNotifier<TUser>"));
+        Assert.That(configException.MissingService, Is.EqualTo("IUserNotifier"));
     }
 
     #endregion

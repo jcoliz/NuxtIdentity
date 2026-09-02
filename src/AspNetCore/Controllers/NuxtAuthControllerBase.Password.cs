@@ -19,7 +19,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
     /// Always returns 204 No Content regardless of whether the user exists to prevent user enumeration.
     /// </remarks>
     /// <exception cref="NuxtIdentityConfigurationException">
-    /// Thrown when no <see cref="IUserNotifier{TUser}"/> implementation is registered.
+    /// Thrown when no <see cref="IUserNotifier"/> implementation is registered.
     /// The consumer must register an implementation in DI for the forgot-password flow to work.
     /// </exception>
     [HttpPost("forgot-password")]
@@ -32,7 +32,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>
         {
             LogNoUserNotifierConfigured();
             throw new NuxtIdentityConfigurationException(
-                nameof(IUserNotifier<TUser>));
+                nameof(IUserNotifier));
         }
 
         var user = await FindUserByUsernameOrEmailAsync(request.Username, request.Email);
@@ -43,10 +43,11 @@ public abstract partial class NuxtAuthControllerBase<TUser>
 
             var code = await UserManager.GeneratePasswordResetTokenAsync(user);
             var urlSafeCode = ToBase64Url(code);
+            var recipient = CreateNotificationRecipient(user);
 
             foreach (var notifier in UserNotifiers)
             {
-                await notifier.SendResetCodeAsync(user, urlSafeCode);
+                await notifier.SendResetCodeAsync(recipient, urlSafeCode);
             }
         }
 

@@ -306,7 +306,7 @@ public class NuxtAuthControllerTests
         var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
         var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
         var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier<TestUser>>>();
+        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier>>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
 
         var controller = new TestAuthController(

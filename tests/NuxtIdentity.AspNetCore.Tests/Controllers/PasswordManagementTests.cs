@@ -122,7 +122,7 @@ public class PasswordManagementTests
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
 
         // And: The notifier should have captured a reset code
-        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier>();
         var notifications = await notifier.GetNotificationsAsync();
         Assert.That(notifications, Has.Count.EqualTo(1));
         Assert.That(notifications[0].Code, Is.Not.Null.And.Not.Empty);
@@ -150,7 +150,7 @@ public class PasswordManagementTests
             refreshTokenService,
             _userManager,
             scope.ServiceProvider.GetRequiredService<SignInManager<TestUser>>(),
-            Enumerable.Empty<IUserNotifier<TestUser>>(),
+            Enumerable.Empty<IUserNotifier>(),
             Enumerable.Empty<IInvitationService>(),
             logger
         );
@@ -186,7 +186,7 @@ public class PasswordManagementTests
         await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
 
         // And: The reset code is retrieved from the test notifier
-        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier>();
         var notifications = await notifier.GetNotificationsAsync();
         var resetCode = notifications.First().Code;
 
@@ -216,7 +216,7 @@ public class PasswordManagementTests
         // And: The forgot-password flow has been completed
         var forgotRequest = new ForgotPasswordRequest { Username = username };
         await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
-        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier>();
         var notifications = await notifier.GetNotificationsAsync();
         var resetCode = notifications.First().Code;
 
@@ -250,7 +250,7 @@ public class PasswordManagementTests
         // And: The forgot-password flow has been completed
         var forgotRequest = new ForgotPasswordRequest { Username = username };
         await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
-        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier>();
         var notifications = await notifier.GetNotificationsAsync();
         var resetCode = notifications.First().Code;
 
@@ -323,7 +323,7 @@ public class PasswordManagementTests
         // And: A valid reset code has been generated
         var forgotRequest = new ForgotPasswordRequest { Username = username };
         await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
-        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier>();
         var notifications = await notifier.GetNotificationsAsync();
         var resetCode = notifications.First().Code;
 
@@ -357,7 +357,7 @@ public class PasswordManagementTests
         // And: A password reset code has been generated and password is reset
         var forgotRequest = new ForgotPasswordRequest { Username = username };
         await _client.PostAsJsonAsync("/api/auth/forgot-password", forgotRequest);
-        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier<TestUser>>();
+        var notifier = _factory.Services.GetRequiredService<InMemoryUserNotifier>();
         var notifications = await notifier.GetNotificationsAsync();
         var resetCode = notifications.First().Code;
 
@@ -596,7 +596,7 @@ public class PasswordManagementTests
         var jwtTokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService<TestUser>>();
         var claimsProviders = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserClaimsProvider<TestUser>>>();
         var refreshTokenService = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier<TestUser>>>();
+        var userNotifiers = scope.ServiceProvider.GetRequiredService<IEnumerable<IUserNotifier>>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TestAuthController>>();
 
         var controller = new TestAuthController(

@@ -73,7 +73,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     IRefreshTokenService refreshTokenService,
     UserManager<TUser> userManager,
     SignInManager<TUser> signInManager,
-    IEnumerable<IUserNotifier<TUser>> userNotifiers,
+    IEnumerable<IUserNotifier> userNotifiers,
     IEnumerable<IInvitationService> invitationServices,
     ILogger logger) : ControllerBase
     where TUser : IdentityUser, new()
@@ -101,7 +101,7 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
     /// <summary>
     /// Gets all registered user notifiers for sending notifications (e.g., email, audit log).
     /// </summary>
-    protected IEnumerable<IUserNotifier<TUser>> UserNotifiers { get; } = userNotifiers;
+    protected IEnumerable<IUserNotifier> UserNotifiers { get; } = userNotifiers;
 
     /// <summary>
     /// Gets the invitation service, or null if none is registered.
@@ -177,6 +177,19 @@ public abstract partial class NuxtAuthControllerBase<TUser>(
             }
         };
     }
+
+    /// <summary>
+    /// Creates a transport-neutral notification recipient payload from the identity user.
+    /// </summary>
+    /// <param name="user">Identity user to map.</param>
+    /// <returns>A <see cref="NotificationRecipient"/> containing the fields required by notifiers.</returns>
+    protected static NotificationRecipient CreateNotificationRecipient(TUser user) =>
+        new()
+        {
+            UserId = user.Id,
+            UserName = user.UserName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
+        };
 
     /// <summary>
     /// Creates a UserInfo object from an IdentityUser with roles and claims.

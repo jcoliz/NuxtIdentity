@@ -14,7 +14,7 @@ public class TestAuthController(
     IRefreshTokenService refreshTokenService,
     UserManager<TestUser> userManager,
     SignInManager<TestUser> signInManager,
-    IEnumerable<IUserNotifier<TestUser>> userNotifiers,
+    IEnumerable<IUserNotifier> userNotifiers,
     IEnumerable<IInvitationService> invitationServices,
     ILogger<TestAuthController> logger)
     : NuxtAuthControllerBase<TestUser>(

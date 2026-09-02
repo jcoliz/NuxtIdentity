@@ -73,9 +73,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
             services.AddNuxtIdentityAuthentication();
 
             // Register InMemoryUserNotifier for testing password reset flows
-            var testNotifier = new InMemoryUserNotifier<TestUser>();
-            services.AddSingleton<InMemoryUserNotifier<TestUser>>(testNotifier);
-            services.AddSingleton<IUserNotifier<TestUser>>(testNotifier);
+            var testNotifier = new InMemoryUserNotifier();
+            services.AddSingleton<InMemoryUserNotifier>(testNotifier);
+            services.AddSingleton<IUserNotifier>(testNotifier);
 
             // Add EF Core refresh token service
             services.AddNuxtIdentityEntityFramework<TestDbContext>();

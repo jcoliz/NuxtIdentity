@@ -31,7 +31,7 @@ public class AuthController(
     IRefreshTokenService refreshTokenService,
     UserManager<IdentityUser> userManager,
     SignInManager<IdentityUser> signInManager,
-    IEnumerable<IUserNotifier<IdentityUser>> userNotifiers,
+    IEnumerable<IUserNotifier> userNotifiers,
     IEnumerable<IInvitationService> invitationServices,
     ILogger<AuthController> logger)
     : NuxtAuthControllerBase<IdentityUser>(
