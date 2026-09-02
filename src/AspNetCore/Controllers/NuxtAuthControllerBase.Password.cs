@@ -45,9 +45,20 @@ public abstract partial class NuxtAuthControllerBase<TUser>
             var urlSafeCode = ToBase64Url(code);
             var recipient = CreateNotificationRecipient(user);
 
-            foreach (var notifier in UserNotifiers)
+            try
             {
-                await notifier.SendResetCodeAsync(recipient, urlSafeCode);
+                foreach (var notifier in UserNotifiers)
+                {
+                    await notifier.SendResetCodeAsync(recipient, urlSafeCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogEmailError(user.Id);
+
+                throw new NuxtIdentityException(
+                    "Email system failure. Your email was not sent, please try again later.",
+                    ex);
             }
         }
 

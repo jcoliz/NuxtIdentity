@@ -76,5 +76,8 @@ public abstract partial class NuxtAuthControllerBase<TUser>
 
     [LoggerMessage(28, LogLevel.Warning, "{Location}: Signup claim assignment failed User {UserId} {Errors}")]
     private partial void LogSignupClaimAssignmentFailedUserId(string userId, string errors, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(29, LogLevel.Error, "{Location}: Email delivery failed for user {UserId}")]
+    private partial void LogEmailError(string userId, [CallerMemberName] string? location = null);
     #endregion
 }
