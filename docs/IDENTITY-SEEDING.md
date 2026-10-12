@@ -307,8 +307,11 @@ existing user entry).
 Invalid entries, failed Identity results, and exceptions during individual
 operations are reported and do not stop unrelated seed operations. If a
 required user or role is unavailable, only dependent assignments or claims
-are skipped. A completion summary reports succeeded, failed, and skipped
-operations and signals partial completion when failures or skips occurred.
+are skipped with a warning. Existing roles, users, role assignments, claims,
+and invitations are logged as `Exists` at Information level with an
+already-exists reason, and are not counted as succeeded. A completion summary
+reports succeeded, failed, and skipped operations. Failures and warning-level
+skips signal partial completion; skips for existing data do not.
 
 `UserManager<TUser>` and `RoleManager<IdentityRole>` must be registered; missing
 required Identity services fail setup clearly. Cancellation is honored and

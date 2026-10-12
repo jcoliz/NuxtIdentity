@@ -108,6 +108,85 @@ public sealed class IdentitySeederTests
     }
 
     [Test]
+    public async Task SeedAsync_LogsExistingDataAsInformationalSkips()
+    {
+        var code = Guid.NewGuid();
+        _harness.Set("IdentitySeeder:Application:Roles:0:Name", "Reader");
+        _harness.Set("IdentitySeeder:Application:Users:0:UserName", "seed-user");
+        _harness.Set("IdentitySeeder:Application:Users:0:Roles:0", "Reader");
+        _harness.Set("IdentitySeeder:Application:Users:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:Users:0:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:UserName", "seed-user");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:Claims:0:Type", "department");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:Claims:0:Value", "engineering");
+        _harness.Set("IdentitySeeder:Application:RoleClaims:0:Role", "Reader");
+        _harness.Set("IdentitySeeder:Application:RoleClaims:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:RoleClaims:0:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Application:Invitations:0:Code", code.ToString("D"));
+
+        await _harness.SeedAsync();
+        Assert.That(_harness.LogEntries.Last().EventId, Is.EqualTo(2));
+        AssertSummary(_harness.LogEntries.Last(), succeeded: 7, failed: 0, skipped: 0);
+        var firstRunLogCount = _harness.LogEntries.Count;
+
+        await _harness.SeedAsync();
+
+        var repeatLogs = _harness.LogEntries.Skip(firstRunLogCount).ToArray();
+        Assert.That(repeatLogs.Select(log => log.EventId), Is.EqualTo(new[] { 9, 9, 9, 9, 9, 9, 9, 2 }));
+        Assert.That(repeatLogs.Take(7).Select(log => log.Properties["ItemKind"]),
+            Is.EqualTo(new[] { "role", "user", "user role", "user claim", "user claim", "role claim", "invitation" }));
+        AssertSummary(repeatLogs.Last(), succeeded: 0, failed: 0, skipped: 7);
+        Assert.That(repeatLogs.Select(log => log.Level), Is.All.EqualTo(LogLevel.Information));
+        Assert.That(_harness.InvitationCreateCount, Is.EqualTo(1));
+
+        _harness.Set("IdentitySeeder:Application:Roles:1:Name", "Contributor");
+        _harness.Set("IdentitySeeder:Application:Users:0:Roles:1", "Missing");
+        await _harness.SeedAsync();
+
+        Assert.That(_harness.LogEntries.Last().EventId, Is.EqualTo(3));
+        AssertSummary(_harness.LogEntries.Last(), succeeded: 1, failed: 0, skipped: 8);
+        Assert.That(_harness.LogEntries.Last().Level, Is.EqualTo(LogLevel.Warning));
+        Assert.That(_harness.LogEntries.Count(log => log.EventId == 6), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task SeedAsync_MissingDependencyAloneStillLogsWarningAndPartialCompletion()
+    {
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:UserName", "missing-user");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:Claims:0:Value", "read");
+
+        await _harness.SeedAsync();
+
+        Assert.That(_harness.LogEventIds, Is.EqualTo(new[] { 6, 3 }));
+        AssertSummary(_harness.LogEntries.Last(), succeeded: 0, failed: 0, skipped: 1);
+        Assert.That(_harness.LogEntries.Select(log => log.Level), Is.All.EqualTo(LogLevel.Warning));
+    }
+
+    [Test]
+    public async Task SeedAsync_InvitationFoundAfterCreateFailureIsLoggedAsSkipped()
+    {
+        var code = Guid.NewGuid();
+        _harness.Set("IdentitySeeder:Application:Invitations:0:Code", code.ToString("D"));
+        _harness.ThrowOnInvitationCreate = true;
+        _harness.CreateInvitationBeforeThrow = true;
+
+        await _harness.SeedAsync();
+
+        Assert.That(_harness.Invitations.ContainsKey(code), Is.True);
+        Assert.That(_harness.LogEventIds, Is.EqualTo(new[] { 9, 2 }));
+        AssertSummary(_harness.LogEntries.Last(), succeeded: 0, failed: 0, skipped: 1);
+        Assert.That(_harness.LogEntries.Select(log => log.Level), Is.All.EqualTo(LogLevel.Information));
+    }
+
+    private static void AssertSummary(CapturedLog log, int succeeded, int failed, int skipped)
+    {
+        Assert.That(log.Properties["Succeeded"], Is.EqualTo(succeeded));
+        Assert.That(log.Properties["Failed"], Is.EqualTo(failed));
+        Assert.That(log.Properties["Skipped"], Is.EqualTo(skipped));
+    }
+
+    [Test]
     public async Task SeedAsync_UserClaimsTargetsExistingUserByNormalizedUsernameWithoutUserDefinition()
     {
         // Given: A database user exists independently of seeding configuration.
@@ -497,6 +576,7 @@ public sealed class IdentitySeederTests
         public IReadOnlyDictionary<Guid, InvitationEntity> Invitations => _invitations;
         public IReadOnlyList<string> Logs => _loggerProvider.Messages;
         public IReadOnlyList<int> LogEventIds => _loggerProvider.EventIds;
+        public IReadOnlyList<CapturedLog> LogEntries => _loggerProvider.Entries;
         public string LogText => string.Join(Environment.NewLine, Logs);
         public int InvitationCreateCount => _invitationCreateCount;
         public string[] LastInvitationRoles => _lastInvitationRoles;
@@ -504,6 +584,7 @@ public sealed class IdentitySeederTests
         public TimeSpan? LastInvitationExpiry => _lastInvitationExpiry;
         public string? LastInvitationMetadata => _lastInvitationMetadata;
         public bool ThrowOnInvitationCreate { get; set; }
+        public bool CreateInvitationBeforeThrow { get; set; }
 
         public void Set(string key, string value)
         {
@@ -601,7 +682,11 @@ public sealed class IdentitySeederTests
                         Guid? code) =>
                     {
                         if (harness.ThrowOnInvitationCreate)
+                        {
+                            if (harness.CreateInvitationBeforeThrow)
+                                harness.AddExistingInvitation(code!.Value, InvitationStatus.Pending, email ?? string.Empty);
                             throw new InvalidOperationException($"Invitation code {code} failed.");
+                        }
 
                         var invitation = new InvitationEntity
                         {
@@ -640,20 +725,25 @@ public sealed class IdentitySeederTests
     {
         private readonly ConcurrentQueue<string> _messages = new();
         private readonly ConcurrentQueue<int> _eventIds = new();
+        private readonly ConcurrentQueue<CapturedLog> _entries = new();
 
         public IReadOnlyList<string> Messages => _messages.ToArray();
         public IReadOnlyList<int> EventIds => _eventIds.ToArray();
+        public IReadOnlyList<CapturedLog> Entries => _entries.ToArray();
 
-        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages, _eventIds);
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages, _eventIds, _entries);
 
         public void Dispose()
         {
         }
     }
 
+    private sealed record CapturedLog(int EventId, LogLevel Level, IReadOnlyDictionary<string, object?> Properties);
+
     private sealed class CapturingLogger(
         ConcurrentQueue<string> messages,
-        ConcurrentQueue<int> eventIds) : ILogger
+        ConcurrentQueue<int> eventIds,
+        ConcurrentQueue<CapturedLog> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
@@ -667,6 +757,9 @@ public sealed class IdentitySeederTests
         {
             messages.Enqueue(formatter(state, exception));
             eventIds.Enqueue(eventId.Id);
+            if (state is not IEnumerable<KeyValuePair<string, object?>> properties)
+                throw new InvalidOperationException("Expected structured logging state.");
+            entries.Enqueue(new CapturedLog(eventId.Id, logLevel, properties.ToDictionary()));
         }
     }
 

@@ -83,7 +83,7 @@ public sealed partial class IdentitySeeder<TUser>
                 await SeedInvitationsAsync(group, invitationService, summary, cancellationToken);
         }
 
-        if (summary.Failed == 0 && summary.Skipped == 0)
+        if (summary.Failed == 0 && summary.Skipped == summary.AlreadyExisting)
         {
             LogSeedingCompleted(summary.Succeeded, summary.Failed, summary.Skipped);
         }
@@ -112,7 +112,7 @@ public sealed partial class IdentitySeeder<TUser>
 
                 var existingRole = await _roleManager.FindByNameAsync(options.Name);
                 if (existingRole is not null)
-                    return SeedOperationResult.Success();
+                    return SeedOperationResult.AlreadyExists("Role already exists.");
 
                 string? id = null;
                 if (!string.IsNullOrWhiteSpace(options.Id))
@@ -150,7 +150,7 @@ public sealed partial class IdentitySeeder<TUser>
                     return SeedOperationResult.Failure("Username is required.");
 
                 if (await _userManager.FindByNameAsync(options.UserName) is not null)
-                    return SeedOperationResult.Success();
+                    return SeedOperationResult.AlreadyExists("User already exists.");
 
                 var user = Activator.CreateInstance<TUser>() ??
                     throw new InvalidOperationException("The configured Identity user type could not be instantiated.");
@@ -200,7 +200,7 @@ public sealed partial class IdentitySeeder<TUser>
 
                     var currentRoles = await _userManager.GetRolesAsync(user);
                     if (currentRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
-                        return SeedOperationResult.Success();
+                        return SeedOperationResult.AlreadyExists("User role assignment already exists.");
 
                     return IdentityResultToOutcome(await _userManager.AddToRoleAsync(user, roleName));
                 });
@@ -240,7 +240,7 @@ public sealed partial class IdentitySeeder<TUser>
                     var existingClaims = await _userManager.GetClaimsAsync(user);
                     if (existingClaims.Any(existing =>
                             existing.Type == claim.Type && existing.Value == claim.Value))
-                        return SeedOperationResult.Success();
+                        return SeedOperationResult.AlreadyExists("User claim already exists.");
 
                     return IdentityResultToOutcome(await _userManager.AddClaimAsync(user, claim));
                 });
@@ -277,7 +277,7 @@ public sealed partial class IdentitySeeder<TUser>
                     var existingClaims = await _roleManager.GetClaimsAsync(role);
                     if (existingClaims.Any(existing =>
                             existing.Type == claim.Type && existing.Value == claim.Value))
-                        return SeedOperationResult.Success();
+                        return SeedOperationResult.AlreadyExists("Role claim already exists.");
 
                     return IdentityResultToOutcome(await _roleManager.AddClaimAsync(role, claim));
                 });
@@ -315,7 +315,7 @@ public sealed partial class IdentitySeeder<TUser>
 
                 var codeText = code.ToString("D");
                 if (await invitationService.GetByCodeAsync(codeText) is not null)
-                    return SeedOperationResult.Success();
+                    return SeedOperationResult.AlreadyExists("Invitation already exists.");
 
                 try
                 {
@@ -335,7 +335,7 @@ public sealed partial class IdentitySeeder<TUser>
                 catch
                 {
                     if (await invitationService.GetByCodeAsync(codeText) is not null)
-                        return SeedOperationResult.Success();
+                        return SeedOperationResult.AlreadyExists("Invitation already exists.");
 
                     throw;
                 }
@@ -371,6 +371,11 @@ public sealed partial class IdentitySeeder<TUser>
                 case SeedOutcome.Skipped:
                     summary.Skipped++;
                     LogOperationSkipped(groupName, itemKind, identifyingKey, configurationPath, result.Reason);
+                    break;
+                case SeedOutcome.AlreadyExists:
+                    summary.Skipped++;
+                    summary.AlreadyExisting++;
+                    LogOperationAlreadyExists(groupName, itemKind, identifyingKey, configurationPath, result.Reason);
                     break;
             }
         }
@@ -421,6 +426,9 @@ public sealed partial class IdentitySeeder<TUser>
 
     [LoggerMessage(8, LogLevel.Warning, "{Location}: Configuration invalid. Group: {GroupName}; item: {ItemKind}; path: {ConfigurationPath}; reason: {Reason}.")]
     private partial void LogConfigurationInvalid(string groupName, string itemKind, string configurationPath, string reason, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(9, LogLevel.Information, "{Location}: Exists. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogOperationAlreadyExists(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason, [CallerMemberName] string? location = null);
 
     #endregion
 
@@ -625,13 +633,15 @@ public sealed partial class IdentitySeeder<TUser>
         public int Succeeded { get; set; }
         public int Failed { get; set; }
         public int Skipped { get; set; }
+        public int AlreadyExisting { get; set; }
     }
 
     private enum SeedOutcome
     {
         Succeeded,
         Failed,
-        Skipped
+        Skipped,
+        AlreadyExists
     }
 
     private sealed record SeedOperationResult(SeedOutcome Outcome, string? Reason = null)
@@ -639,5 +649,6 @@ public sealed partial class IdentitySeeder<TUser>
         public static SeedOperationResult Success() => new(SeedOutcome.Succeeded);
         public static SeedOperationResult Failure(string reason) => new(SeedOutcome.Failed, reason);
         public static SeedOperationResult Skipped(string reason) => new(SeedOutcome.Skipped, reason);
+        public static SeedOperationResult AlreadyExists(string reason) => new(SeedOutcome.AlreadyExists, reason);
     }
 }
