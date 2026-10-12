@@ -1,5 +1,5 @@
 ---
-status: In Review
+status: Approved
 prd: PRD-SEEDING.md
 issue: 29
 ---
@@ -105,8 +105,3 @@ Add focused NUnit tests in `tests/NuxtIdentity.AspNetCore.Tests` using the exist
 - Use the existing `IInvitationService.CreateAsync` code parameter; no invitation API or schema change is required.
 - Focused tests for binding, ordered create-only seeding, failure isolation, invitation behavior, and startup integration.
 - Update `src/AspNetCore/README.md` with registration, startup ordering, invitation-first guidance, and secret handling. No schema migration or frontend changes.
-
-## PRD Items Requiring Reconciliation
-
-1. **Invitation lifecycle:** Create-only semantics leave every existing invitation unchanged, including terminal states. The existing `CreateAsync` code parameter supports deterministic invitation creation without direct EF Core access.
-2. **API genericity:** The PRD's non-generic example must become generic to support the repository's `TUser : IdentityUser` pattern.

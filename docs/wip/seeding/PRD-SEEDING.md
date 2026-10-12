@@ -322,10 +322,10 @@ This targets the optional user example above and leverages .NET's built-in confi
 
 ```csharp
 // In Program.cs — Service registration
-builder.Services.AddNuxtIdentitySeeding(builder.Configuration);
+builder.Services.AddNuxtIdentitySeeding<ApplicationUser>(builder.Configuration);
 
 // In Program.cs — After database setup, before app.Run()
-await app.SeedNuxtIdentityAsync();
+await app.SeedNuxtIdentityAsync<ApplicationUser>();
 ```
 
 The seeder discovers all immediate child groups under `IdentitySeeder`, binds each to the same seed options shape (including optional `Order`), and processes them in the defined order. It does not hard-code group names:
