@@ -19,7 +19,6 @@ The preferred onboarding path is to seed roles and invitations, then let invitee
 - **Configuration binding:** Enumerate immediate children under `IdentitySeeder`, bind each group to the same options shape, and sort by `Order` ascending (default `0`) followed by `StringComparer.OrdinalIgnoreCase` group name. Do not model groups as an array or reserve group names.
 - **Invitation code:** The current `IInvitationService.CreateAsync` already accepts optional `Guid? code`; `EfInvitationService` already uses it and creates invitations as Pending. The PRD's open question is therefore resolved in the current codebase; no code parameter change is needed.
 - **Create-only behavior:** A matching role name, username, claim pair, role assignment, or invitation Code is already present and is a no-op. Never update its fields, reset a password, or change invitation lifecycle state. Missing roles, users, assignments, claims, and invitations may be created. Existing roles, users, and invitations do not prevent separate missing associations or claims from being added.
-- **Drift ownership limitation:** Standard Identity rows have no marker identifying which rows were created by configuration seeding. Without a ledger/schema change or a marker in Identity data, the library cannot reliably distinguish a seeded role/user from a runtime-created one after configuration is removed. Phase 1 uses advisory drift warnings: compare all persisted roles against the combined configured role names, and compare current role assignments for configured users against the combined desired assignments. Role warnings may include runtime-created roles. Exact detection of removed seeded users and their assignments is deferred; do not claim these warnings prove ownership. If strict seeded-only drift becomes mandatory, it requires an explicit ownership ledger design and schema change.
 - **Passwords:** Never include configured passwords in logs or exception details. Set a configured password through `UserManager` only when creating a new user. Never reset the password of an existing user from configuration. Configuration guidance recommends secret providers and invitation-first onboarding.
 - **No destructive reconciliation:** Existing roles, users, claims, assignments, and invitations are never updated or removed. Missing configured items can be created; configuration omissions do not revoke data.
 
@@ -72,17 +71,11 @@ For each ordered group, execute these stages in sequence:
 
 A stage is not wrapped in a single catch. Each configured item and each association/claim is an independent operation. A failure resolving one entity does not suppress unrelated items. Before a dependent operation, use the current database/manager state rather than assuming an earlier create succeeded.
 
-Groups are applied in order. References may use entities already present in the database or created by the current or earlier groups; the seeder does not defer a missing dependency until a later group. Existing database rows always win over configuration. When an item is absent, the first group in execution order that defines it supplies its initial fields; later groups cannot update those fields. Distinct missing role assignments and claims are separate items and may be added by any group. Drift evaluation happens once, after all groups finish.
+Groups are applied in order. References may use entities already present in the database or created by the current or earlier groups; the seeder does not defer a missing dependency until a later group. Existing database rows always win over configuration. When an item is absent, the first group in execution order that defines it supplies its initial fields; later groups cannot update those fields. Distinct missing role assignments and claims are separate items and may be added by any group.
 
 ## Invitation Handling
 
 No `IInvitationService` change is needed. Its existing `CreateAsync` accepts the configured `Guid? code`; the seeder checks for that code first and calls `CreateAsync` only when absent. Do not use `CreateTestAsync`; seeded invitations are ordinary application invitations. Existing invitations, including Accepted, Revoked, and Expired invitations, remain untouched.
-
-## Drift Reporting
-
-After all groups, construct combined desired role names and desired role assignments keyed by configured username. Read persisted roles through `RoleManager.Roles` only when the underlying role store supports `IQueryableRoleStore<IdentityRole>`; if it does not, skip role inventory drift checks with a warning rather than failing the seed run. Warn for persisted role names absent from combined configuration. For each configured user that resolves, compare current role names with the combined configured role list and warn for extra assignments; never remove them.
-
-This is intentionally advisory and has known limits: warnings for roles may include roles created at runtime, and removed users cannot be reliably identified after their configuration disappears. User-claim and role-claim drift are not reported in Phase 1 because omissions are additive and there is no ownership history. These limits should be documented alongside consumer guidance. Strict ownership-aware drift requires revising the PRD's no-schema-change constraint.
 
 ## Failure Handling and Logging
 
@@ -90,7 +83,7 @@ Use structured logs with group name, configuration path, item kind, and a safe i
 
 Catch and record exceptions at the smallest operation boundary, including failed `IdentityResult` and invitation-service outcomes. Continue later items, stages, and groups. Do not catch an `OperationCanceledException` when the supplied token is canceled. Fatal setup errors outside item processing (for example, missing required Identity services) propagate.
 
-Maintain run counters for succeeded, failed, and skipped operations. A no-change/idempotent operation counts as succeeded. Log a completion summary that explicitly signals partial completion when failures or skips occurred; item failures do not fail application startup. Drift warnings are reported separately and do not count as seed failures.
+Maintain run counters for succeeded, failed, and skipped operations. A no-change/idempotent operation counts as succeeded. Log a completion summary that explicitly signals partial completion when failures or skips occurred; item failures do not fail application startup.
 
 ## Testing
 
@@ -104,18 +97,16 @@ Add focused NUnit tests in `tests/NuxtIdentity.AspNetCore.Tests` using the exist
 - Invalid group/item configuration, invalid or empty invitation code, missing invitation service, and invitation lifecycle states are isolated and counted correctly.
 - Existing invitations in every lifecycle state remain unchanged; a configured code creates an invitation only when not already present.
 - Cancellation propagates; completion logs distinguish success, failure, and skip.
-- Drift warnings use combined group configuration and do not remove database data; tests document known ownership limitations.
 - Startup extension creates/disposes an async scope and runs after consumer-controlled database initialization.
 
 ## Implementation Scope
 
 - New configuration option models, scoped seeder, and service/startup extensions in `NuxtIdentity.AspNetCore`.
 - Use the existing `IInvitationService.CreateAsync` code parameter; no invitation API or schema change is required.
-- Focused tests for binding, ordered create-only seeding, failure isolation, invitation behavior, drift, and startup integration.
+- Focused tests for binding, ordered create-only seeding, failure isolation, invitation behavior, and startup integration.
 - Update `src/AspNetCore/README.md` with registration, startup ordering, invitation-first guidance, and secret handling. No schema migration or frontend changes.
 
 ## PRD Items Requiring Reconciliation
 
-1. **Drift scope:** Exact seeded-only drift detection is not achievable from standard Identity tables without ownership metadata. This design proposes advisory table/config comparisons and explicitly defers removed-seed provenance. Decide whether that limitation is acceptable or revise the no-schema-change constraint to add an ownership ledger.
-2. **Invitation lifecycle:** Create-only semantics leave every existing invitation unchanged, including terminal states. The existing `CreateAsync` code parameter supports deterministic invitation creation without direct EF Core access.
-3. **API genericity:** The PRD's non-generic example must become generic to support the repository's `TUser : IdentityUser` pattern.
+1. **Invitation lifecycle:** Create-only semantics leave every existing invitation unchanged, including terminal states. The existing `CreateAsync` code parameter supports deterministic invitation creation without direct EF Core access.
+2. **API genericity:** The PRD's non-generic example must become generic to support the repository's `TUser : IdentityUser` pattern.

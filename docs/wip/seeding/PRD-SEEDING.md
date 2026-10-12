@@ -20,7 +20,6 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Support seeding all five key Identity tables: AspNetUsers, AspNetRoles, AspNetUserRoles, AspNetUserClaims, and AspNetRoleClaims
 - [ ] Support seeding the NuxtIdentity Invitations table across all environments, with invitation-first onboarding as the recommended practice
 - [ ] Use non-destructive create-only semantics: create missing items, leave existing items unchanged, and never remove data
-- [ ] Log warnings when the database contains seeded-category items that are not present in the current configuration
 - [ ] Isolate and log individual seed-item failures without preventing other items or groups from seeding
 - [ ] Work across all three environments: Local Development, Container, and Deployment (including production)
 - [ ] Be agnostic to configuration source — works with appsettings.json, TOML, environment variables, or any IConfiguration provider
@@ -117,20 +116,6 @@ Direct user seeding, including passwords, is a supported capability rather than 
 
 - [ ] Claims defined under a role in configuration are added to the AspNetRoleClaims table
 - [ ] If a claim with the same type and value already exists for the role, no duplicate is created
-
-### Story 7: Developer - Receive warnings for config drift
-
-**As a** developer using NuxtIdentity
-**I want** to be warned at startup if the database contains seeded items not in my current configuration
-**So that** I can identify configuration drift or stale seed data
-
-**Acceptance Criteria**:
-
-- [ ] If the database contains roles that were previously seeded but are no longer in config, a warning is logged
-- [ ] If the database contains user-role assignments for seeded users that are no longer in config, a warning is logged
-- [ ] Warnings do not block application startup
-- [ ] Warnings include enough detail to identify the specific items causing the drift
-- [ ] Drift is evaluated against the combined desired data from all groups after seeding, respecting override precedence and additive associations; items configured in another group do not cause false drift warnings
 
 ### Story 8: Developer - Seed invitations from configuration
 
@@ -369,7 +354,6 @@ The seeder creates missing items and never modifies or removes existing items. T
 | Same item defined in multiple groups | First group in execution order can create it; later definitions do not change it; distinct missing associations and claims may still be added |
 | Individual item fails | Log the failure and continue with other items and groups; retain successful operations |
 | Required role or user is unavailable | Log and skip the dependent operation, then continue with unrelated operations |
-| Seeded-category item in DB, not in combined desired data | Log warning after all groups finish, do not remove |
 
 Group isolation prevents configuration-key collisions. If multiple groups refer to the same role name, username, or invitation Code, existing database state wins; when the seeder creates a missing item, the first group that reaches it supplies its initial fields. Later groups never update those fields. Associations and claims are independently matched and added only when missing. A user's password is set only when that user is first created; later configured password changes do not reset it.
 
@@ -384,7 +368,7 @@ Seeding processes every group in ascending `Order`, then group name as defined a
 5. RoleClaims (depends on Roles)
 6. Invitations (no dependencies on other seeded data; requires `IInvitationService`)
 
-References to roles or users seeded in another group must target data from an earlier group, or data already present in the database. A group must not rely on a later group to satisfy a dependency. Drift warnings are evaluated only after all groups have been processed, against their combined desired data.
+References to roles or users seeded in another group must target data from an earlier group, or data already present in the database. A group must not rely on a later group to satisfy a dependency.
 
 **Failure Isolation**:
 
@@ -404,7 +388,7 @@ Successful operations remain applied. Logs identify the group, item type, identi
 
 1. **Idempotent Execution** — Running the seeder multiple times produces the same database state. No duplicates, no errors on re-runs.
 2. **Non-Destructive** — The seeder never removes data. Items present in the database but absent from configuration trigger a warning log, not a deletion.
-3. **Named Seed Groups** — The seeder supports any number of named groups under `IdentitySeeder`, ordered by ascending optional `Order` (default `0`) and then ordinal, case-insensitive group name. Every group uses the same non-destructive create-only semantics. Independent contributions use distinct group paths; an existing database item is never updated by a later group. Distinct missing associations and claims remain additive. Drift checks use the combined desired data after all groups finish.
+3. **Named Seed Groups** — The seeder supports any number of named groups under `IdentitySeeder`, ordered by ascending optional `Order` (default `0`) and then ordinal, case-insensitive group name. Every group uses the same non-destructive create-only semantics. Independent contributions use distinct group paths; an existing database item is never updated by a later group. Distinct missing associations and claims remain additive.
 4. **Configuration Layering** — Passwords and other secrets should be provided via environment variables or secret stores, not config files. The library leverages standard .NET configuration layering for this.
 5. **Dependency Order** — Roles must be seeded before UserRoles and RoleClaims. Users must be seeded before UserRoles and UserClaims. Invitations have no dependencies on other seeded data.
 6. **Identity API Usage** — All operations go through UserManager and RoleManager (for Identity tables) or `IInvitationService` (for Invitations), not direct database access, ensuring password hashing, validation, and Identity behaviors are preserved.
@@ -443,7 +427,6 @@ Successful operations remain applied. Logs identify the group, item type, identi
 - Three or more independent configuration contributions coexist through distinct named groups without coordinating array indices
 - All seeded data survives application restarts without duplication
 - Newly configured items are created on the next startup; changes to fields of existing items are intentionally not applied
-- Warnings surface configuration drift clearly in logs
 - A deliberately failing seed item does not prevent valid subsequent items in the same group or later groups from seeding; logs and the completion summary expose the failure and any dependent skips
 
 ---
