@@ -21,6 +21,7 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Support seeding the NuxtIdentity Invitations table across all environments, with invitation-first onboarding as the recommended practice
 - [ ] Use non-destructive upsert semantics: create missing items, update existing ones to match config, but never remove data
 - [ ] Log warnings when the database contains seeded-category items that are not present in the current configuration
+- [ ] Isolate and log individual seed-item failures without preventing other items or groups from seeding
 - [ ] Work across all three environments: Local Development, Container, and Deployment (including production)
 - [ ] Be agnostic to configuration source — works with appsettings.json, TOML, environment variables, or any IConfiguration provider
 - [ ] Support any number of named seed groups so independent configuration contributions do not compete for array indices
@@ -161,6 +162,12 @@ Direct user seeding, including passwords, is a supported capability rather than 
 - [ ] Seeding runs after database creation/migration and Identity registration
 - [ ] Seeding is idempotent — running it multiple times produces the same result
 - [ ] Seeding logs information about what actions were taken at startup
+- [ ] A failure in an individual role, user, role assignment, claim, or invitation does not stop remaining items, later seeding stages, or later groups
+- [ ] Item failures include invalid item configuration, unsuccessful Identity/service results, and exceptions raised while processing an item; they are logged with the group, item type, identifying key or configuration path, and failure reason without exposing passwords or other secrets
+- [ ] If a failed item leaves a required role or user unavailable, only operations depending on that missing entity are skipped and logged; unrelated operations continue
+- [ ] Successful operations remain applied when another item fails; there is no all-or-nothing rollback of the seed run
+- [ ] A completion summary distinguishes successful, failed, and skipped operations; partial completion is not reported as full success
+- [ ] Individual item failures do not block application startup; cancellation or application shutdown is still honored rather than treated as an item failure
 
 ### Story 10: Site Administrator - Configure site-specific deployment seeding
 
@@ -361,6 +368,8 @@ The seeder uses non-destructive upsert behavior:
 | Item in config and in DB, matching | No change |
 | Item in config and in DB, different | Update DB to match config |
 | Same item defined in multiple groups | Later groups take precedence for configured updates; associations remain additive |
+| Individual item fails | Log the failure and continue with other items and groups; retain successful operations |
+| Required role or user is unavailable | Log and skip the dependent operation, then continue with unrelated operations |
 | Seeded-category item in DB, not in combined desired data | Log warning after all groups finish, do not remove |
 
 Group isolation prevents configuration-key collisions; it does not prevent intentional database-level updates when groups refer to the same role name, username, or invitation Code. Existing additive role and claim behavior remains unchanged. A later group omitting a user's password does not undo an earlier group's password operation.
@@ -377,6 +386,12 @@ Seeding processes every group in ascending `Order`, then group name as defined a
 6. Invitations (no dependencies on other seeded data; requires `IInvitationService`)
 
 References to roles or users seeded in another group must target data from an earlier group, or data already present in the database. A group must not rely on a later group to satisfy a dependency. Drift warnings are evaluated only after all groups have been processed, against their combined desired data.
+
+**Failure Isolation**:
+
+Failures are isolated at the individual operation level, not around a whole stage, group, or seed run. Invalid configuration for one item, a failed Identity/service result, or an exception while processing an item must be logged without aborting the remaining work. A failed role or user operation does not automatically suppress related operations if the required entity is already available in the database; skip and log only operations whose dependencies are actually unavailable. Failure of one role assignment or claim must not prevent other assignments or claims for the same entity from being attempted.
+
+Successful operations remain applied. Logs identify the group, item type, identifying key or configuration path, and failure reason without including secrets. The run ends with a summary of successful, failed, and skipped operations so partial completion is explicit. Item-level failures do not block startup; cancellation and application shutdown are not swallowed. Handling of failures outside individual item processing, such as inability to initialize required services, is a separate design concern.
 
 **Layers Affected**:
 
@@ -396,6 +411,7 @@ References to roles or users seeded in another group must target data from an ea
 6. **Identity API Usage** — All operations go through UserManager and RoleManager (for Identity tables) or `IInvitationService` (for Invitations), not direct database access, ensuring password hashing, validation, and Identity behaviors are preserved.
 7. **Optional Invitation Seeding** — Invitation seeding requires `IInvitationService` to be registered. If the service is not available (e.g., the consuming app doesn't use invitations), invitation configuration is skipped with a warning log. This keeps the seeder usable for Identity-only scenarios.
 8. **Invitation-First Onboarding** — Recommend seeding invitations and claiming them through the existing registration flow so passwords never need to be seeded. Direct user seeding with passwords remains a supported, optional capability.
+9. **Item-Level Failure Isolation** — Log failures and continue attempting other seed operations across all stages and groups. Skip and log operations only when required dependencies are unavailable, preserve successful operations, and report partial completion explicitly. Honor cancellation and shutdown.
 
 **Code Patterns to Follow**:
 
@@ -429,6 +445,7 @@ References to roles or users seeded in another group must target data from an ea
 - All seeded data survives application restarts without duplication
 - Configuration changes are reflected in the database on next startup
 - Warnings surface configuration drift clearly in logs
+- A deliberately failing seed item does not prevent valid subsequent items in the same group or later groups from seeding; logs and the completion summary expose the failure and any dependent skips
 
 ---
 
