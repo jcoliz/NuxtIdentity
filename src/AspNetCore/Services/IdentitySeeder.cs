@@ -407,7 +407,7 @@ public sealed partial class IdentitySeeder<TUser>
     [LoggerMessage(3, LogLevel.Warning, "{Location}: Partially completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
     private partial void LogSeedingPartiallyCompleted(int succeeded, int failed, int skipped, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(4, LogLevel.Debug, "{Location}: OK. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}.")]
+    [LoggerMessage(4, LogLevel.Information, "{Location}: OK. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}.")]
     private partial void LogOperationSucceeded(string groupName, string itemKind, string identifyingKey, string configurationPath, [CallerMemberName] string? location = null);
 
     [LoggerMessage(5, LogLevel.Warning, "{Location}: Failed. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
