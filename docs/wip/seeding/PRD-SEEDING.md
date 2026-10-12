@@ -1,7 +1,7 @@
 ---
-status: In Review
-design_document: TBD
-ado: TBD
+status: Approved
+design_document: ./DESIGN-SEEDING.md
+issue: 29
 ---
 
 # Product Requirements Document: Identity Seeding
