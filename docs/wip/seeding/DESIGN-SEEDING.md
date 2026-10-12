@@ -8,7 +8,7 @@ issue: 29
 
 ## Overview
 
-This document describes a configuration-driven startup seeder in `NuxtIdentity.AspNetCore`. It seeds roles, users, user-role associations, user claims, role claims, and invitations through ASP.NET Core Identity managers and `IInvitationService`. Configuration is discovered as arbitrary named groups under `IdentitySeeder`, merged into one desired state, and applied in deterministic group order without deleting database data.
+This document describes a configuration-driven startup seeder in `NuxtIdentity.AspNetCore`. It seeds roles, users, user-role associations, user claims, role claims, and invitations through ASP.NET Core Identity managers and `IInvitationService`. Configuration is discovered as arbitrary named groups under `IdentitySeeder`, merged into one desired state, and applied in deterministic group order. The seeder creates missing items but never changes or deletes existing items.
 
 The preferred onboarding path is to seed roles and invitations, then let invitees choose their own passwords through invitation registration. Direct user and password seeding remains supported for fixtures and other explicit needs.
 
@@ -18,10 +18,10 @@ The preferred onboarding path is to seed roles and invitations, then let invitee
 - **Generic user type:** The seeder must use the consumer's `UserManager<TUser>`, so the registration and startup extensions are generic: `AddNuxtIdentitySeeding<TUser>(...)` and `SeedNuxtIdentityAsync<TUser>(...)`, where `TUser : IdentityUser`. A non-generic API cannot resolve custom user types reliably from DI. Role seeding uses `IdentityRole`, matching the existing role-claims provider.
 - **Configuration binding:** Enumerate immediate children under `IdentitySeeder`, bind each group to the same options shape, and sort by `Order` ascending (default `0`) followed by `StringComparer.OrdinalIgnoreCase` group name. Do not model groups as an array or reserve group names.
 - **Invitation code:** The current `IInvitationService.CreateAsync` already accepts optional `Guid? code`; `EfInvitationService` already uses it and creates invitations as Pending. The PRD's open question is therefore resolved in the current codebase; no code parameter change is needed.
-- **Invitation updates:** `IInvitationService` currently supports creation and reads but has no update operation. Add a narrowly scoped `UpdatePendingAsync` operation (or equivalent explicitly pending-only update contract) so the seeder can update an existing invitation without accessing EF Core directly. Do not reset Accepted, Revoked, or Expired invitations to Pending. Preserve their lifecycle state and report that the configured invitation could not be fully applied.
+- **Create-only behavior:** A matching role name, username, claim pair, role assignment, or invitation Code is already present and is a no-op. Never update its fields, reset a password, or change invitation lifecycle state. Missing roles, users, assignments, claims, and invitations may be created. Existing roles, users, and invitations do not prevent separate missing associations or claims from being added.
 - **Drift ownership limitation:** Standard Identity rows have no marker identifying which rows were created by configuration seeding. Without a ledger/schema change or a marker in Identity data, the library cannot reliably distinguish a seeded role/user from a runtime-created one after configuration is removed. Phase 1 uses advisory drift warnings: compare all persisted roles against the combined configured role names, and compare current role assignments for configured users against the combined desired assignments. Role warnings may include runtime-created roles. Exact detection of removed seeded users and their assignments is deferred; do not claim these warnings prove ownership. If strict seeded-only drift becomes mandatory, it requires an explicit ownership ledger design and schema change.
-- **Passwords:** Never include configured passwords in logs or exception details. If a password is present, set it on every run through `UserManager`; if absent, leave the existing password unchanged. Configuration guidance recommends secret providers and invitation-first onboarding.
-- **No destructive reconciliation:** Roles, users, claims, assignments, and invitations absent from configuration are never removed. Claims and associations are additive; configuration omissions do not revoke them.
+- **Passwords:** Never include configured passwords in logs or exception details. Set a configured password through `UserManager` only when creating a new user. Never reset the password of an existing user from configuration. Configuration guidance recommends secret providers and invitation-first onboarding.
+- **No destructive reconciliation:** Existing roles, users, claims, assignments, and invitations are never updated or removed. Missing configured items can be created; configuration omissions do not revoke data.
 
 ## Configuration Models
 
@@ -63,24 +63,20 @@ Missing `UserManager<TUser>` or `RoleManager<IdentityRole>` is a service-registr
 
 For each ordered group, execute these stages in sequence:
 
-1. **Roles**: Validate each role. Find by name using `RoleManager<IdentityRole>`. Create when absent, using the configured string `Id` only for creation (parse a valid GUID and store its canonical string). If present, retain its immutable Identity ID; a configured ID mismatch is an item-level failure. Role names are the matching key. No role properties other than the supported name/ID are mutated.
-2. **Users**: Validate each username, find by username using `UserManager<TUser>`, or create a new `TUser` with the supported standard properties. For an existing user, update configured email and `EmailConfirmed` values and persist with `UpdateAsync` only when changed. The username is the lookup key; do not silently rename users. If a configured password is non-empty, use Identity password APIs: `AddPasswordAsync` for a user without a password and `GeneratePasswordResetTokenAsync` plus `ResetPasswordAsync` for an existing password. Never bypass password hashing or policy validation.
-3. **User roles**: For each configured assignment, resolve both user and role. If either is unavailable, skip and log only that assignment. Call `AddToRoleAsync` only when `GetRolesAsync` shows the user is not already in the role. Do not remove unconfigured memberships.
-4. **User claims**: Resolve the user and read existing claims via `GetClaimsAsync`. Add each missing exact `(Type, Value)` pair using `AddClaimAsync`. Existing claims are retained; same type with another value remains a separate claim.
-5. **Role claims**: Resolve the role and read existing claims via `RoleManager.GetClaimsAsync`. Add each missing exact `(Type, Value)` pair with `AddClaimAsync`. Existing claims are retained.
-6. **Invitations**: Validate code and fields. Look up by code with `IInvitationService.GetByCodeAsync`. Create missing invitations with `CreateAsync`, supplying code and all configured fields. For an existing Pending invitation, update only when configured values differ using the new pending-only service operation. If the existing invitation is Accepted, Revoked, or Expired, do not change lifecycle state; log the unapplied configuration as a failed item. A uniqueness race during create is caught as an item failure; re-read by code and attempt the pending update once if appropriate.
+1. **Roles**: Validate each role. Find by name using `RoleManager<IdentityRole>`. Create when absent, using the configured string `Id` only for creation (parse a valid GUID and store its canonical string). If present, make no changes, even if a configured ID differs. Role names are the matching key.
+2. **Users**: Validate each username and find by username using `UserManager<TUser>`. If absent, create a new `TUser` with the supported standard properties; if a non-empty password is configured, set it through Identity password APIs as part of user creation. If present, make no changes to its username, email, `EmailConfirmed`, or password, even if configured values differ. The username is the matching key; do not silently rename users or reset passwords.
+3. **User roles**: For each configured assignment, resolve both user and role. If either is unavailable, skip and log only that assignment. Call `AddToRoleAsync` only when `GetRolesAsync` shows the user is not already in the role. An existing assignment is a no-op; do not remove unconfigured memberships.
+4. **User claims**: Resolve the user and read existing claims via `GetClaimsAsync`. Add each missing exact `(Type, Value)` pair using `AddClaimAsync`. An existing claim is a no-op; same type with another value is a distinct claim and may be added.
+5. **Role claims**: Resolve the role and read existing claims via `RoleManager.GetClaimsAsync`. Add each missing exact `(Type, Value)` pair with `AddClaimAsync`. Existing claims are no-ops.
+6. **Invitations**: Validate code and fields. Look up by code with `IInvitationService.GetByCodeAsync`. Create a missing invitation with `CreateAsync`, supplying code and all configured fields. If an invitation with that code already exists, make no changes regardless of its configured-field differences or lifecycle state. On a uniqueness race during create, re-read by code and treat the now-existing invitation as a no-op.
 
 A stage is not wrapped in a single catch. Each configured item and each association/claim is an independent operation. A failure resolving one entity does not suppress unrelated items. Before a dependent operation, use the current database/manager state rather than assuming an earlier create succeeded.
 
-Groups are applied in order. References may use entities already present in the database or created by the current or earlier groups; the seeder does not defer a missing dependency until a later group. Later groups may update supported fields for the same role/user/invitation. Role assignments and claims accumulate across groups. Drift evaluation happens once, after all groups finish.
+Groups are applied in order. References may use entities already present in the database or created by the current or earlier groups; the seeder does not defer a missing dependency until a later group. Existing database rows always win over configuration. When an item is absent, the first group in execution order that defines it supplies its initial fields; later groups cannot update those fields. Distinct missing role assignments and claims are separate items and may be added by any group. Drift evaluation happens once, after all groups finish.
 
-## Invitation Service Change
+## Invitation Handling
 
-**Files**: `src/Core/Abstractions/IInvitationService.cs` and `src/EntityFrameworkCore/Services/EfInvitationService.cs`
-
-Add a pending-only update contract for an invitation identified by code, covering `Email`, `Roles`, `Claims`, `Metadata`, and expiration. The EF implementation must load the entity, return a clear not-found/non-pending outcome (or a typed result), update only those fields for Pending state, preserve `Code`, `Id`, `CreatedAt`, acceptance fields, and `IsTest`, then save. Keep it on `IInvitationService` so the seeder remains independent of the storage implementation. Do not use `CreateTestAsync`; seeded invitations are ordinary application invitations.
-
-If the interface contract is instead designed to throw on not found/non-pending, document those outcomes and handle them as item results in the seeder. Do not treat an accepted/revoked invitation as an upsertable pending invitation.
+No `IInvitationService` change is needed. Its existing `CreateAsync` accepts the configured `Guid? code`; the seeder checks for that code first and calls `CreateAsync` only when absent. Do not use `CreateTestAsync`; seeded invitations are ordinary application invitations. Existing invitations, including Accepted, Revoked, and Expired invitations, remain untouched.
 
 ## Drift Reporting
 
@@ -101,12 +97,12 @@ Maintain run counters for succeeded, failed, and skipped operations. A no-change
 Add focused NUnit tests in `tests/NuxtIdentity.AspNetCore.Tests` using the existing Identity test stores and Gherkin-style Given/When/Then comments:
 
 - Configuration binds arbitrary named groups and sorts by `Order`, then case-insensitive group name; missing `Order` is zero.
-- A later group updates a matching role/user/invitation while role assignments and claims remain additive.
+- Existing role/user/invitation fields are never changed; later groups can add distinct missing role assignments and claims.
 - Repeated runs do not duplicate roles, users, memberships, claims, or invitations.
-- User creation/update uses UserManager; password add/reset honors Identity validation and logs do not contain passwords.
+- User creation uses UserManager; a configured password is applied only for a newly created user, honors Identity validation, and is never logged.
 - A failed role/user/claim/assignment/invitation does not prevent later items or groups; dependent operations alone are skipped when entities are unavailable.
 - Invalid group/item configuration, invalid or empty invitation code, missing invitation service, and invitation lifecycle states are isolated and counted correctly.
-- Pending invitations update through `IInvitationService`; accepted/revoked/expired invitations are not reset.
+- Existing invitations in every lifecycle state remain unchanged; a configured code creates an invitation only when not already present.
 - Cancellation propagates; completion logs distinguish success, failure, and skip.
 - Drift warnings use combined group configuration and do not remove database data; tests document known ownership limitations.
 - Startup extension creates/disposes an async scope and runs after consumer-controlled database initialization.
@@ -114,12 +110,12 @@ Add focused NUnit tests in `tests/NuxtIdentity.AspNetCore.Tests` using the exist
 ## Implementation Scope
 
 - New configuration option models, scoped seeder, and service/startup extensions in `NuxtIdentity.AspNetCore`.
-- Extend `IInvitationService` and `EfInvitationService` with pending-only update semantics.
-- Focused tests for binding, ordered upserts, failure isolation, invitation behavior, drift, and startup integration.
+- Use the existing `IInvitationService.CreateAsync` code parameter; no invitation API or schema change is required.
+- Focused tests for binding, ordered create-only seeding, failure isolation, invitation behavior, drift, and startup integration.
 - Update `src/AspNetCore/README.md` with registration, startup ordering, invitation-first guidance, and secret handling. No schema migration or frontend changes.
 
 ## PRD Items Requiring Reconciliation
 
 1. **Drift scope:** Exact seeded-only drift detection is not achievable from standard Identity tables without ownership metadata. This design proposes advisory table/config comparisons and explicitly defers removed-seed provenance. Decide whether that limitation is acceptable or revise the no-schema-change constraint to add an ownership ledger.
-2. **Invitation upsert lifecycle:** A requirement to reset every existing invitation to Pending conflicts with invitation lifecycle safety. This design preserves terminal states and only updates Pending invitations; confirm this is the intended behavior.
+2. **Invitation lifecycle:** Create-only semantics leave every existing invitation unchanged, including terminal states. The existing `CreateAsync` code parameter supports deterministic invitation creation without direct EF Core access.
 3. **API genericity:** The PRD's non-generic example must become generic to support the repository's `TUser : IdentityUser` pattern.

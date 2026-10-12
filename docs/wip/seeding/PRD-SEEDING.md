@@ -19,7 +19,7 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Provide a reusable library feature that seeds ASP.NET Identity tables and NuxtIdentity-owned tables from .NET Configuration
 - [ ] Support seeding all five key Identity tables: AspNetUsers, AspNetRoles, AspNetUserRoles, AspNetUserClaims, and AspNetRoleClaims
 - [ ] Support seeding the NuxtIdentity Invitations table across all environments, with invitation-first onboarding as the recommended practice
-- [ ] Use non-destructive upsert semantics: create missing items, update existing ones to match config, but never remove data
+- [ ] Use non-destructive create-only semantics: create missing items, leave existing items unchanged, and never remove data
 - [ ] Log warnings when the database contains seeded-category items that are not present in the current configuration
 - [ ] Isolate and log individual seed-item failures without preventing other items or groups from seeding
 - [ ] Work across all three environments: Local Development, Container, and Deployment (including production)
@@ -89,8 +89,8 @@ Direct user seeding, including passwords, is a supported capability rather than 
 **Acceptance Criteria**:
 
 - [ ] Users defined in configuration are created in the AspNetUsers table if they do not exist
-- [ ] User passwords are set using ASP.NET Identity's UserManager so password hashing and policy validation apply
-- [ ] If a user already exists by username, their password is updated to match configuration
+- [ ] Passwords for newly created users are set using ASP.NET Identity's UserManager so password hashing and policy validation apply
+- [ ] If a user already exists by username, its stored properties and password are left unchanged
 - [ ] Users are assigned to the roles specified in configuration via the AspNetUserRoles table
 - [ ] If a user already has a role assignment, no duplicate is created
 - [ ] Missing role assignments from config are added to existing users
@@ -144,9 +144,9 @@ Direct user seeding, including passwords, is a supported capability rather than 
 - [ ] Seeded invitations support specifying: Code (GUID, required), Email, Roles, Claims, Metadata, and ExpiresIn (duration)
 - [ ] Recommended examples seed invitations instead of password-bearing users; recipients choose their passwords through the existing invitation-claim registration flow
 - [ ] The developer provides a predictable Code (GUID) in configuration so that tests and manual workflows can reference it
-- [ ] All seeded invitations are created with Pending status
-- [ ] Seeded invitations follow the same upsert semantics as other seeded data (create if missing, update if different, never delete)
-- [ ] The upsert match key is Code — if an invitation with the same Code already exists, it is updated rather than duplicated
+- [ ] Newly created invitations have Pending status; existing invitations retain their current status
+- [ ] Seeded invitations use create-only semantics (create if missing, leave an existing invitation unchanged, never delete)
+- [ ] The match key is Code — if an invitation with the same Code already exists, no changes are made to it
 - [ ] The seeder never seeds an empty GUID (`00000000-0000-0000-0000-000000000000`). An empty GUID in configuration is treated as a misconfiguration and generates a warning
 - [ ] Seeding invitations requires `IInvitationService` to be registered; if missing, invitation seeding is skipped with a warning
 
@@ -185,7 +185,7 @@ Direct user seeding, including passwords, is a supported capability rather than 
 - [ ] Supports any number of arbitrary named groups; `Application`, `Environment`, and `Deployment` are conventions, not reserved names
 - [ ] Every group supports the same roles, users, role claims, and invitations
 - [ ] Groups are processed by ascending optional `Order` (default `0`), with group name in ordinal, case-insensitive order as the tie-breaker
-- [ ] Later groups can intentionally update the same seeded item using the existing non-destructive upsert semantics
+- [ ] A later group defining the same role, username, or invitation Code does not update the existing item; it may still contribute distinct missing associations or claims
 - [ ] Separate groups preserve independent contributions; providers targeting the same group path follow standard .NET configuration precedence
 - [ ] Secrets can target a specific group's fields without duplicating that group's non-secret configuration
 
@@ -296,7 +296,7 @@ UserRoles and UserClaims are nested under their parent User entries for ergonomi
 
 Seed roles and invitations, then have recipients claim their invitations through the existing registration flow. Roles and claims come from the invitation, while the recipient supplies their password during registration. The seeder does not need to receive, store, or reset that password. This is the preferred practice across Local Development, Container, and Deployment.
 
-Direct user seeding remains supported for scenarios that require pre-created accounts, including test fixtures. It is not disabled or deprecated, and its password-upsert semantics remain unchanged.
+Direct user seeding remains supported for scenarios that require pre-created accounts, including test fixtures. It is not disabled or deprecated. A configured password is applied only when the user is created; it never resets an existing user's password.
 
 **Optional Direct User Seeding** (capability example, not the recommended onboarding workflow):
 
@@ -358,21 +358,20 @@ foreach (var group in groups
 }
 ```
 
-**Upsert Semantics**:
+**Create-Only Semantics**:
 
-The seeder uses non-destructive upsert behavior:
+The seeder creates missing items and never modifies or removes existing items. The match key identifies whether an item already exists; a matching item is a no-op even if other configured fields differ. For a user, role assignments and claims are separate items: missing configured associations and claims may be added to an existing user or role, while existing associations and claims are left unchanged.
 
 | Scenario | Behavior |
 | --- | --- |
 | Item in config, not in DB | Create it |
-| Item in config and in DB, matching | No change |
-| Item in config and in DB, different | Update DB to match config |
-| Same item defined in multiple groups | Later groups take precedence for configured updates; associations remain additive |
+| Item in config and in DB | No change, even when configured fields differ |
+| Same item defined in multiple groups | First group in execution order can create it; later definitions do not change it; distinct missing associations and claims may still be added |
 | Individual item fails | Log the failure and continue with other items and groups; retain successful operations |
 | Required role or user is unavailable | Log and skip the dependent operation, then continue with unrelated operations |
 | Seeded-category item in DB, not in combined desired data | Log warning after all groups finish, do not remove |
 
-Group isolation prevents configuration-key collisions; it does not prevent intentional database-level updates when groups refer to the same role name, username, or invitation Code. Existing additive role and claim behavior remains unchanged. A later group omitting a user's password does not undo an earlier group's password operation.
+Group isolation prevents configuration-key collisions. If multiple groups refer to the same role name, username, or invitation Code, existing database state wins; when the seeder creates a missing item, the first group that reaches it supplies its initial fields. Later groups never update those fields. Associations and claims are independently matched and added only when missing. A user's password is set only when that user is first created; later configured password changes do not reset it.
 
 **Seeding Order**:
 
@@ -405,7 +404,7 @@ Successful operations remain applied. Logs identify the group, item type, identi
 
 1. **Idempotent Execution** — Running the seeder multiple times produces the same database state. No duplicates, no errors on re-runs.
 2. **Non-Destructive** — The seeder never removes data. Items present in the database but absent from configuration trigger a warning log, not a deletion.
-3. **Named Seed Groups** — The seeder supports any number of named groups under `IdentitySeeder`, ordered by ascending optional `Order` (default `0`) and then ordinal, case-insensitive group name. Every group uses the same non-destructive upsert semantics. Independent contributions use distinct group paths; later groups may intentionally update the same database items. Drift checks use the combined desired data after all groups finish.
+3. **Named Seed Groups** — The seeder supports any number of named groups under `IdentitySeeder`, ordered by ascending optional `Order` (default `0`) and then ordinal, case-insensitive group name. Every group uses the same non-destructive create-only semantics. Independent contributions use distinct group paths; an existing database item is never updated by a later group. Distinct missing associations and claims remain additive. Drift checks use the combined desired data after all groups finish.
 4. **Configuration Layering** — Passwords and other secrets should be provided via environment variables or secret stores, not config files. The library leverages standard .NET configuration layering for this.
 5. **Dependency Order** — Roles must be seeded before UserRoles and RoleClaims. Users must be seeded before UserRoles and UserClaims. Invitations have no dependencies on other seeded data.
 6. **Identity API Usage** — All operations go through UserManager and RoleManager (for Identity tables) or `IInvitationService` (for Invitations), not direct database access, ensuring password hashing, validation, and Identity behaviors are preserved.
@@ -426,12 +425,12 @@ Successful operations remain applied. Logs identify the group, item type, identi
 
 - [X] **Library Packaging**: Should seeding live in an existing NuxtIdentity package or in a new dedicated package? **A**: Seeding lives in `NuxtIdentity.AspNetCore`. It shares the same ASP.NET Core Identity dependencies (UserManager, RoleManager) and will always be used together. Extraction to a separate package remains possible later without breaking the API.
 - [X] **Custom User Types**: Should the seeder support seeding custom properties on derived user types? **A**: Not for the initial release. Only standard `IdentityUser` properties (UserName, Email, Password, EmailConfirmed) are supported. Custom user type extensibility can be added when the need arises.
-- [X] **Password Update on Upsert**: When a user already exists and the config has a password, should the password always be reset to match config? **A**: Yes, always reset to match config. This follows the "ensure DB matches config" principle. If a developer doesn't want to re-set a password, they omit the `Password` field for that user — the seeder skips password operations when Password is null/empty.
+- [X] **Existing Seed Items**: Should a configured item that already exists be updated to match configuration? **A**: No. Existing roles, users, and invitations are left unchanged, including user passwords and scalar properties. Existing role assignments and claims are also left unchanged; missing configured assignments and claims may be added as separate items. This avoids startup configuration unexpectedly changing established or runtime-managed data.
 - [X] **EmailConfirmed Default**: Should `EmailConfirmed` default to `true` for seeded users? **A**: Yes. Seeded users are pre-trusted, so `EmailConfirmed` defaults to `true`. Developers can explicitly set `"EmailConfirmed": false` per user in config for test scenarios that require an unconfirmed user.
 - [X] **Section Name**: Is `IdentitySeeder` the right configuration section name? **A**: Yes. `IdentitySeeder` is concise, descriptive, and doesn't tie it to Nuxt since the feature is Identity-generic. Follows .NET PascalCase conventions.
 - [X] **Multiple Configuration Contributions**: How should more than two independent sources contribute seed data? **A**: Use arbitrary named groups under `IdentitySeeder`, not an outer array or a fixed list of names. `Application`, `Environment`, and `Deployment` are recommended conventions with example orders `0`, `100`, and `200`. Optional `Order` defaults to `0`; ties use ordinal, case-insensitive group-name ordering. Shared group paths retain normal .NET provider precedence and key-level array merging.
 - [X] **Preferred User Onboarding**: Should password-based user seeding remain supported? **A**: Yes, but prefer seeding invitations and claiming them through the existing registration flow. Recommended examples do not seed passwords; direct user/password seeding remains available when required.
-- [ ] **Invitation Seeding API**: `IInvitationService.CreateAsync` currently generates a random GUID for the code. The seeder needs to provide a specific code from configuration. Should `CreateAsync` accept an optional `code` parameter, or should the seeder bypass the service and write directly via EF Core? This is a design-time decision.
+- [X] **Invitation Seeding API**: Does the seeder need a new invitation update API or direct EF Core access? **A**: No. `IInvitationService.CreateAsync` already accepts an optional code. The seeder looks up by Code and calls `CreateAsync` only when that code is absent; an existing invitation is left unchanged in any lifecycle state.
 
 ---
 
@@ -443,7 +442,7 @@ Successful operations remain applied. Logs identify the group, item type, identi
 - Consumers can define their complete Identity seed data in configuration with zero custom C# seeding code
 - Three or more independent configuration contributions coexist through distinct named groups without coordinating array indices
 - All seeded data survives application restarts without duplication
-- Configuration changes are reflected in the database on next startup
+- Newly configured items are created on the next startup; changes to fields of existing items are intentionally not applied
 - Warnings surface configuration drift clearly in logs
 - A deliberately failing seed item does not prevent valid subsequent items in the same group or later groups from seeding; logs and the completion summary expose the failure and any dependent skips
 
