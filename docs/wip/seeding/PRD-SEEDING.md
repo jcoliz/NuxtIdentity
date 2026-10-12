@@ -15,6 +15,7 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 ## Goals & Non-Goals
 
 ### Goals
+
 - [ ] Provide a reusable library feature that seeds ASP.NET Identity tables and NuxtIdentity-owned tables from .NET Configuration
 - [ ] Support seeding all five key Identity tables: AspNetUsers, AspNetRoles, AspNetUserRoles, AspNetUserClaims, and AspNetRoleClaims
 - [ ] Support seeding the NuxtIdentity Invitations table for test and development environments
@@ -24,6 +25,7 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Be agnostic to configuration source — works with appsettings.json, TOML, environment variables, or any IConfiguration provider
 
 ### Non-Goals
+
 - Will NOT delete or remove data from the database that is not in the configuration (non-destructive)
 - Will NOT manage runtime-created data (e.g., users who sign up through the application)
 - Will NOT provide a UI or API for managing seed data — this is a startup-time, configuration-driven feature
@@ -34,11 +36,13 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 ## User Stories
 
 ### Story 1: Application Developer - Seed test fixture roles separate from environment configuration
+
 **As an** application developer using NuxtIdentity
 **I want** to define roles and data required by functional tests in application-level configuration
 **So that** my test fixtures remain consistent across all environments without being overwritten by environment-specific configuration
 
 **Acceptance Criteria**:
+
 - [ ] Can define roles in `IdentitySeeder:Application` section that persist across all environments
 - [ ] Application-level roles are seeded before environment-specific roles
 - [ ] Application-level configuration can include roles with fixed GUIDs for test stability
@@ -46,11 +50,13 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Works with any IConfiguration source including appsettings.json, TOML, and environment variables
 
 ### Story 2: Site Administrator - Configure environment-specific seeding without overwriting test fixtures
+
 **As a** site administrator configuring a deployment environment
 **I want** to define environment-specific users, roles, and invitations
 **So that** I can seed environment-specific administrators and invitations without affecting application-level test fixtures
 
 **Acceptance Criteria**:
+
 - [ ] Can define environment-specific data in `IdentitySeeder:Environment` section
 - [ ] Environment-specific seeding adds to (not replaces) application-level seeding
 - [ ] Can seed site administrators with environment-specific credentials
@@ -58,21 +64,25 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Configuration in `appsettings.Production.json` seamlessly merges with application-level fixtures
 
 ### Story 3: Developer - Seed roles from configuration
+
 **As a** developer using NuxtIdentity
 **I want** to define roles in my application configuration
 **So that** my application has the required roles available on every startup without writing custom code
 
 **Acceptance Criteria**:
+
 - [ ] Roles defined in either configuration section are created in the AspNetRoles table if they do not exist
 - [ ] If a role already exists by name, no error occurs and no duplicate is created
 - [ ] Works with any IConfiguration source including appsettings.json, TOML, and environment variables
 
 ### Story 4: Developer - Seed users with role assignments from configuration
+
 **As a** developer using NuxtIdentity
 **I want** to define users with their passwords and role assignments in configuration
 **So that** my application has the required user accounts ready on every startup
 
 **Acceptance Criteria**:
+
 - [ ] Users defined in configuration are created in the AspNetUsers table if they do not exist
 - [ ] User passwords are set using ASP.NET Identity's UserManager so password hashing and policy validation apply
 - [ ] If a user already exists by username, their password is updated to match configuration
@@ -81,41 +91,49 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Missing role assignments from config are added to existing users
 
 ### Story 5: Developer - Seed user claims from configuration
+
 **As a** developer using NuxtIdentity
 **I want** to define claims for specific users in configuration
 **So that** my users have the required claims for authorization on every startup
 
 **Acceptance Criteria**:
+
 - [ ] Claims defined under a user in configuration are added to the AspNetUserClaims table
 - [ ] If a claim with the same type and value already exists for the user, no duplicate is created
 - [ ] Claims with the same type but different values are added as additional claims, matching ASP.NET Identity behavior
 
 ### Story 6: Developer - Seed role claims from configuration
+
 **As a** developer using NuxtIdentity
 **I want** to define claims for specific roles in configuration
 **So that** all users in a role automatically inherit those claims
 
 **Acceptance Criteria**:
+
 - [ ] Claims defined under a role in configuration are added to the AspNetRoleClaims table
 - [ ] If a claim with the same type and value already exists for the role, no duplicate is created
 
 ### Story 7: Developer - Receive warnings for config drift
+
 **As a** developer using NuxtIdentity
 **I want** to be warned at startup if the database contains seeded items not in my current configuration
 **So that** I can identify configuration drift or stale seed data
 
 **Acceptance Criteria**:
+
 - [ ] If the database contains roles that were previously seeded but are no longer in config, a warning is logged
 - [ ] If the database contains user-role assignments for seeded users that are no longer in config, a warning is logged
 - [ ] Warnings do not block application startup
 - [ ] Warnings include enough detail to identify the specific items causing the drift
 
 ### Story 8: Developer - Seed invitations from configuration
+
 **As a** developer using NuxtIdentity
 **I want** to define invitations in my application configuration
 **So that** my test and development environments have predictable invitation codes available without writing custom setup code
 
 **Acceptance Criteria**:
+
 - [ ] Invitations defined in configuration are created in the Invitations table if they do not exist
 - [ ] Seeded invitations support specifying: Code (GUID, required), Email, Roles, Claims, Metadata, and ExpiresIn (duration)
 - [ ] The developer provides a predictable Code (GUID) in configuration so that tests and manual workflows can reference it
@@ -126,11 +144,13 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Seeding invitations requires `IInvitationService` to be registered; if missing, invitation seeding is skipped with a warning
 
 ### Story 9: Developer - Integrate seeding into application startup
+
 **As a** developer using NuxtIdentity
 **I want** a simple API to add seeding to my application
 **So that** I don't need to write boilerplate seeding code
 
 **Acceptance Criteria**:
+
 - [ ] Seeding can be added with a service registration call and an application startup call
 - [ ] Seeding runs after database creation/migration and Identity registration
 - [ ] Seeding is idempotent — running it multiple times produces the same result
@@ -240,7 +260,7 @@ UserRoles and UserClaims are nested under their parent User entries for ergonomi
 
 **Environment Variables for Secrets** (recommended for production):
 
-```
+```env
 IdentitySeeder__Environment__Users__0__Password=SecureProductionPassword!
 IdentitySeeder__Environment__Users__1__Password=AnotherSecurePassword!
 ```
@@ -250,7 +270,7 @@ This leverages .NET's built-in configuration layering — passwords stay out of 
 ### Section Usage Guidance
 
 | Use Case | Section | Typical Location | Example Contents |
-|----------|---------|------------------|------------------|
+| ---------- | --------- | ------------------ | ------------------ |
 | Application-required business roles | `Application:Roles` | `appsettings.json` | User, Administrator |
 | Functional test fixture roles | `Application:Roles` | `appsettings.json` | Functional Tests (with fixed GUID) |
 | Functional test fixture users | `Application:Users` | `appsettings.json` | Test users with predictable credentials |
@@ -291,7 +311,7 @@ if (envConfig != null)
 The seeder uses non-destructive upsert behavior:
 
 | Scenario | Behavior |
-|---|---|
+| --- | --- |
 | Item in config, not in DB | Create it |
 | Item in config and in DB, matching | No change |
 | Item in config and in DB, different | Update DB to match config |
@@ -302,6 +322,7 @@ The seeder uses non-destructive upsert behavior:
 Seeding must execute in two-section dependency order:
 
 **Application Section** (processed first):
+
 1. Roles (no dependencies)
 2. Users (no dependencies)
 3. UserRoles (depends on Roles and Users)
@@ -310,6 +331,7 @@ Seeding must execute in two-section dependency order:
 6. Invitations (no dependencies on other seeded data; requires `IInvitationService`)
 
 **Environment Section** (processed second):
+
 1. Roles (no dependencies)
 2. Users (no dependencies)
 3. UserRoles (depends on Roles and Users)
@@ -318,6 +340,7 @@ Seeding must execute in two-section dependency order:
 6. Invitations (no dependencies on other seeded data; requires `IInvitationService`)
 
 **Layers Affected**:
+
 - [ ] Frontend (Vue/Nuxt)
 - [ ] Controllers (API endpoints)
 - [X] Application (Features/Business logic): Seeding service and configuration models
@@ -325,6 +348,7 @@ Seeding must execute in two-section dependency order:
 - [ ] Database (Schema changes)
 
 **Key Business Rules**:
+
 1. **Idempotent Execution** — Running the seeder multiple times produces the same database state. No duplicates, no errors on re-runs.
 2. **Non-Destructive** — The seeder never removes data. Items present in the database but absent from configuration trigger a warning log, not a deletion.
 3. **Two-Section Merging** — The seeder processes `IdentitySeeder:Application` first, then `IdentitySeeder:Environment`. Both sections use the same upsert semantics, allowing environment-specific data to add to or override application data without deleting application fixtures.
@@ -334,6 +358,7 @@ Seeding must execute in two-section dependency order:
 7. **Optional Invitation Seeding** — Invitation seeding requires `IInvitationService` to be registered. If the service is not available (e.g., the consuming app doesn't use invitations), invitation configuration is skipped with a warning log. This keeps the seeder usable for Identity-only scenarios.
 
 **Code Patterns to Follow**:
+
 - Configuration options: [`JwtOptions`](../../src/Core/Configuration/JwtOptions.cs) for options class pattern
 - Extension methods: [`ServiceCollectionExtensions`](../../src/AspNetCore/Extensions/ServiceCollectionExtensions.cs) for registration pattern
 - Existing seeding reference: [`DatabaseExtensions.cs`](../../playground/local/Extensions/DatabaseExtensions.cs) for current ad-hoc approach to replace
@@ -366,12 +391,14 @@ Seeding must execute in two-section dependency order:
 ## Dependencies & Constraints
 
 **Dependencies**:
+
 - ASP.NET Core Identity (UserManager, RoleManager) must be registered before seeding runs
 - Database must be created/migrated before seeding runs
 - IConfiguration must be available with seed data populated
 - `IInvitationService` must be registered for invitation seeding (optional — skipped with warning if absent)
 
 **Constraints**:
+
 - Must work with the generic `TUser : IdentityUser` pattern used throughout NuxtIdentity
 - Must use UserManager/RoleManager APIs (for Identity data) and `IInvitationService` (for invitations), not direct database access, to preserve Identity behaviors and invitation lifecycle semantics
 - Must not add heavy dependencies that would bloat the package
@@ -387,6 +414,7 @@ The developer's existing ListsWebApp project uses a similar configuration-driven
 **Security Note**: Passwords in configuration files are a known risk. The recommended practice is to use .NET configuration layering — define non-secret seed data in appsettings.json and inject passwords via environment variables (`IdentitySeeder__Users__0__Password`), container secrets, or Azure Key Vault. The library documentation should include this guidance prominently.
 
 **Related Documents**:
+
 - [PRD Template](PRD-TEMPLATE.md)
 - [PRD Token GUIDs](PRD-TOKEN-GUIDS.md) — reference for PRD quality
 - [PRD Registration](PRD-REGISTRATION.md) — defines the invitation system that the seeder supports
@@ -396,6 +424,7 @@ The developer's existing ListsWebApp project uses a similar configuration-driven
 ## Handoff Checklist (for AI implementation)
 
 When handing this off for detailed design/implementation:
+
 - [X] Document stays within PRD scope (WHAT/WHY). If implementation details are needed, they are in a separate Design Document. See [`PRD-GUIDANCE.md`](PRD-GUIDANCE.md).
 - [X] All user stories have clear acceptance criteria
 - [X] Open questions are resolved or documented as design decisions
