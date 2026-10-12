@@ -14,7 +14,7 @@ namespace NuxtIdentity.AspNetCore.Services;
 /// Applies configured Identity and invitation seed data without modifying existing records.
 /// </summary>
 /// <typeparam name="TUser">The application's Identity user type.</typeparam>
-public sealed class IdentitySeeder<TUser>
+public sealed partial class IdentitySeeder<TUser>
     where TUser : IdentityUser
 {
     private const string SectionName = "IdentitySeeder";
@@ -58,9 +58,7 @@ public sealed class IdentitySeeder<TUser>
             var invitationCount = groups.Sum(group => group.Options.Invitations.Count);
             if (invitationCount > 0)
             {
-                _logger.LogWarning(
-                    "Invitation seeding is configured but IInvitationService is not registered. Configured invitations: {Count}.",
-                    invitationCount);
+                LogInvitationServiceNotRegistered(invitationCount);
                 summary.Skipped += invitationCount;
             }
         }
@@ -86,15 +84,11 @@ public sealed class IdentitySeeder<TUser>
 
         if (summary.Failed == 0 && summary.Skipped == 0)
         {
-            _logger.LogInformation(
-                "Identity seeding completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.",
-                summary.Succeeded, summary.Failed, summary.Skipped);
+            LogSeedingCompleted(summary.Succeeded, summary.Failed, summary.Skipped);
         }
         else
         {
-            _logger.LogWarning(
-                "Identity seeding partially completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.",
-                summary.Succeeded, summary.Failed, summary.Skipped);
+            LogSeedingPartiallyCompleted(summary.Succeeded, summary.Failed, summary.Skipped);
         }
     }
 
@@ -362,21 +356,15 @@ public sealed class IdentitySeeder<TUser>
             {
                 case SeedOutcome.Succeeded:
                     summary.Succeeded++;
-                    _logger.LogDebug(
-                        "Identity seed operation succeeded. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}.",
-                        groupName, itemKind, identifyingKey, configurationPath);
+                    LogOperationSucceeded(groupName, itemKind, identifyingKey, configurationPath);
                     break;
                 case SeedOutcome.Failed:
                     summary.Failed++;
-                    _logger.LogWarning(
-                        "Identity seed operation failed. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.",
-                        groupName, itemKind, identifyingKey, configurationPath, result.Reason);
+                    LogOperationFailed(groupName, itemKind, identifyingKey, configurationPath, result.Reason);
                     break;
                 case SeedOutcome.Skipped:
                     summary.Skipped++;
-                    _logger.LogWarning(
-                        "Identity seed operation skipped. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.",
-                        groupName, itemKind, identifyingKey, configurationPath, result.Reason);
+                    LogOperationSkipped(groupName, itemKind, identifyingKey, configurationPath, result.Reason);
                     break;
             }
         }
@@ -387,9 +375,7 @@ public sealed class IdentitySeeder<TUser>
         catch (Exception exception)
         {
             summary.Failed++;
-            _logger.LogError(
-                "Identity seed operation threw an exception. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; exception type: {ExceptionType}.",
-                groupName, itemKind, identifyingKey, configurationPath, exception.GetType().Name);
+            LogOperationException(groupName, itemKind, identifyingKey, configurationPath, exception.GetType().Name);
         }
     }
 
@@ -401,10 +387,36 @@ public sealed class IdentitySeeder<TUser>
         string reason)
     {
         summary.Failed++;
-        _logger.LogWarning(
-            "Identity seed configuration is invalid. Group: {GroupName}; item: {ItemKind}; path: {ConfigurationPath}; reason: {Reason}.",
-            groupName, itemKind, path, reason);
+        LogConfigurationInvalid(groupName, itemKind, path, reason);
     }
+
+    #region Logger Messages
+
+    [LoggerMessage(1, LogLevel.Warning, "Invitation seeding is configured but IInvitationService is not registered. Configured invitations: {Count}.")]
+    private partial void LogInvitationServiceNotRegistered(int count);
+
+    [LoggerMessage(2, LogLevel.Information, "Identity seeding completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
+    private partial void LogSeedingCompleted(int succeeded, int failed, int skipped);
+
+    [LoggerMessage(3, LogLevel.Warning, "Identity seeding partially completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
+    private partial void LogSeedingPartiallyCompleted(int succeeded, int failed, int skipped);
+
+    [LoggerMessage(4, LogLevel.Debug, "Identity seed operation succeeded. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}.")]
+    private partial void LogOperationSucceeded(string groupName, string itemKind, string identifyingKey, string configurationPath);
+
+    [LoggerMessage(5, LogLevel.Warning, "Identity seed operation failed. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogOperationFailed(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason);
+
+    [LoggerMessage(6, LogLevel.Warning, "Identity seed operation skipped. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogOperationSkipped(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason);
+
+    [LoggerMessage(7, LogLevel.Error, "Identity seed operation threw an exception. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; exception type: {ExceptionType}.")]
+    private partial void LogOperationException(string groupName, string itemKind, string identifyingKey, string configurationPath, string exceptionType);
+
+    [LoggerMessage(8, LogLevel.Warning, "Identity seed configuration is invalid. Group: {GroupName}; item: {ItemKind}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogConfigurationInvalid(string groupName, string itemKind, string configurationPath, string reason);
+
+    #endregion
 
     private static SeedOperationResult IdentityResultToOutcome(IdentityResult result)
     {
