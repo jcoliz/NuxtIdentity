@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
@@ -104,6 +105,138 @@ public sealed class IdentitySeederTests
         Assert.That((await users.FindByNameAsync("default-order-user"))!.Email, Is.EqualTo("default@example.com"));
         Assert.That(await users.Users.CountAsync(), Is.EqualTo(3));
         Assert.That(await roles.Roles.CountAsync(), Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task SeedAsync_UserClaimsTargetsExistingUserByNormalizedUsernameWithoutUserDefinition()
+    {
+        // Given: A database user exists independently of seeding configuration.
+        await using (var scope = _harness.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<TestUser>>();
+            var user = new TestUser
+            {
+                UserName = "Tester",
+                Email = "stored@example.com",
+                EmailConfirmed = false
+            };
+            Assert.That((await users.CreateAsync(user, "stored-secret")).Succeeded, Is.True);
+            Assert.That((await users.AddClaimAsync(user, new Claim("existing", "preserved"))).Succeeded, Is.True);
+        }
+
+        const string entitlement = "f6a1c48d-959b-4cc1-ac0c-e92e4cf49133:Read:Write:Manage";
+        _harness.Set("IdentitySeeder:Deployment:UserClaims:0:UserName", "tester");
+        _harness.Set("IdentitySeeder:Deployment:UserClaims:0:Claims:0:Type", "entitlement");
+        _harness.Set("IdentitySeeder:Deployment:UserClaims:0:Claims:0:Value", entitlement);
+
+        // When: Independent user claims are seeded twice.
+        await _harness.SeedAsync();
+        await _harness.SeedAsync();
+
+        // Then: Username normalization resolves the user without modifying account fields or duplicating claims.
+        await using var verifyScope = _harness.Services.CreateAsyncScope();
+        var userManager = verifyScope.ServiceProvider.GetRequiredService<UserManager<TestUser>>();
+        var existing = await userManager.FindByNameAsync("Tester");
+        Assert.That(existing, Is.Not.Null);
+        Assert.That(existing!.UserName, Is.EqualTo("Tester"));
+        Assert.That(existing.Email, Is.EqualTo("stored@example.com"));
+        Assert.That(existing.EmailConfirmed, Is.False);
+        Assert.That(await userManager.CheckPasswordAsync(existing, "stored-secret"), Is.True);
+        Assert.That((await userManager.GetClaimsAsync(existing))
+            .Select(claim => (claim.Type, claim.Value)),
+            Is.EquivalentTo(new[] { ("existing", "preserved"), ("entitlement", entitlement) }));
+        Assert.That(await userManager.Users.CountAsync(), Is.EqualTo(1));
+        Assert.That(_harness.LogText, Does.Not.Contain("partially completed"));
+    }
+
+    [Test]
+    public async Task SeedAsync_UserClaimsAreAdditiveAcrossNestedClaimsAndOrderedGroups()
+    {
+        // Given: Nested and independent claims overlap for a user created in the first group.
+        _harness.Set("IdentitySeeder:Accounts:Order", "0");
+        _harness.Set("IdentitySeeder:Accounts:Users:0:UserName", "Tester");
+        _harness.Set("IdentitySeeder:Accounts:Users:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Accounts:Users:0:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Accounts:UserClaims:0:UserName", "Tester");
+        _harness.Set("IdentitySeeder:Accounts:UserClaims:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Accounts:UserClaims:0:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Accounts:UserClaims:0:Claims:1:Type", "permission");
+        _harness.Set("IdentitySeeder:Accounts:UserClaims:0:Claims:1:Value", "write");
+        _harness.Set("IdentitySeeder:Grants:Order", "100");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:0:UserName", "Tester");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:0:Claims:0:Value", "write");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:0:Claims:1:Type", "permission");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:0:Claims:1:Value", "manage");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:1:UserName", "Tester");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:1:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Grants:UserClaims:1:Claims:0:Value", "manage");
+
+        // When: Seeding runs twice, then a configured claim changes.
+        await _harness.SeedAsync();
+        await _harness.SeedAsync();
+        _harness.Set("IdentitySeeder:Grants:UserClaims:1:Claims:0:Value", "admin");
+        await _harness.SeedAsync();
+
+        // Then: Claims are deduplicated across both forms and groups, and changing configuration never revokes grants.
+        await using var scope = _harness.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<TestUser>>();
+        var user = await users.FindByNameAsync("Tester");
+        Assert.That(user, Is.Not.Null);
+        Assert.That((await users.GetClaimsAsync(user!))
+            .Select(claim => (claim.Type, claim.Value)),
+            Is.EquivalentTo(new[]
+            {
+                ("permission", "read"), ("permission", "write"),
+                ("permission", "manage"), ("permission", "admin")
+            }));
+        Assert.That(await users.Users.CountAsync(), Is.EqualTo(1));
+        Assert.That(_harness.LogText, Does.Not.Contain("partially completed"));
+    }
+
+    [Test]
+    public async Task SeedAsync_UserClaimsIsolatesInvalidClaimsAndMissingUsers()
+    {
+        // Given: Missing and blank usernames, invalid claim fields, and an unavailable target precede valid claims.
+        _harness.Set("IdentitySeeder:Application:Users:0:UserName", "valid-user");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:UserClaims:0:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Application:UserClaims:1:UserName", " ");
+        _harness.Set("IdentitySeeder:Application:UserClaims:1:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:UserClaims:1:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Application:UserClaims:2:UserName", "missing-user");
+        _harness.Set("IdentitySeeder:Application:UserClaims:2:Claims:0:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:UserClaims:2:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Application:UserClaims:3:UserName", "valid-user");
+        _harness.Set("IdentitySeeder:Application:UserClaims:3:Claims:0:Type", " ");
+        _harness.Set("IdentitySeeder:Application:UserClaims:3:Claims:0:Value", "read");
+        _harness.Set("IdentitySeeder:Application:UserClaims:3:Claims:1:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:UserClaims:3:Claims:2:Type", "permission");
+        _harness.Set("IdentitySeeder:Application:UserClaims:3:Claims:2:Value", "read");
+        _harness.Set("IdentitySeeder:Later:Order", "100");
+        _harness.Set("IdentitySeeder:Later:UserClaims:0:UserName", "valid-user");
+        _harness.Set("IdentitySeeder:Later:UserClaims:0:Claims:0:Type", "empty-value");
+        _harness.Set("IdentitySeeder:Later:UserClaims:0:Claims:0:Value", "");
+
+        // When: Seeding runs.
+        await _harness.SeedAsync();
+
+        // Then: Valid claims continue within and across groups, with precise diagnostics and no implicit account creation.
+        await using var scope = _harness.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<TestUser>>();
+        var user = await users.FindByNameAsync("valid-user");
+        Assert.That(user, Is.Not.Null);
+        Assert.That((await users.GetClaimsAsync(user!))
+            .Select(claim => (claim.Type, claim.Value)),
+            Is.EquivalentTo(new[] { ("permission", "read"), ("empty-value", "") }));
+        Assert.That(await users.FindByNameAsync("missing-user"), Is.Null);
+        Assert.That(await users.Users.CountAsync(), Is.EqualTo(1));
+        Assert.That(_harness.LogText, Does.Contain("Username is required for user claim."));
+        Assert.That(_harness.LogText, Does.Contain("Claim type is required."));
+        Assert.That(_harness.LogText, Does.Contain("Claim value is required."));
+        Assert.That(_harness.LogText, Does.Contain("Required user is unavailable."));
+        Assert.That(_harness.LogText, Does.Contain("IdentitySeeder:Application:UserClaims:3:Claims:1"));
+        Assert.That(_harness.LogText, Does.Contain("Succeeded: 3; failed: 4; skipped: 1"));
     }
 
     [Test]

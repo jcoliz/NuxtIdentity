@@ -28,10 +28,11 @@ The preferred onboarding path is to seed roles and invitations, then let invitee
 
 Use mutable bindable options with nullable/reference properties and defaults suitable for configuration binding:
 
-- `IdentitySeederGroupOptions`: `Order`, `Roles`, `Users`, `RoleClaims`, `Invitations`
+- `IdentitySeederGroupOptions`: `Order`, `Roles`, `Users`, `UserClaims`, `RoleClaims`, `Invitations`
 - `SeedRoleOptions`: optional `Id`, required `Name`
 - `SeedUserOptions`: required `UserName`; optional `Email`, `Password`; `EmailConfirmed` defaulting to `true`; `Roles` and `Claims`
 - `SeedClaimOptions`: required `Type` and `Value`
+- `SeedUserClaimsOptions`: required `UserName` and `Claims`
 - `SeedRoleClaimsOptions`: required `Role` and `Claims`
 - `SeedInvitationOptions`: required `Code`; optional `Email`, `Roles`, `Claims`, `Metadata`, `ExpiresIn`
 
@@ -65,7 +66,7 @@ For each ordered group, execute these stages in sequence:
 1. **Roles**: Validate each role. Find by name using `RoleManager<IdentityRole>`. Create when absent, using the configured string `Id` only for creation (parse a valid GUID and store its canonical string). If present, make no changes, even if a configured ID differs. Role names are the matching key.
 2. **Users**: Validate each username and find by username using `UserManager<TUser>`. If absent, create a new `TUser` with the supported standard properties; if a non-empty password is configured, set it through Identity password APIs as part of user creation. If present, make no changes to its username, email, `EmailConfirmed`, or password, even if configured values differ. The username is the matching key; do not silently rename users or reset passwords.
 3. **User roles**: For each configured assignment, resolve both user and role. If either is unavailable, skip and log only that assignment. Call `AddToRoleAsync` only when `GetRolesAsync` shows the user is not already in the role. An existing assignment is a no-op; do not remove unconfigured memberships.
-4. **User claims**: Resolve the user and read existing claims via `GetClaimsAsync`. Add each missing exact `(Type, Value)` pair using `AddClaimAsync`. An existing claim is a no-op; same type with another value is a distinct claim and may be added.
+4. **User claims**: Process nested `Users[].Claims`, then group-level `UserClaims` entries through the same operation logic. Resolve each target by `UserName` using `FindByNameAsync` and read existing claims via `GetClaimsAsync`. A `UserClaims` entry does not require a `Users` entry and never creates or changes the user; an unavailable user is logged and skipped. Add each missing exact `(Type, Value)` pair using `AddClaimAsync`. An existing claim is a no-op across both configuration forms and groups; same type with another value is a distinct claim and may be added. Invalid usernames or claim fields fail only the affected claim operation, retaining its configuration path.
 5. **Role claims**: Resolve the role and read existing claims via `RoleManager.GetClaimsAsync`. Add each missing exact `(Type, Value)` pair with `AddClaimAsync`. Existing claims are no-ops.
 6. **Invitations**: Validate code and fields. Look up by code with `IInvitationService.GetByCodeAsync`. Create a missing invitation with `CreateAsync`, supplying code and all configured fields. If an invitation with that code already exists, make no changes regardless of its configured-field differences or lifecycle state. On a uniqueness race during create, re-read by code and treat the now-existing invitation as a no-op.
 

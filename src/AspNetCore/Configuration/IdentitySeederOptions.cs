@@ -21,6 +21,11 @@ public class IdentitySeederGroupOptions
     public List<SeedUserOptions> Users { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the claims to seed for users identified by username.
+    /// </summary>
+    public List<SeedUserClaimsOptions> UserClaims { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the role claims to seed.
     /// </summary>
     public List<SeedRoleClaimsOptions> RoleClaims { get; set; } = new();
@@ -188,6 +193,27 @@ public class SeedClaimOptions
     /// other claims from being processed.
     /// </remarks>
     internal string? ConfigurationError { get; set; }
+}
+
+/// <summary>
+/// Configuration for claims to add to a user identified by username.
+/// </summary>
+public class SeedUserClaimsOptions
+{
+    /// <summary>
+    /// Gets or sets the username of the user that receives these claims.
+    /// </summary>
+    public string? UserName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the claims to add to the user.
+    /// </summary>
+    public List<SeedClaimOptions> Claims { get; set; } = new();
+
+    /// <summary>
+    /// Gets the configuration path for this user-claims entry.
+    /// </summary>
+    internal string? ConfigurationPath { get; set; }
 }
 
 /// <summary>

@@ -103,6 +103,10 @@ Direct user seeding, including passwords, is a supported capability rather than 
 **Acceptance Criteria**:
 
 - [ ] Claims defined under a user in configuration are added to the AspNetUserClaims table
+- [ ] Each seed group supports a separate `UserClaims` array whose entries contain required `UserName` and a `Claims` array of `Type`/`Value` pairs
+- [ ] `UserClaims` resolves users by username through ASP.NET Identity, including users already in the database or created in the same or an earlier group, without requiring a `Users` entry or changing user properties
+- [ ] Nested `Users[].Claims` remains supported; both forms are additive and share exact type/value duplicate detection
+- [ ] Missing target users are logged and skipped without creating accounts; invalid usernames or claims are logged as individual failures while valid claims continue
 - [ ] If a claim with the same type and value already exists for the user, no duplicate is created
 - [ ] Claims with the same type but different values are added as additional claims, matching ASP.NET Identity behavior
 
@@ -275,7 +279,27 @@ Roles = ["User"]
 ExpiresIn = "7.00:00:00"
 ```
 
-UserRoles and UserClaims are nested under their parent User entries for ergonomic configuration. RoleClaims are a separate top-level section because they associate claims with roles, not users. Invitations are a top-level section because they represent pending registrations, not existing users or roles.
+UserRoles remain nested under their parent User entries for ergonomic configuration. User claims can be nested under `Users[].Claims` or supplied independently in each group's `UserClaims` array, keyed by `UserName`. The separate array allows claims to be contributed without redefining a user. Both forms are additive and use the same exact `(Type, Value)` duplicate detection. RoleClaims are a separate top-level section because they associate claims with roles, not users. Invitations are a top-level section because they represent pending registrations, not existing users or roles.
+
+**Independent User Claims** (inside any seed group):
+
+```json
+{
+  "UserClaims": [
+    {
+      "UserName": "Tester",
+      "Claims": [
+        {
+          "Type": "entitlement",
+          "Value": "f6a1c48d-959b-4cc1-ac0c-e92e4cf49133:Read:Write:Manage"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The target user must already exist or be created in the same or an earlier group. An unavailable user is logged and skipped; `UserClaims` never creates a user. User lookup follows ASP.NET Identity's username normalization.
 
 ### Recommended Onboarding: Seed Invitations, Not Passwords
 
@@ -315,7 +339,7 @@ This targets the optional user example above and leverages .NET's built-in confi
 | Site-specific invitations | `Deployment:Invitations` | `config.toml` in any of the three environments | Operator and evaluator onboarding codes |
 | Site-specific roles | `Deployment:Roles` | `config.toml` in any of the three environments | Additional roles for a site |
 | Site-specific users (optional) | `Deployment:Users` | `config.toml`, with passwords from secret providers | Pre-created accounts when required |
-| Additional independent contributions | `<GroupName>:Roles`, `Users`, `RoleClaims`, or `Invitations` | Any IConfiguration provider | Data isolated from existing groups |
+| Additional independent contributions | `<GroupName>:Roles`, `Users`, `UserClaims`, `RoleClaims`, or `Invitations` | Any IConfiguration provider | Data isolated from existing groups |
 | Role permissions | Any group | Depends on use case | RoleClaims for role-based permissions |
 
 **Consumer API**:

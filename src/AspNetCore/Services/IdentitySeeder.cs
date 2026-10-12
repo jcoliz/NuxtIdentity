@@ -212,7 +212,12 @@ public sealed partial class IdentitySeeder<TUser>
         SeedSummary summary,
         CancellationToken cancellationToken)
     {
-        foreach (var userOptions in group.Options.Users)
+        var userClaims = group.Options.Users
+            .Select(user => (user.UserName, user.Claims, user.ConfigurationPath))
+            .Concat(group.Options.UserClaims
+                .Select(user => (user.UserName, user.Claims, user.ConfigurationPath)));
+
+        foreach (var userOptions in userClaims)
         {
             foreach (var claimOptions in userOptions.Claims)
             {
@@ -539,6 +544,17 @@ public sealed partial class IdentitySeeder<TUser>
 
                 user.Claims.AddRange(ReadClaims(userSection.GetSection("Claims")));
                 options.Users.Add(user);
+            }
+
+            foreach (var userClaimsSection in groupSection.GetSection("UserClaims").GetChildren())
+            {
+                var userClaims = new SeedUserClaimsOptions
+                {
+                    UserName = userClaimsSection["UserName"],
+                    ConfigurationPath = userClaimsSection.Path
+                };
+                userClaims.Claims.AddRange(ReadClaims(userClaimsSection.GetSection("Claims")));
+                options.UserClaims.Add(userClaims);
             }
 
             foreach (var roleClaimsSection in groupSection.GetSection("RoleClaims").GetChildren())

@@ -77,6 +77,7 @@ integer `Order` and the same seed sections:
 | `Order` | Optional group priority; lower numbers run first and the default is `0`. |
 | `Roles` | Roles to create, optionally with fixed GUID IDs. |
 | `Users` | Users to create, with optional password, role assignments, and claims. |
+| `UserClaims` | Claims to add to users identified by `UserName`, without redefining them. |
 | `RoleClaims` | Claims to add to named roles. |
 | `Invitations` | Invitations to create with a supplied GUID code. |
 
@@ -192,6 +193,37 @@ responsible for registering any non-default configuration providers.
   `Roles`, `Claims`, and `Metadata` are optional. `ExpiresIn` is an optional
   non-negative .NET `TimeSpan`, for example `"30.00:00:00"` for 30 days.
   Newly created invitations are ordinary Pending invitations.
+
+### Independent user claims
+
+Each group can supply `UserClaims` independently of `Users`. `UserName` is
+required and resolves the target through ASP.NET Identity's username lookup.
+`Claims` contains objects with required `Type` and `Value`. For example, place
+this inside any seed group:
+
+```json
+{
+  "UserClaims": [
+    {
+      "UserName": "Tester",
+      "Claims": [
+        {
+          "Type": "entitlement",
+          "Value": "f6a1c48d-959b-4cc1-ac0c-e92e4cf49133:Read:Write:Manage"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The user must already exist or be created in the same or an earlier group.
+A missing user is logged and skipped; this section never creates accounts or
+changes user properties. Nested `Users[].Claims` remains supported and is
+processed first. Both forms add only missing exact `(Type, Value)` pairs,
+including when the same claim appears in both forms or in multiple groups.
+Invalid usernames or claim fields are logged individually without preventing
+other claims from being seeded.
 
 ## Create-only behavior
 
