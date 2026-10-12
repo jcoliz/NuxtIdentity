@@ -4,11 +4,6 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Folder Name="/samples/Local/">
-    <Project Path="samples/Local/AppHost/NuxtIdentity.Samples.Local.AppHost.csproj" />
-    <Project Path="samples/Local/Backend/NuxtIdentity.Samples.Local.Backend.csproj" />
-    <Project Path="samples/Local/ServiceDefaults/NuxtIdentity.Samples.Local.ServiceDefaults.csproj" />
-  </Folder>
   <Folder Name="/src/">
     <Project Path="src/AspNetCore/NuxtIdentity.AspNetCore.csproj" />
     <Project Path="src/Core/NuxtIdentity.Core.csproj" />
