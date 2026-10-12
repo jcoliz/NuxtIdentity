@@ -33,12 +33,29 @@ public class IdentitySeederGroupOptions
     /// <summary>
     /// Gets the name of this group, populated from its configuration key.
     /// </summary>
+    /// <remarks>
+    /// The group name is not part of the group object's bound values, so the seeder
+    /// retains it separately for deterministic ordering and structured diagnostics.
+    /// </remarks>
     internal string? GroupName { get; set; }
 
     /// <summary>
     /// Gets the configuration path for this group.
     /// </summary>
+    /// <remarks>
+    /// The seeder keeps the source path so group-level binding errors can identify
+    /// the relevant configuration section.
+    /// </remarks>
     internal string? ConfigurationPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a group-level configuration parsing error.
+    /// </summary>
+    /// <remarks>
+    /// Invalid scalar values are retained with the bound group so execution can
+    /// report the error and continue processing other groups.
+    /// </remarks>
+    internal string? ConfigurationError { get; set; }
 }
 
 /// <summary>
@@ -59,7 +76,20 @@ public class SeedRoleOptions
     /// <summary>
     /// Gets the configuration path for this role.
     /// </summary>
+    /// <remarks>
+    /// The seeder uses the path to report invalid role configuration without
+    /// needing to reconstruct array indices.
+    /// </remarks>
     internal string? ConfigurationPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a role-level configuration parsing error.
+    /// </summary>
+    /// <remarks>
+    /// This allows malformed role data to be isolated and reported during seeding
+    /// without preventing valid roles from being processed.
+    /// </remarks>
+    internal string? ConfigurationError { get; set; }
 }
 
 /// <summary>
@@ -93,6 +123,16 @@ public class SeedUserOptions
     public List<string> Roles { get; set; } = new();
 
     /// <summary>
+    /// Gets the configuration paths corresponding to <see cref="Roles"/>.
+    /// </summary>
+    /// <remarks>
+    /// Role names alone do not retain their individual configuration keys. The
+    /// seeder keeps these paths aligned with <see cref="Roles"/> so assignment
+    /// failures can point to the exact configured entry.
+    /// </remarks>
+    internal List<string> RoleConfigurationPaths { get; } = new();
+
+    /// <summary>
     /// Gets or sets the claims to add to this user.
     /// </summary>
     public List<SeedClaimOptions> Claims { get; set; } = new();
@@ -100,7 +140,20 @@ public class SeedUserOptions
     /// <summary>
     /// Gets the configuration path for this user.
     /// </summary>
+    /// <remarks>
+    /// The seeder retains this path to identify malformed user configuration and
+    /// provide useful diagnostics for operations associated with the user.
+    /// </remarks>
     internal string? ConfigurationPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a user-level configuration parsing error.
+    /// </summary>
+    /// <remarks>
+    /// Keeping parsing errors with the user allows that item to be reported and
+    /// skipped independently from unrelated users and seed operations.
+    /// </remarks>
+    internal string? ConfigurationError { get; set; }
 }
 
 /// <summary>
@@ -121,7 +174,20 @@ public class SeedClaimOptions
     /// <summary>
     /// Gets the configuration path for this claim.
     /// </summary>
+    /// <remarks>
+    /// The seeder retains the path so invalid claims can be reported at their
+    /// individual configuration entry.
+    /// </remarks>
     internal string? ConfigurationPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a claim-level configuration parsing error.
+    /// </summary>
+    /// <remarks>
+    /// Claim errors are stored per item so one malformed claim does not prevent
+    /// other claims from being processed.
+    /// </remarks>
+    internal string? ConfigurationError { get; set; }
 }
 
 /// <summary>
@@ -142,7 +208,20 @@ public class SeedRoleClaimsOptions
     /// <summary>
     /// Gets the configuration path for this role-claims entry.
     /// </summary>
+    /// <remarks>
+    /// The seeder retains this path to report malformed role-claims entries with
+    /// their original configuration location.
+    /// </remarks>
     internal string? ConfigurationPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a role-claims-level configuration parsing error.
+    /// </summary>
+    /// <remarks>
+    /// This lets the seeder isolate a malformed role-claims entry without
+    /// suppressing other role claims or groups.
+    /// </remarks>
+    internal string? ConfigurationError { get; set; }
 }
 
 /// <summary>
@@ -183,5 +262,18 @@ public class SeedInvitationOptions
     /// <summary>
     /// Gets the configuration path for this invitation.
     /// </summary>
+    /// <remarks>
+    /// Invitation codes must not be included in diagnostics. The seeder retains
+    /// this path to identify invitation configuration safely when reporting errors.
+    /// </remarks>
     internal string? ConfigurationPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets an invitation-level configuration parsing error.
+    /// </summary>
+    /// <remarks>
+    /// This lets the seeder report malformed invitation data by path, without
+    /// exposing its code or preventing other invitations from being processed.
+    /// </remarks>
+    internal string? ConfigurationError { get; set; }
 }
