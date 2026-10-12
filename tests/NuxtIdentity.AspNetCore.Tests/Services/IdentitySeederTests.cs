@@ -289,7 +289,7 @@ public sealed class IdentitySeederTests
         Assert.That(await roleManager.RoleExistsAsync("Available"), Is.True);
         Assert.That(await userManager.FindByNameAsync("valid-user"), Is.Not.Null);
         Assert.That(await userManager.FindByNameAsync("later-user"), Is.Not.Null);
-        Assert.That(_harness.LogText, Does.Contain("partially completed"));
+        Assert.That(_harness.LogEventIds, Does.Contain(3));
         Assert.That(_harness.LogText, Does.Contain("skipped"));
     }
 
@@ -319,7 +319,7 @@ public sealed class IdentitySeederTests
         Assert.That(_harness.InvitationCreateCount, Is.Zero);
         Assert.That(_harness.LogText, Does.Not.Contain(invalidCode));
         Assert.That(_harness.LogText, Does.Not.Contain(negativeExpiryCode.ToString()));
-        Assert.That(_harness.LogText, Does.Contain("partially completed"));
+        Assert.That(_harness.LogEventIds, Does.Contain(3));
     }
 
     [Test]
@@ -395,7 +395,7 @@ public sealed class IdentitySeederTests
         await using var scope = _harness.Services.CreateAsyncScope();
         Assert.That(await scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>()
             .RoleExistsAsync("StillCreated"), Is.True);
-        Assert.That(_harness.LogText, Does.Contain("partially completed"));
+        Assert.That(_harness.LogEventIds, Does.Contain(3));
         Assert.That(_harness.LogText, Does.Not.Contain(code.ToString()));
     }
 
@@ -496,6 +496,7 @@ public sealed class IdentitySeederTests
         public ServiceProvider Services { get; }
         public IReadOnlyDictionary<Guid, InvitationEntity> Invitations => _invitations;
         public IReadOnlyList<string> Logs => _loggerProvider.Messages;
+        public IReadOnlyList<int> LogEventIds => _loggerProvider.EventIds;
         public string LogText => string.Join(Environment.NewLine, Logs);
         public int InvitationCreateCount => _invitationCreateCount;
         public string[] LastInvitationRoles => _lastInvitationRoles;
@@ -638,17 +639,21 @@ public sealed class IdentitySeederTests
     private sealed class CapturingLoggerProvider : ILoggerProvider
     {
         private readonly ConcurrentQueue<string> _messages = new();
+        private readonly ConcurrentQueue<int> _eventIds = new();
 
         public IReadOnlyList<string> Messages => _messages.ToArray();
+        public IReadOnlyList<int> EventIds => _eventIds.ToArray();
 
-        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages);
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages, _eventIds);
 
         public void Dispose()
         {
         }
     }
 
-    private sealed class CapturingLogger(ConcurrentQueue<string> messages) : ILogger
+    private sealed class CapturingLogger(
+        ConcurrentQueue<string> messages,
+        ConcurrentQueue<int> eventIds) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
@@ -661,6 +666,7 @@ public sealed class IdentitySeederTests
             Func<TState, Exception?, string> formatter)
         {
             messages.Enqueue(formatter(state, exception));
+            eventIds.Enqueue(eventId.Id);
         }
     }
 

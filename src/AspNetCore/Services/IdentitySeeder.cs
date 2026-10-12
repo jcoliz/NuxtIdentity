@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -397,29 +398,29 @@ public sealed partial class IdentitySeeder<TUser>
 
     #region Logger Messages
 
-    [LoggerMessage(1, LogLevel.Warning, "Invitation seeding is configured but IInvitationService is not registered. Configured invitations: {Count}.")]
-    private partial void LogInvitationServiceNotRegistered(int count);
+    [LoggerMessage(1, LogLevel.Warning, "{Location}: Invitation seeding is configured but IInvitationService is not registered. Configured invitations: {Count}.")]
+    private partial void LogInvitationServiceNotRegistered(int count, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(2, LogLevel.Information, "Identity seeding completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
-    private partial void LogSeedingCompleted(int succeeded, int failed, int skipped);
+    [LoggerMessage(2, LogLevel.Information, "{Location}: OK. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
+    private partial void LogSeedingCompleted(int succeeded, int failed, int skipped, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(3, LogLevel.Warning, "Identity seeding partially completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
-    private partial void LogSeedingPartiallyCompleted(int succeeded, int failed, int skipped);
+    [LoggerMessage(3, LogLevel.Warning, "{Location}: Partially completed. Succeeded: {Succeeded}; failed: {Failed}; skipped: {Skipped}.")]
+    private partial void LogSeedingPartiallyCompleted(int succeeded, int failed, int skipped, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(4, LogLevel.Debug, "Identity seed operation succeeded. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}.")]
-    private partial void LogOperationSucceeded(string groupName, string itemKind, string identifyingKey, string configurationPath);
+    [LoggerMessage(4, LogLevel.Debug, "{Location}: OK. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}.")]
+    private partial void LogOperationSucceeded(string groupName, string itemKind, string identifyingKey, string configurationPath, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(5, LogLevel.Warning, "Identity seed operation failed. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
-    private partial void LogOperationFailed(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason);
+    [LoggerMessage(5, LogLevel.Warning, "{Location}: Failed. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogOperationFailed(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(6, LogLevel.Warning, "Identity seed operation skipped. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
-    private partial void LogOperationSkipped(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason);
+    [LoggerMessage(6, LogLevel.Warning, "{Location}: Skipped. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogOperationSkipped(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(7, LogLevel.Error, "Identity seed operation threw an exception. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; exception type: {ExceptionType}.")]
-    private partial void LogOperationException(string groupName, string itemKind, string identifyingKey, string configurationPath, string exceptionType);
+    [LoggerMessage(7, LogLevel.Error, "{Location}: Error. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; exception type: {ExceptionType}.")]
+    private partial void LogOperationException(string groupName, string itemKind, string identifyingKey, string configurationPath, string exceptionType, [CallerMemberName] string? location = null);
 
-    [LoggerMessage(8, LogLevel.Warning, "Identity seed configuration is invalid. Group: {GroupName}; item: {ItemKind}; path: {ConfigurationPath}; reason: {Reason}.")]
-    private partial void LogConfigurationInvalid(string groupName, string itemKind, string configurationPath, string reason);
+    [LoggerMessage(8, LogLevel.Warning, "{Location}: Configuration invalid. Group: {GroupName}; item: {ItemKind}; path: {ConfigurationPath}; reason: {Reason}.")]
+    private partial void LogConfigurationInvalid(string groupName, string itemKind, string configurationPath, string reason, [CallerMemberName] string? location = null);
 
     #endregion
 
