@@ -50,20 +50,20 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - [ ] Environment-specific configuration in `appsettings.Container.json` or `appsettings.Development.json` does not overwrite application-level fixtures in `appsettings.json`
 - [ ] Works with any IConfiguration source including appsettings.json, TOML, and environment variables
 
-### Story 2: Site Administrator - Configure environment-specific seeding without overwriting test fixtures
+### Story 2: Application Developer - Configure development and testing convenience data
 
-**As a** site administrator configuring a deployment environment
-**I want** to define environment-specific roles and invitations, with direct user seeding available when needed
-**So that** I can onboard administrators by claiming invitations without seeding their passwords or affecting application-level test fixtures
+**As an** application developer using NuxtIdentity
+**I want** to define special environment-specific roles and invitations for development and testing, with direct user seeding available when needed
+**So that** local development and container-based tests have convenient seed data without overwriting shared application-level fixtures or being leaked to production
 
 **Acceptance Criteria**:
 
-- [ ] Can define environment-specific data in `IdentitySeeder:Environment` section
+- [ ] Can define development and testing convenience data in the `IdentitySeeder:Environment` group
 - [ ] Environment-specific seeding adds to (not replaces) application-level seeding
-- [ ] Can seed invitations granting administrator roles, then claim them through the existing registration flow without configuring a seeded password
-- [ ] Direct user seeding with environment-specific credentials remains supported when explicitly needed
-- [ ] Can seed invitation codes for onboarding new users in specific environments
+- [ ] Can seed predictable invitation codes with roles and claims for development and test workflows without configuring seeded passwords
+- [ ] Direct user seeding remains supported for development and test scenarios that explicitly require pre-created accounts
 - [ ] Configuration in `appsettings.Container.json` or `appsettings.Development.json` contributes the `Environment` group without colliding with application-level fixture arrays
+- [ ] Production environment-specific seeding is allowed, but is not a current use case and is not required by the recommended configuration examples
 
 ### Story 3: Developer - Seed roles from configuration
 
@@ -162,16 +162,19 @@ Direct user seeding, including passwords, is a supported capability rather than 
 - [ ] Seeding is idempotent — running it multiple times produces the same result
 - [ ] Seeding logs information about what actions were taken at startup
 
-### Story 10: Deployment Operator - Add an independent configuration contribution
+### Story 10: Site Administrator - Configure site-specific deployment seeding
 
-**As a** deployment operator
-**I want** to add deployment-specific seed data alongside application and environment configuration
-**So that** a third or subsequent configuration source can contribute data without overwriting another group's arrays
+**As a** site administrator configuring a deployment
+**I want** to define site-specific roles and invitations in `config.toml` alongside developer-owned application and environment configuration
+**So that** I can onboard site administrators and other users by claiming invitations without seeding their passwords or overwriting application and test configuration
 
 **Acceptance Criteria**:
 
 - [ ] Can define deployment-specific data in `IdentitySeeder:Deployment`
 - [ ] `config.toml` supplies the `Deployment` group independently of environment JSON and can be loaded in Local Development, Container, or Deployment
+- [ ] Can seed invitations granting administrator roles, then claim them through the existing registration flow without configuring a seeded password
+- [ ] Can seed site-specific invitation codes for onboarding other users
+- [ ] Direct user seeding with site-specific credentials remains supported when explicitly needed
 - [ ] Supports any number of arbitrary named groups; `Application`, `Environment`, and `Deployment` are conventions, not reserved names
 - [ ] Every group supports the same roles, users, role claims, and invitations
 - [ ] Groups are processed by ascending optional `Order` (default `0`), with group name in ordinal, case-insensitive order as the tie-breaker
@@ -190,10 +193,12 @@ The seeding feature reads from .NET `IConfiguration`, making it source-agnostic.
 `IdentitySeeder` is an object keyed by arbitrary group names, not an array or a fixed set of subsections. Each immediate child is a seed group with the same data shape and an optional integer `Order`. This allows application, environment, deployment, and further independent contributions to coexist:
 
 - **`IdentitySeeder:Application`** - Application-required roles (User, Administrator, Functional Tests) and test fixture data from `appsettings.json`, consistent across all environments
-- **`IdentitySeeder:Environment`** - Environment-specific roles and invitations from `appsettings.Container.json` or `appsettings.Development.json`
-- **`IdentitySeeder:Deployment`** - Site-specific invitations or roles from `config.toml`, supplied independently of application and environment configuration; direct user seeding remains available when needed
+- **`IdentitySeeder:Environment`** - Developer-owned development and testing convenience roles and invitations from `appsettings.Container.json` or `appsettings.Development.json`
+- **`IdentitySeeder:Deployment`** - Site-administrator-owned invitations or roles from `config.toml`, supplied independently of application and environment configuration; direct user seeding remains available when needed
 
 The three execution environments are Local Development, Container, and Deployment. The `Deployment` group names the site-specific contribution, not an execution-environment restriction: `config.toml` can be loaded in any of the three environments. The examples use this source mapping as a consumer convention; the library remains agnostic to configuration providers.
+
+There is no current use case for an `Environment` contribution in production. Such configuration is allowed, but the recommended production setup uses application data and site-specific `Deployment` data rather than requiring a third, environment-specific contribution.
 
 These names are recommended conventions, not reserved names. Consumers can add further groups without library changes. Use `Order: 0` for `Application`, `Order: 100` for `Environment`, and `Order: 200` for `Deployment` in the examples. Groups are processed by ascending `Order`, defaulting to `0` when omitted, then by group name using ordinal, case-insensitive ordering. Provider registration order and JSON property order do not determine group execution order.
 
@@ -223,7 +228,7 @@ A group is a logical contribution, not necessarily a configuration provider. Eac
 }
 ```
 
-**appsettings.Container.json / appsettings.Development.json** (environment-specific):
+**appsettings.Container.json / appsettings.Development.json** (developer-owned development and testing convenience data):
 
 ```json
 {
@@ -233,17 +238,17 @@ A group is a logical contribution, not necessarily a configuration provider. Eac
       "Invitations": [
         {
           "Code": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-          "Email": "admin@production.com",
-          "Roles": ["Administrator"],
+          "Email": "tester@example.com",
+          "Roles": ["Functional Tests"],
           "Claims": [
-            { "Type": "department", "Value": "operations" }
+            { "Type": "department", "Value": "testing" }
           ],
           "ExpiresIn": "30.00:00:00"
         }
       ],
       "RoleClaims": [
         {
-          "Role": "Administrator",
+          "Role": "Functional Tests",
           "Claims": [
             { "Type": "permission", "Value": "manage-users" },
             { "Type": "permission", "Value": "view-reports" }
@@ -255,7 +260,7 @@ A group is a logical contribution, not necessarily a configuration provider. Eac
 }
 ```
 
-**config.toml** (site-specific contribution, usable in any of the three environments):
+**config.toml** (site-administrator-owned contribution, usable in any of the three environments):
 
 ```toml
 # Application roles come from appsettings.json.
@@ -312,8 +317,9 @@ This targets the optional user example above and leverages .NET's built-in confi
 | Functional test fixture roles | `Application:Roles` | `appsettings.json` | Functional Tests (with fixed GUID) |
 | Functional test fixture invitations | `Application:Invitations` | `appsettings.json` | Predictable invitation codes with test roles |
 | Functional test fixture users (optional) | `Application:Users` | `appsettings.json`, with passwords from secret providers | Pre-created test accounts when required |
-| Site administrator onboarding | `Environment:Invitations` | `appsettings.Container.json` or `appsettings.Development.json` | Invitations granting Administrator |
-| Environment-specific roles | `Environment:Roles` | `appsettings.Container.json` or `appsettings.Development.json` | Roles unique to an environment |
+| Development and test onboarding | `Environment:Invitations` | `appsettings.Container.json` or `appsettings.Development.json` | Predictable invitations with test roles and claims |
+| Development and test convenience roles | `Environment:Roles` | `appsettings.Container.json` or `appsettings.Development.json` | Additional roles for development or testing |
+| Site administrator onboarding | `Deployment:Invitations` | `config.toml` in any of the three environments | Invitations granting Administrator |
 | Site-specific invitations | `Deployment:Invitations` | `config.toml` in any of the three environments | Operator and evaluator onboarding codes |
 | Site-specific roles | `Deployment:Roles` | `config.toml` in any of the three environments | Additional roles for a site |
 | Site-specific users (optional) | `Deployment:Users` | `config.toml`, with passwords from secret providers | Pre-created accounts when required |
