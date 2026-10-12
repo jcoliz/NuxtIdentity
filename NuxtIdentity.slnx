@@ -4,9 +4,6 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Folder Name="/playground/local/">
-    <Project Path="playground/local/NuxtIdentity.Playground.Local.csproj" />
-  </Folder>
   <Folder Name="/samples/Local/">
     <Project Path="samples/Local/AppHost/NuxtIdentity.Samples.Local.AppHost.csproj" />
     <Project Path="samples/Local/Backend/NuxtIdentity.Samples.Local.Backend.csproj" />
