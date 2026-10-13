@@ -19,6 +19,9 @@ associations, but never updates or deletes existing data.
 - Register `IInvitationService` if invitation seeding is required. For the
   Entity Framework Core integration, `AddNuxtIdentityEntityFramework<TContext>`
   registers it, provided the context is configured for invitations.
+- Optionally, register custom seed stages with `AddSeedStage<TStage>` to seed
+  application data from the same groups. See
+  [Writing a custom seed stage](#writing-a-custom-seed-stage).
 
 ## Register and run the seeder
 
@@ -42,6 +45,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 builder.Services.AddNuxtIdentityEntityFramework<ApplicationDbContext>();
 builder.Services.AddNuxtIdentitySeeding<ApplicationUser>(builder.Configuration);
 
+// Optional: seed application data alongside Identity data.
+builder.Services.AddSeedStage<ListsSeedStage>();
 var app = builder.Build();
 
 // Complete migrations/database creation before running the seeder.
@@ -83,7 +88,8 @@ integer `Order` and the same seed sections:
 
 Groups are processed by ascending `Order`, then by group name using ordinal,
 case-insensitive ordering. The seeder processes each group in this order:
-roles, users, user-role assignments, user claims, role claims, and invitations.
+roles, users, user-role assignments, user claims, role claims, invitations,
+and then any registered custom seed stages.
 A group can reference data already in the database or created by an earlier
 group; it does not wait for dependencies defined only in a later group.
 
@@ -323,3 +329,161 @@ Structured diagnostics include the group, configuration path, operation type,
 and safe identifying data. Passwords and invitation codes are excluded. For
 troubleshooting, use the configuration path and operation type shown in the
 log rather than adding secret values to logs.
+
+Custom seed stage items use the same diagnostics and summary counts as
+built-in items. An exception that escapes a stage's `SeedAsync` is counted as
+one failure and logged as a `Stage error` with the group, stage name, and
+exception type only; the seeder then continues with the next stage.
+
+## Writing a custom seed stage
+
+A seed stage seeds application data, such as lists or sample records, from the
+same named groups as Identity data. Stages run inside each group after the
+built-in Identity steps, so a stage can rely on users and roles created earlier
+in the same group, or in an earlier group. Stages get the same ordering,
+create-only semantics, failure isolation, and diagnostics as built-in items.
+
+### Referencing the stage types
+
+The stage types live in `NuxtIdentity.Core.Abstractions`, so a stage can be
+implemented in a project that references only `NuxtIdentity.Core` and does not
+depend on ASP.NET Core:
+
+| Type | Purpose |
+| --- | --- |
+| `ISeedStage` | The stage: `Name`, `Order`, and `SeedAsync(SeedGroupContext, CancellationToken)`. |
+| `SeedGroupContext` | The current group: `GroupName`, `Path`, `Items<T>(key)`, and `RunAsync(...)`. |
+| `SeedItem<T>` | One bound configuration item: `Value`, `Path`, and `Error`. |
+| `SeedResult` | An item outcome: `Success()`, `AlreadyExists(reason)`, `Skipped(reason)`, or `Failure(reason)`. |
+
+Only the application's startup project needs `NuxtIdentity.AspNetCore`, to
+register the stage with `AddSeedStage<TStage>()`.
+
+### Example
+
+The following stage seeds lists owned by seeded users. Each group may contain
+a `Lists` key:
+
+```json
+{
+  "IdentitySeeder": {
+    "Demo": {
+      "Order": 100,
+      "Users": [
+        { "UserName": "demo", "Email": "demo@example.com" }
+      ],
+      "Lists": [
+        { "Name": "Groceries", "Owner": "demo" },
+        { "Name": "Chores", "Owner": "demo" }
+      ]
+    }
+  }
+}
+```
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using NuxtIdentity.Core.Abstractions;
+
+public sealed class ListSeedOptions
+{
+    public string? Name { get; set; }
+    public string? Owner { get; set; }
+}
+
+public sealed class ListsSeedStage(ApplicationDbContext db) : ISeedStage
+{
+    public string Name => "Lists";
+    public int Order => 0;
+
+    public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+    {
+        foreach (var item in context.Items<ListSeedOptions>("Lists"))
+        {
+            var options = item.Value;
+            await context.RunAsync(item, "list", options.Name ?? "(unnamed)", async () =>
+            {
+                if (string.IsNullOrWhiteSpace(options.Name))
+                    return SeedResult.Failure("Name is required.");
+
+                var owner = await db.Users.SingleOrDefaultAsync(
+                    user => user.UserName == options.Owner, cancellationToken);
+                if (owner is null)
+                    return SeedResult.Skipped("Owner was not found.");
+
+                var exists = await db.Lists.AnyAsync(
+                    list => list.OwnerId == owner.Id && list.Name == options.Name, cancellationToken);
+                if (exists)
+                    return SeedResult.AlreadyExists("List already exists.");
+
+                db.Lists.Add(new TodoList { OwnerId = owner.Id, Name = options.Name });
+                await db.SaveChangesAsync(cancellationToken);
+                return SeedResult.Success();
+            });
+        }
+    }
+}
+```
+
+Register it in the startup project:
+
+```csharp
+builder.Services.AddNuxtIdentitySeeding<ApplicationUser>(builder.Configuration);
+builder.Services.AddSeedStage<ListsSeedStage>();
+```
+
+Stages are registered as scoped services, so they can inject a `DbContext` or
+other scoped services. Registering the same stage type more than once has no
+effect.
+
+### Binding and running items
+
+`Items<T>(key)` binds each child of the group's `key` subsection to `T`. A
+missing key yields no items. If an item can't be bound, for example because a
+number field contains text, the item is returned with a default `Value` and
+`Error` set; enumeration continues with the next item. Binding errors never
+include the configured value.
+
+`RunAsync(item, itemKind, identifyingKey, operation)` runs one item's
+operation and records its outcome. If the item has a binding error, the
+operation is not invoked and the item is recorded as failed. For data that
+doesn't come from `Items<T>`, use the
+`RunAsync(itemKind, path, identifyingKey, operation)` overload with your own
+configuration path.
+
+Choose the result that describes what happened:
+
+| Result | Use when | Counted as |
+| --- | --- | --- |
+| `SeedResult.Success()` | The item was created. | Succeeded |
+| `SeedResult.AlreadyExists(reason)` | The item already exists; nothing changed. | Skipped (not a partial run) |
+| `SeedResult.Skipped(reason)` | A dependency is missing, so the item can't be created. | Skipped (partial run) |
+| `SeedResult.Failure(reason)` | The configuration is invalid or creation failed. | Failed |
+
+An exception thrown by `operation` is counted as a failure for that item and
+logged by exception type only. Seeding then continues.
+
+### Run order
+
+Within each group, built-in Identity steps run first, then stages run by
+ascending `Order`, then by `Name` using ordinal comparison. Every stage runs
+for every group, including groups that have no data for it. A group's stages
+finish before the next group begins.
+
+### Stage contract
+
+- **Create-only and idempotent.** Create missing data; never update or delete
+  existing data. Return `AlreadyExists` when the item is already present, so
+  re-running the seeder makes no changes.
+- **Wrap each item in `RunAsync`.** This isolates failures, counts outcomes,
+  and logs diagnostics consistently with built-in items.
+- **Never log or return secrets.** `itemKind`, `identifyingKey`, and reasons
+  are logged. Use a non-secret key, such as a name, never a password, token,
+  or invitation code.
+- **Use your own keys.** Don't read the built-in keys: `Order`, `Roles`,
+  `Users`, `UserClaims`, `RoleClaims`, and `Invitations`. Pick key names that
+  won't collide with other stages.
+- **Honor cancellation.** Pass the `CancellationToken` to asynchronous calls.
+  Cancellation stops seeding and is not counted as a failure.
+- **Handle a missing key.** A group without the stage's key has no items for
+  it; the stage should do nothing.

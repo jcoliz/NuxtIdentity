@@ -24,6 +24,7 @@ public sealed partial class IdentitySeeder<TUser>
     private readonly UserManager<TUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IInvitationService? _invitationService;
+    private readonly IReadOnlyList<ISeedStage> _stages;
     private readonly ILogger<IdentitySeeder<TUser>> _logger;
 
     /// <summary>
@@ -34,12 +35,17 @@ public sealed partial class IdentitySeeder<TUser>
         UserManager<TUser> userManager,
         RoleManager<IdentityRole> roleManager,
         IServiceProvider serviceProvider,
+        IEnumerable<ISeedStage> stages,
         ILogger<IdentitySeeder<TUser>> logger)
     {
         _configuration = configuration;
         _userManager = userManager;
         _roleManager = roleManager;
         _invitationService = serviceProvider.GetService<IInvitationService>();
+        _stages = stages
+            .OrderBy(stage => stage.Order)
+            .ThenBy(stage => stage.Name ?? string.Empty, StringComparer.Ordinal)
+            .ToList();
         _logger = logger;
     }
 
@@ -81,6 +87,7 @@ public sealed partial class IdentitySeeder<TUser>
             await SeedRoleClaimsAsync(group, summary, cancellationToken);
             if (_invitationService is { } invitationService)
                 await SeedInvitationsAsync(group, invitationService, summary, cancellationToken);
+            await SeedCustomStagesAsync(group, summary, cancellationToken);
         }
 
         if (summary.Failed == 0 && summary.Skipped == summary.AlreadyExisting)
@@ -105,20 +112,20 @@ public sealed partial class IdentitySeeder<TUser>
             await RunOperationAsync(group.Name, path, "role", SafeKey(options.Name), summary, cancellationToken, async () =>
             {
                 if (options.ConfigurationError is not null)
-                    return SeedOperationResult.Failure(options.ConfigurationError);
+                    return SeedResult.Failure(options.ConfigurationError);
 
                 if (string.IsNullOrWhiteSpace(options.Name))
-                    return SeedOperationResult.Failure("Role name is required.");
+                    return SeedResult.Failure("Role name is required.");
 
                 var existingRole = await _roleManager.FindByNameAsync(options.Name);
                 if (existingRole is not null)
-                    return SeedOperationResult.AlreadyExists("Role already exists.");
+                    return SeedResult.AlreadyExists("Role already exists.");
 
                 string? id = null;
                 if (!string.IsNullOrWhiteSpace(options.Id))
                 {
                     if (!Guid.TryParse(options.Id, out var roleId))
-                        return SeedOperationResult.Failure("Role ID must be a valid GUID.");
+                        return SeedResult.Failure("Role ID must be a valid GUID.");
 
                     id = roleId.ToString("D");
                 }
@@ -144,13 +151,13 @@ public sealed partial class IdentitySeeder<TUser>
             await RunOperationAsync(group.Name, path, "user", SafeKey(options.UserName), summary, cancellationToken, async () =>
             {
                 if (options.ConfigurationError is not null)
-                    return SeedOperationResult.Failure(options.ConfigurationError);
+                    return SeedResult.Failure(options.ConfigurationError);
 
                 if (string.IsNullOrWhiteSpace(options.UserName))
-                    return SeedOperationResult.Failure("Username is required.");
+                    return SeedResult.Failure("Username is required.");
 
                 if (await _userManager.FindByNameAsync(options.UserName) is not null)
-                    return SeedOperationResult.AlreadyExists("User already exists.");
+                    return SeedResult.AlreadyExists("User already exists.");
 
                 var user = Activator.CreateInstance<TUser>() ??
                     throw new InvalidOperationException("The configured Identity user type could not be instantiated.");
@@ -188,19 +195,19 @@ public sealed partial class IdentitySeeder<TUser>
                 await RunOperationAsync(group.Name, path, "user role", key, summary, cancellationToken, async () =>
                 {
                     if (string.IsNullOrWhiteSpace(userOptions.UserName))
-                        return SeedOperationResult.Failure("Username is required for role assignment.");
+                        return SeedResult.Failure("Username is required for role assignment.");
 
                     if (string.IsNullOrWhiteSpace(roleName))
-                        return SeedOperationResult.Failure("Role name is required for role assignment.");
+                        return SeedResult.Failure("Role name is required for role assignment.");
 
                     var user = await _userManager.FindByNameAsync(userOptions.UserName);
                     var role = await _roleManager.FindByNameAsync(roleName);
                     if (user is null || role is null)
-                        return SeedOperationResult.Skipped("Required user or role is unavailable.");
+                        return SeedResult.Skipped("Required user or role is unavailable.");
 
                     var currentRoles = await _userManager.GetRolesAsync(user);
                     if (currentRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
-                        return SeedOperationResult.AlreadyExists("User role assignment already exists.");
+                        return SeedResult.AlreadyExists("User role assignment already exists.");
 
                     return IdentityResultToOutcome(await _userManager.AddToRoleAsync(user, roleName));
                 });
@@ -227,20 +234,20 @@ public sealed partial class IdentitySeeder<TUser>
                 await RunOperationAsync(group.Name, path, "user claim", SafeKey(userOptions.UserName), summary, cancellationToken, async () =>
                 {
                     if (claimOptions.ConfigurationError is not null)
-                        return SeedOperationResult.Failure(claimOptions.ConfigurationError);
+                        return SeedResult.Failure(claimOptions.ConfigurationError);
                     if (string.IsNullOrWhiteSpace(userOptions.UserName))
-                        return SeedOperationResult.Failure("Username is required for user claim.");
+                        return SeedResult.Failure("Username is required for user claim.");
                     if (!TryGetClaim(claimOptions, out var claim, out var error))
-                        return SeedOperationResult.Failure(error);
+                        return SeedResult.Failure(error);
 
                     var user = await _userManager.FindByNameAsync(userOptions.UserName);
                     if (user is null)
-                        return SeedOperationResult.Skipped("Required user is unavailable.");
+                        return SeedResult.Skipped("Required user is unavailable.");
 
                     var existingClaims = await _userManager.GetClaimsAsync(user);
                     if (existingClaims.Any(existing =>
                             existing.Type == claim.Type && existing.Value == claim.Value))
-                        return SeedOperationResult.AlreadyExists("User claim already exists.");
+                        return SeedResult.AlreadyExists("User claim already exists.");
 
                     return IdentityResultToOutcome(await _userManager.AddClaimAsync(user, claim));
                 });
@@ -262,22 +269,22 @@ public sealed partial class IdentitySeeder<TUser>
                 await RunOperationAsync(group.Name, path, "role claim", SafeKey(roleClaimsOptions.Role), summary, cancellationToken, async () =>
                 {
                     if (roleClaimsOptions.ConfigurationError is not null)
-                        return SeedOperationResult.Failure(roleClaimsOptions.ConfigurationError);
+                        return SeedResult.Failure(roleClaimsOptions.ConfigurationError);
                     if (claimOptions.ConfigurationError is not null)
-                        return SeedOperationResult.Failure(claimOptions.ConfigurationError);
+                        return SeedResult.Failure(claimOptions.ConfigurationError);
                     if (string.IsNullOrWhiteSpace(roleClaimsOptions.Role))
-                        return SeedOperationResult.Failure("Role name is required for role claim.");
+                        return SeedResult.Failure("Role name is required for role claim.");
                     if (!TryGetClaim(claimOptions, out var claim, out var error))
-                        return SeedOperationResult.Failure(error);
+                        return SeedResult.Failure(error);
 
                     var role = await _roleManager.FindByNameAsync(roleClaimsOptions.Role);
                     if (role is null)
-                        return SeedOperationResult.Skipped("Required role is unavailable.");
+                        return SeedResult.Skipped("Required role is unavailable.");
 
                     var existingClaims = await _roleManager.GetClaimsAsync(role);
                     if (existingClaims.Any(existing =>
                             existing.Type == claim.Type && existing.Value == claim.Value))
-                        return SeedOperationResult.AlreadyExists("Role claim already exists.");
+                        return SeedResult.AlreadyExists("Role claim already exists.");
 
                     return IdentityResultToOutcome(await _roleManager.AddClaimAsync(role, claim));
                 });
@@ -301,21 +308,21 @@ public sealed partial class IdentitySeeder<TUser>
             await RunOperationAsync(group.Name, path, "invitation", "configured invitation", summary, cancellationToken, async () =>
             {
                 if (options.ConfigurationError is not null)
-                    return SeedOperationResult.Failure(options.ConfigurationError);
+                    return SeedResult.Failure(options.ConfigurationError);
                 if (!Guid.TryParse(options.Code, out var code))
-                    return SeedOperationResult.Failure("Invitation code must be a valid GUID.");
+                    return SeedResult.Failure("Invitation code must be a valid GUID.");
                 if (code == Guid.Empty)
-                    return SeedOperationResult.Skipped("Empty invitation code is not allowed.");
+                    return SeedResult.Skipped("Empty invitation code is not allowed.");
                 if (options.ExpiresIn is { } expiresIn && expiresIn < TimeSpan.Zero)
-                    return SeedOperationResult.Failure("Invitation expiry must not be negative.");
+                    return SeedResult.Failure("Invitation expiry must not be negative.");
                 if (options.Roles.Any(string.IsNullOrWhiteSpace))
-                    return SeedOperationResult.Failure("Invitation roles must not contain empty values.");
+                    return SeedResult.Failure("Invitation roles must not contain empty values.");
                 if (!TryGetClaims(options.Claims, out var claims, out var error))
-                    return SeedOperationResult.Failure(error);
+                    return SeedResult.Failure(error);
 
                 var codeText = code.ToString("D");
                 if (await invitationService.GetByCodeAsync(codeText) is not null)
-                    return SeedOperationResult.AlreadyExists("Invitation already exists.");
+                    return SeedResult.AlreadyExists("Invitation already exists.");
 
                 try
                 {
@@ -326,7 +333,7 @@ public sealed partial class IdentitySeeder<TUser>
                         expiresIn: options.ExpiresIn,
                         metadata: options.Metadata,
                         code: code);
-                    return SeedOperationResult.Success();
+                    return SeedResult.Success();
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -335,11 +342,35 @@ public sealed partial class IdentitySeeder<TUser>
                 catch
                 {
                     if (await invitationService.GetByCodeAsync(codeText) is not null)
-                        return SeedOperationResult.AlreadyExists("Invitation already exists.");
+                        return SeedResult.AlreadyExists("Invitation already exists.");
 
                     throw;
                 }
             });
+        }
+    }
+
+    private async Task SeedCustomStagesAsync(
+        SeedGroup group,
+        SeedSummary summary,
+        CancellationToken cancellationToken)
+    {
+        foreach (var stage in _stages)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await stage.SeedAsync(new GroupContext(this, group, summary, cancellationToken), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                summary.Failed++;
+                LogStageException(group.Name, SafeKey(stage.Name), exception.GetType().Name);
+            }
         }
     }
 
@@ -350,7 +381,7 @@ public sealed partial class IdentitySeeder<TUser>
         string identifyingKey,
         SeedSummary summary,
         CancellationToken cancellationToken,
-        Func<Task<SeedOperationResult>> operation)
+        Func<Task<SeedResult>> operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -430,13 +461,16 @@ public sealed partial class IdentitySeeder<TUser>
     [LoggerMessage(9, LogLevel.Information, "{Location}: Exists. Group: {GroupName}; item: {ItemKind}; key: {IdentifyingKey}; path: {ConfigurationPath}; reason: {Reason}.")]
     private partial void LogOperationAlreadyExists(string groupName, string itemKind, string identifyingKey, string configurationPath, string? reason, [CallerMemberName] string? location = null);
 
+    [LoggerMessage(10, LogLevel.Error, "{Location}: Stage error. Group: {GroupName}; stage: {StageName}; exception type: {ExceptionType}.")]
+    private partial void LogStageException(string groupName, string stageName, string exceptionType, [CallerMemberName] string? location = null);
+
     #endregion
 
-    private static SeedOperationResult IdentityResultToOutcome(IdentityResult result)
+    private static SeedResult IdentityResultToOutcome(IdentityResult result)
     {
         return result.Succeeded
-            ? SeedOperationResult.Success()
-            : SeedOperationResult.Failure($"Identity operation returned {result.Errors.Count()} error(s).");
+            ? SeedResult.Success()
+            : SeedResult.Failure($"Identity operation returned {result.Errors.Count()} error(s).");
     }
 
     private static bool TryGetClaim(
@@ -601,7 +635,7 @@ public sealed partial class IdentitySeeder<TUser>
                 options.Invitations.Add(invitation);
             }
 
-            yield return new SeedGroup(groupSection.Key, options, groupSection.Path);
+            yield return new SeedGroup(groupSection.Key, options, groupSection.Path, groupSection);
         }
     }
 
@@ -626,7 +660,8 @@ public sealed partial class IdentitySeeder<TUser>
     private sealed record SeedGroup(
         string Name,
         IdentitySeederGroupOptions Options,
-        string Path);
+        string Path,
+        IConfigurationSection Section);
 
     private sealed class SeedSummary
     {
@@ -636,19 +671,55 @@ public sealed partial class IdentitySeeder<TUser>
         public int AlreadyExisting { get; set; }
     }
 
-    private enum SeedOutcome
+    private sealed class GroupContext(
+        IdentitySeeder<TUser> seeder,
+        SeedGroup group,
+        SeedSummary summary,
+        CancellationToken cancellationToken) : SeedGroupContext
     {
-        Succeeded,
-        Failed,
-        Skipped,
-        AlreadyExists
-    }
+        public override string GroupName => group.Name;
 
-    private sealed record SeedOperationResult(SeedOutcome Outcome, string? Reason = null)
-    {
-        public static SeedOperationResult Success() => new(SeedOutcome.Succeeded);
-        public static SeedOperationResult Failure(string reason) => new(SeedOutcome.Failed, reason);
-        public static SeedOperationResult Skipped(string reason) => new(SeedOutcome.Skipped, reason);
-        public static SeedOperationResult AlreadyExists(string reason) => new(SeedOutcome.AlreadyExists, reason);
+        public override string Path => group.Path;
+
+        public override IEnumerable<SeedItem<T>> Items<T>(string key)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+            foreach (var itemSection in group.Section.GetSection(key).GetChildren())
+            {
+                T value;
+                string? error = null;
+                try
+                {
+                    value = itemSection.Get<T>() ?? new T();
+                }
+                catch (Exception)
+                {
+                    // Binder exception messages can include configured values, so they are not surfaced.
+                    value = new T();
+                    error = $"Configuration could not be bound to {typeof(T).Name}.";
+                }
+
+                yield return CreateItem(value, itemSection.Path, error);
+            }
+        }
+
+        public override Task RunAsync(
+            string itemKind,
+            string path,
+            string identifyingKey,
+            Func<Task<SeedResult>> operation)
+        {
+            ArgumentNullException.ThrowIfNull(operation);
+
+            return seeder.RunOperationAsync(
+                group.Name,
+                string.IsNullOrWhiteSpace(path) ? group.Path : path,
+                SafeKey(itemKind),
+                SafeKey(identifyingKey),
+                summary,
+                cancellationToken,
+                operation);
+        }
     }
 }

@@ -45,6 +45,8 @@ This library provides ready-to-use ASP.NET Core components for JWT authenticatio
 
 ### Extensions
 
+- **`AddNuxtIdentitySeeding<TUser>()`** / **`SeedNuxtIdentityAsync<TUser>()`** - Registers and runs the configuration-driven Identity seeder
+- **`AddSeedStage<TStage>()`** - Registers a custom seed stage that seeds application data from the same seed groups. See [Identity Seeding](../../docs/IDENTITY-SEEDING.md#writing-a-custom-seed-stage)
 - **`AddNuxtIdentity<TUser>()`** - Registers JWT token service and claims provider
 - **`AddNuxtIdentityAuthentication()`** - Configures JWT Bearer authentication
 

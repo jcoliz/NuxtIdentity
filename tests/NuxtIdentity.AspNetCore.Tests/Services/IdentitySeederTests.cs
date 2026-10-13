@@ -545,6 +545,224 @@ public sealed class IdentitySeederTests
         Assert.That(exception!.Message, Does.Contain("UserManager`1"));
     }
 
+    [Test]
+    public async Task CustomStages_RunAfterBuiltInStepsInOrderWithinEachGroup()
+    {
+        // Given: Stages with mixed Order and Name values, one registered twice, and two configured groups.
+        await using var harness = await SeederHarness.CreateAsync(configureServices: services =>
+        {
+            services.AddSingleton<StageRecorder>();
+            services.AddSeedStage<BravoStage>();
+            services.AddSeedStage<AlphaStage>();
+            services.AddSeedStage<EarlyStage>();
+            services.AddSeedStage<AlphaStage>();
+        });
+        harness.Set("IdentitySeeder:First:Order", "1");
+        harness.Set("IdentitySeeder:First:Roles:0:Name", "FirstRole");
+        harness.Set("IdentitySeeder:Second:Order", "2");
+
+        // When: Seeding runs.
+        await harness.SeedAsync();
+
+        // Then: Each group runs its built-in steps, then stages by Order then Name, before the next group starts.
+        var recorder = harness.Services.GetRequiredService<StageRecorder>();
+        Assert.That(recorder.Calls, Is.EqualTo(new[]
+        {
+            "First:Early:FirstRole=True",
+            "First:Alpha:FirstRole=True",
+            "First:Bravo:FirstRole=True",
+            "Second:Early:FirstRole=True",
+            "Second:Alpha:FirstRole=True",
+            "Second:Bravo:FirstRole=True",
+        }));
+    }
+
+    [Test]
+    public async Task CustomStage_SeedsItemsAgainstSameGroupIdentityDataAndCountsOutcomes()
+    {
+        // Given: A group seeds a user and lists owned by that user, a missing owner, and an unbindable item.
+        await using var harness = await SeederHarness.CreateAsync(configureServices: services =>
+        {
+            services.AddSingleton<StageRecorder>();
+            services.AddSeedStage<ListsStage>();
+        });
+        harness.Set("IdentitySeeder:Demo:Users:0:UserName", "owner");
+        harness.Set("IdentitySeeder:Demo:Users:0:Email", "owner@example.com");
+        harness.Set("IdentitySeeder:Demo:Lists:0:Name", "Groceries");
+        harness.Set("IdentitySeeder:Demo:Lists:0:Owner", "owner");
+        harness.Set("IdentitySeeder:Demo:Lists:1:Name", "Orphan");
+        harness.Set("IdentitySeeder:Demo:Lists:1:Owner", "nobody");
+        harness.Set("IdentitySeeder:Demo:Lists:2:Name", "Broken");
+        harness.Set("IdentitySeeder:Demo:Lists:2:Owner", "owner");
+        harness.Set("IdentitySeeder:Demo:Lists:2:Capacity", "secret-capacity-value");
+
+        // When: Seeding runs twice.
+        await harness.SeedAsync();
+        var firstRunLogs = harness.LogEntries.ToArray();
+        await harness.SeedAsync();
+        var secondRunLogs = harness.LogEntries.Skip(firstRunLogs.Length).ToArray();
+
+        // Then: The owned list is created once, the orphan is skipped, and the binding error fails without leaking the value.
+        var recorder = harness.Services.GetRequiredService<StageRecorder>();
+        Assert.That(recorder.Lists, Is.EquivalentTo(new[] { "owner/Groceries" }));
+        AssertSummary(firstRunLogs.Last(), succeeded: 2, failed: 1, skipped: 1);
+        AssertSummary(secondRunLogs.Last(), succeeded: 0, failed: 1, skipped: 3);
+
+        var failure = firstRunLogs.Single(log => log.EventId == 5);
+        Assert.That(failure.Properties["ItemKind"], Is.EqualTo("list"));
+        Assert.That(failure.Properties["ConfigurationPath"], Is.EqualTo("IdentitySeeder:Demo:Lists:2"));
+        Assert.That(failure.Properties["Reason"], Is.EqualTo("Configuration could not be bound to ListOptions."));
+        var skipped = firstRunLogs.Single(log => log.EventId == 6);
+        Assert.That(skipped.Properties["IdentifyingKey"], Is.EqualTo("Orphan"));
+        Assert.That(harness.LogText, Does.Not.Contain("secret-capacity-value"));
+    }
+
+    [Test]
+    public async Task CustomStages_IsolateExceptionsAndLogOnlyExceptionType()
+    {
+        // Given: One stage throws from an item operation and from SeedAsync, and a later stage is healthy.
+        await using var harness = await SeederHarness.CreateAsync(configureServices: services =>
+        {
+            services.AddSingleton<StageRecorder>();
+            services.AddSeedStage<ThrowingStage>();
+            services.AddSeedStage<AlphaStage>();
+        });
+        harness.Set("IdentitySeeder:Demo:Roles:0:Name", "DemoRole");
+
+        // When: Seeding runs.
+        await harness.SeedAsync();
+
+        // Then: Both exceptions are counted as failures, logged by type only, and the later stage still runs.
+        var recorder = harness.Services.GetRequiredService<StageRecorder>();
+        Assert.That(recorder.Calls, Is.EqualTo(new[] { "Demo:Alpha:FirstRole=False" }));
+        var itemError = harness.LogEntries.Single(log => log.EventId == 7);
+        Assert.That(itemError.Properties["ItemKind"], Is.EqualTo("widget"));
+        Assert.That(itemError.Properties["ExceptionType"], Is.EqualTo(nameof(InvalidOperationException)));
+        var stageError = harness.LogEntries.Single(log => log.EventId == 10);
+        Assert.That(stageError.Level, Is.EqualTo(LogLevel.Error));
+        Assert.That(stageError.Properties["GroupName"], Is.EqualTo("Demo"));
+        Assert.That(stageError.Properties["StageName"], Is.EqualTo("Throwing"));
+        Assert.That(stageError.Properties["ExceptionType"], Is.EqualTo(nameof(InvalidOperationException)));
+        Assert.That(harness.LogText, Does.Not.Contain(ThrowingStage.SecretMessage));
+        AssertSummary(harness.LogEntries.Last(), succeeded: 1, failed: 2, skipped: 0);
+    }
+
+    [Test]
+    public async Task CustomStage_CancellationPropagates()
+    {
+        // Given: A stage that observes the seeding token after cancellation is requested.
+        using var cancellation = new CancellationTokenSource();
+        await using var harness = await SeederHarness.CreateAsync(configureServices: services =>
+        {
+            services.AddSingleton(new StageRecorder { Cancellation = cancellation });
+            services.AddSeedStage<CancelingStage>();
+            services.AddSeedStage<AlphaStage>();
+        });
+        harness.Set("IdentitySeeder:Demo:Roles:0:Name", "DemoRole");
+
+        // When: Seeding runs and the stage cancels.
+        Assert.ThrowsAsync<OperationCanceledException>(() => harness.SeedAsync(cancellation.Token));
+
+        // Then: Cancellation is not swallowed as a stage failure and later stages do not run.
+        var recorder = harness.Services.GetRequiredService<StageRecorder>();
+        Assert.That(recorder.Calls, Is.Empty);
+        Assert.That(harness.LogEventIds, Does.Not.Contain(10));
+    }
+
+    private sealed class StageRecorder
+    {
+        public List<string> Calls { get; } = new();
+        public HashSet<string> Lists { get; } = new(StringComparer.Ordinal);
+        public CancellationTokenSource? Cancellation { get; init; }
+    }
+
+    private abstract class RecordingStage(StageRecorder recorder, RoleManager<IdentityRole> roles) : ISeedStage
+    {
+        public abstract string Name { get; }
+        public abstract int Order { get; }
+
+        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        {
+            var roleExists = await roles.RoleExistsAsync("FirstRole");
+            recorder.Calls.Add($"{context.GroupName}:{Name}:FirstRole={roleExists}");
+        }
+    }
+
+    private sealed class AlphaStage(StageRecorder recorder, RoleManager<IdentityRole> roles) : RecordingStage(recorder, roles)
+    {
+        public override string Name => "Alpha";
+        public override int Order => 10;
+    }
+
+    private sealed class BravoStage(StageRecorder recorder, RoleManager<IdentityRole> roles) : RecordingStage(recorder, roles)
+    {
+        public override string Name => "Bravo";
+        public override int Order => 10;
+    }
+
+    private sealed class EarlyStage(StageRecorder recorder, RoleManager<IdentityRole> roles) : RecordingStage(recorder, roles)
+    {
+        public override string Name => "Early";
+        public override int Order => -5;
+    }
+
+    private sealed class ListOptions
+    {
+        public string? Name { get; set; }
+        public string? Owner { get; set; }
+        public int Capacity { get; set; }
+    }
+
+    private sealed class ListsStage(StageRecorder recorder, UserManager<TestUser> users) : ISeedStage
+    {
+        public string Name => "Lists";
+        public int Order => 0;
+
+        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        {
+            foreach (var item in context.Items<ListOptions>("Lists"))
+            {
+                await context.RunAsync(item, "list", item.Value.Name ?? "(unnamed)", async () =>
+                {
+                    var owner = await users.FindByNameAsync(item.Value.Owner ?? string.Empty);
+                    if (owner is null)
+                        return SeedResult.Skipped("Owner was not found.");
+
+                    return recorder.Lists.Add($"{owner.UserName}/{item.Value.Name}")
+                        ? SeedResult.Success()
+                        : SeedResult.AlreadyExists("List already exists.");
+                });
+            }
+        }
+    }
+
+    private sealed class ThrowingStage : ISeedStage
+    {
+        public const string SecretMessage = "secret-stage-message";
+
+        public string Name => "Throwing";
+        public int Order => 0;
+
+        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        {
+            await context.RunAsync("widget", $"{context.Path}:Widgets:0", "w1",
+                () => throw new InvalidOperationException(SecretMessage));
+            throw new InvalidOperationException(SecretMessage);
+        }
+    }
+
+    private sealed class CancelingStage(StageRecorder recorder) : ISeedStage
+    {
+        public string Name => "Canceling";
+        public int Order => 0;
+
+        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        {
+            await recorder.Cancellation!.CancelAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+    }
+
     private sealed class SeederHarness : IAsyncDisposable
     {
         private readonly SqliteConnection _connection;
@@ -604,13 +822,15 @@ public sealed class IdentitySeederTests
             return invitation;
         }
 
-        public async Task SeedAsync()
+        public async Task SeedAsync(CancellationToken cancellationToken = default)
         {
             await using var scope = Services.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<IdentitySeeder<TestUser>>().SeedAsync();
+            await scope.ServiceProvider.GetRequiredService<IdentitySeeder<TestUser>>().SeedAsync(cancellationToken);
         }
 
-        public static async Task<SeederHarness> CreateAsync(bool registerInvitationService = true)
+        public static async Task<SeederHarness> CreateAsync(
+            bool registerInvitationService = true,
+            Action<IServiceCollection>? configureServices = null)
         {
             var connection = new SqliteConnection("DataSource=:memory:");
             await connection.OpenAsync();
@@ -647,6 +867,8 @@ public sealed class IdentitySeederTests
 
             if (registerInvitationService)
                 services.AddSingleton(invitationService.Object);
+
+            configureServices?.Invoke(services);
 
             var harness = new SeederHarness(
                 connection,
