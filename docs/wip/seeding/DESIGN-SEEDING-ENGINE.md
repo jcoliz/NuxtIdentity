@@ -127,7 +127,7 @@ await app.Services.SeedAsync();
 ## Design Decisions
 
 - **Package boundary:** The engine lives in a new `src/Seeding/NuxtIdentity.Seeding.csproj` that depends only on `Microsoft.Extensions.Configuration.Abstractions`, `Microsoft.Extensions.Configuration.Binder`, `Microsoft.Extensions.DependencyInjection.Abstractions`, and `Microsoft.Extensions.Logging.Abstractions`. `NuxtIdentity.AspNetCore` references it. Applications reference it directly only if they seed without Identity. The package can move to its own repository later without API changes if a non-NuxtIdentity consumer appears.
-- **Stage-facing types:** The interim design ([DESIGN-SEEDING.md, Custom Seed Stages](./DESIGN-SEEDING.md#custom-seed-stages)) places `ISeedStage`, `SeedGroupContext`, `SeedItem<T>`, `SeedResult`, and `SeedOutcome` in `NuxtIdentity.Core.Abstractions`, so stage libraries need no ASP.NET Core reference. The engine reuses those types rather than redefining them, adding members such as `ISeedStage.Keys` there. If the engine moves to its own repository, the types move to a dependency-free abstractions package with type forwarding from Core.
+- **Stage-facing types:** The interim design ([DESIGN-SEEDING.md, Custom Seed Stages](./DESIGN-SEEDING.md#custom-seed-stages)) places `ISeedStage`, `ISeedGroupContext`, `SeedItem<T>`, `SeedResult`, and `SeedOutcome` in `NuxtIdentity.Core.Abstractions`, so stage libraries need no ASP.NET Core reference. The engine reuses those types rather than redefining them, adding members such as `ISeedStage.Keys` there. If the engine moves to its own repository, the types move to a dependency-free abstractions package with type forwarding from Core.
 - **Configuration section:** Rename the root section from `IdentitySeeder` to `Seeding`. Group semantics are unchanged: immediate children are named groups, ordered by `Order` ascending (default `0`) then by `StringComparer.OrdinalIgnoreCase` group name. `Order` is reserved at the group level and owned by the engine.
 - **Execution order:** Groups are the outer loop; stages are the inner loop. For each group in order, each stage runs in ascending `ISeedStage.Order`, with ties broken by ordinal stage name. This keeps "a group is a coherent fixture" as the mental model and lets application stages rely on Identity entities created earlier in the same group or in earlier groups.
 - **Stage ordering bands:** `SeedStageOrder` constants define well-known bands: `Identity = 0` (Identity stages use 0–599, spaced 100 apart), and `Application = 1000` (default for application stages). Applications can choose values in between or after these bands when they need finer ordering.
@@ -158,13 +158,13 @@ public interface ISeedStage
     IReadOnlyCollection<string> Keys { get; }
 
     /// Seeds this stage's items for one group.
-    Task SeedAsync(SeedGroupContext group, CancellationToken cancellationToken);
+    Task SeedAsync(ISeedGroupContext group, CancellationToken cancellationToken);
 }
 ```
 
 A stage may own multiple keys (for example, the Identity user-claims stage processes nested `Users[].Claims` and group-level `UserClaims`). A stage may read keys it does not own (the user-roles stage reads `Users[].Roles`), but only the owner's key participates in collision and unclaimed-key validation.
 
-### `SeedGroupContext`
+### `ISeedGroupContext`
 
 Passed to each stage for each group. Exposes:
 
@@ -225,7 +225,7 @@ The run token is captured by the context, so stages do not pass it to `RunAsync`
 
 1. Resolve `IEnumerable<ISeedStage>` from the scope. Validate key ownership (duplicate keys or a stage claiming `Order` throws `InvalidOperationException` naming the stages and key). Sort stages by `Order`, then ordinal `Name`.
 2. Read groups from `Seeding`, parse `Order` (an invalid `Order` records one group configuration failure and uses `0`, matching current behavior), and sort.
-3. For each group: warn for each unclaimed key, then run each stage's `SeedAsync` with a `SeedGroupContext`. An exception escaping a stage's `SeedAsync` (outside `RunAsync`) is counted as one failure for that stage and group, logged with the exception type name, and does not stop later stages or groups. Cancellation propagates.
+3. For each group: warn for each unclaimed key, then run each stage's `SeedAsync` with a `ISeedGroupContext`. An exception escaping a stage's `SeedAsync` (outside `RunAsync`) is counted as one failure for that stage and group, logged with the exception type name, and does not stop later stages or groups. Cancellation propagates.
 4. Log the completion or partial-completion summary.
 
 No stages registered, or no `Seeding` section, completes successfully with zero counts and a debug log.

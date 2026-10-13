@@ -351,8 +351,8 @@ depend on ASP.NET Core:
 
 | Type | Purpose |
 | --- | --- |
-| `ISeedStage` | The stage: `Name`, `Order`, and `SeedAsync(SeedGroupContext, CancellationToken)`. |
-| `SeedGroupContext` | The current group: `GroupName`, `Path`, `Items<T>(key)`, and `RunAsync(...)`. |
+| `ISeedStage` | The stage: `Name`, `Order`, and `SeedAsync(ISeedGroupContext, CancellationToken)`. |
+| `ISeedGroupContext` | The current group: `GroupName`, `Path`, `Items<T>(key)`, and `RunAsync(...)`. |
 | `SeedItem<T>` | One bound configuration item: `Value`, `Path`, and `Error`. |
 | `SeedResult` | An item outcome: `Success()`, `AlreadyExists(reason)`, `Skipped(reason)`, or `Failure(reason)`. |
 
@@ -396,7 +396,7 @@ public sealed class ListsSeedStage(ApplicationDbContext db) : ISeedStage
     public string Name => "Lists";
     public int Order => 0;
 
-    public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+    public async Task SeedAsync(ISeedGroupContext context, CancellationToken cancellationToken)
     {
         foreach (var item in context.Items<ListSeedOptions>("Lists"))
         {

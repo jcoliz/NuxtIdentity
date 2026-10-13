@@ -675,13 +675,13 @@ public sealed partial class IdentitySeeder<TUser>
         IdentitySeeder<TUser> seeder,
         SeedGroup group,
         SeedSummary summary,
-        CancellationToken cancellationToken) : SeedGroupContext
+        CancellationToken cancellationToken) : ISeedGroupContext
     {
-        public override string GroupName => group.Name;
+        public string GroupName => group.Name;
 
-        public override string Path => group.Path;
+        public string Path => group.Path;
 
-        public override IEnumerable<SeedItem<T>> Items<T>(string key)
+        public IEnumerable<SeedItem<T>> Items<T>(string key) where T : new()
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
@@ -700,11 +700,11 @@ public sealed partial class IdentitySeeder<TUser>
                     error = $"Configuration could not be bound to {typeof(T).Name}.";
                 }
 
-                yield return CreateItem(value, itemSection.Path, error);
+                yield return new SeedItem<T>(value, itemSection.Path, error);
             }
         }
 
-        public override Task RunAsync(
+        public Task RunAsync(
             string itemKind,
             string path,
             string identifyingKey,
@@ -720,6 +720,23 @@ public sealed partial class IdentitySeeder<TUser>
                 summary,
                 cancellationToken,
                 operation);
+        }
+
+        public Task RunAsync<T>(
+            SeedItem<T> item,
+            string itemKind,
+            string identifyingKey,
+            Func<Task<SeedResult>> operation)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+            ArgumentNullException.ThrowIfNull(operation);
+
+            var error = item.Error;
+            return RunAsync(
+                itemKind,
+                item.Path,
+                identifyingKey,
+                error is null ? operation : () => Task.FromResult(SeedResult.Failure(error)));
         }
     }
 }

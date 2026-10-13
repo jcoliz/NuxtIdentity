@@ -6,7 +6,13 @@ namespace NuxtIdentity.Core.Abstractions;
 /// <typeparam name="T">The options type the item is bound to.</typeparam>
 public sealed class SeedItem<T>
 {
-    internal SeedItem(T value, string path, string? error)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SeedItem{T}"/> class.
+    /// </summary>
+    /// <param name="value">The bound value.</param>
+    /// <param name="path">The configuration path of the item.</param>
+    /// <param name="error">A safe description of a binding error, or <see langword="null"/>.</param>
+    public SeedItem(T value, string path, string? error)
     {
         Value = value;
         Path = path;

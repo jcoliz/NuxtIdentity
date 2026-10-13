@@ -30,7 +30,7 @@ namespace NuxtIdentity.Core.Abstractions;
 /// <c>RoleClaims</c>, or <c>Invitations</c>.
 /// </description></item>
 /// <item><description>
-/// Run every item through <see cref="SeedGroupContext.RunAsync(string, string, string, Func{Task{SeedResult}})"/>
+/// Run every item through <see cref="ISeedGroupContext.RunAsync(string, string, string, Func{Task{SeedResult}})"/>
 /// so its failures are isolated and counted.
 /// </description></item>
 /// </list>
@@ -52,5 +52,5 @@ public interface ISeedStage
     /// </summary>
     /// <param name="group">The group being seeded.</param>
     /// <param name="cancellationToken">A token used to cancel seeding.</param>
-    Task SeedAsync(SeedGroupContext group, CancellationToken cancellationToken);
+    Task SeedAsync(ISeedGroupContext group, CancellationToken cancellationToken);
 }

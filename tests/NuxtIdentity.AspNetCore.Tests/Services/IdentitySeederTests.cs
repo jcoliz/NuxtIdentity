@@ -605,6 +605,9 @@ public sealed class IdentitySeederTests
         // Then: The owned list is created once, the orphan is skipped, and the binding error fails without leaking the value.
         var recorder = harness.Services.GetRequiredService<StageRecorder>();
         Assert.That(recorder.Lists, Is.EquivalentTo(new[] { "owner/Groceries" }));
+        Assert.That(recorder.Calls, Does.Not.Contain("operation:IdentitySeeder:Demo:Lists:2"),
+            "An item with a binding error must not invoke its operation.");
+        Assert.That(recorder.Calls, Does.Contain("operation:IdentitySeeder:Demo:Lists:0"));
         AssertSummary(firstRunLogs.Last(), succeeded: 2, failed: 1, skipped: 1);
         AssertSummary(secondRunLogs.Last(), succeeded: 0, failed: 1, skipped: 3);
 
@@ -681,7 +684,7 @@ public sealed class IdentitySeederTests
         public abstract string Name { get; }
         public abstract int Order { get; }
 
-        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        public async Task SeedAsync(ISeedGroupContext context, CancellationToken cancellationToken)
         {
             var roleExists = await roles.RoleExistsAsync("FirstRole");
             recorder.Calls.Add($"{context.GroupName}:{Name}:FirstRole={roleExists}");
@@ -718,12 +721,13 @@ public sealed class IdentitySeederTests
         public string Name => "Lists";
         public int Order => 0;
 
-        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        public async Task SeedAsync(ISeedGroupContext context, CancellationToken cancellationToken)
         {
             foreach (var item in context.Items<ListOptions>("Lists"))
             {
                 await context.RunAsync(item, "list", item.Value.Name ?? "(unnamed)", async () =>
                 {
+                    recorder.Calls.Add($"operation:{item.Path}");
                     var owner = await users.FindByNameAsync(item.Value.Owner ?? string.Empty);
                     if (owner is null)
                         return SeedResult.Skipped("Owner was not found.");
@@ -743,7 +747,7 @@ public sealed class IdentitySeederTests
         public string Name => "Throwing";
         public int Order => 0;
 
-        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        public async Task SeedAsync(ISeedGroupContext context, CancellationToken cancellationToken)
         {
             await context.RunAsync("widget", $"{context.Path}:Widgets:0", "w1",
                 () => throw new InvalidOperationException(SecretMessage));
@@ -756,7 +760,7 @@ public sealed class IdentitySeederTests
         public string Name => "Canceling";
         public int Order => 0;
 
-        public async Task SeedAsync(SeedGroupContext context, CancellationToken cancellationToken)
+        public async Task SeedAsync(ISeedGroupContext context, CancellationToken cancellationToken)
         {
             await recorder.Cancellation!.CancelAsync();
             cancellationToken.ThrowIfCancellationRequested();
