@@ -31,7 +31,7 @@ Developers using NuxtIdentity need a way to pre-populate ASP.NET Identity tables
 - Will NOT manage runtime-created data (e.g., users who sign up through the application)
 - Will NOT provide a UI or API for managing seed data — this is a startup-time, configuration-driven feature
 - Will NOT enforce security policies around passwords in production — this is documented guidance, not enforcement
-- Will NOT seed application-specific tables beyond the standard ASP.NET Identity tables and NuxtIdentity-owned tables (e.g., Invitations)
+- Will NOT seed application-specific tables directly; the library seeds only the standard ASP.NET Identity tables and NuxtIdentity-owned tables (e.g., Invitations). Applications can seed their own tables through custom seed stages (Story 11), which they implement.
 - Will NOT handle database migrations — the database schema must already exist before seeding runs
 
 ## User Stories
@@ -177,6 +177,25 @@ Direct user seeding, including passwords, is a supported capability rather than 
 - [ ] A later group defining the same role, username, or invitation Code does not update the existing item; it may still contribute distinct missing associations or claims
 - [ ] Separate groups preserve independent contributions; providers targeting the same group path follow standard .NET configuration precedence
 - [ ] Secrets can target a specific group's fields without duplicating that group's non-secret configuration
+
+### Story 11: Application Developer - Seed application data with custom seed stages
+
+**As an** application developer using NuxtIdentity
+**I want** to add my own seed stage that seeds application data from the same named groups as Identity data
+**So that** related fixtures (for example, a demo user and that user's lists) live together, and my application data gets the same ordering, failure isolation, logging, and summary as Identity seeding, without duplicating that infrastructure
+
+**Acceptance Criteria**:
+
+- [ ] An application can register a custom seed stage with a single service registration call; no change to the existing seeding startup call is required
+- [ ] A custom stage receives each named group in the same order as Identity seeding, and can read its own keys (for example `Lists`) from that group's configuration
+- [ ] Within each group, custom stages run after all built-in Identity stages, so a custom stage can resolve roles and users created in the same group or in earlier groups
+- [ ] Multiple custom stages run in a deterministic order within each group
+- [ ] A custom stage can bind each configured item to a typed options object; a malformed item is reported with its configuration path and does not prevent other items from being processed
+- [ ] Each custom item operation is counted as succeeded, already existing, failed, or skipped in the single run summary, and is logged with group, item type, identifying key, and configuration path
+- [ ] An exception in a custom item operation, or one escaping a custom stage, is logged and counted without stopping later items, stages, or groups; cancellation is still honored
+- [ ] Identifying keys and failure reasons supplied by a custom stage are logged and must never be secrets; the library never logs configured values or exception messages on a stage's behalf
+- [ ] Existing Identity seeding behavior and configuration are unchanged
+- [ ] Custom stages are expected to follow the same create-only rules as Identity seeding; this is documented guidance, not something the library can enforce
 
 ---
 
