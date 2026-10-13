@@ -373,6 +373,55 @@ public sealed class IdentitySeederTests
     }
 
     [Test]
+    public async Task SeedAsync_RejectsEmptyRoleIdsEvenWhenRoleAlreadyExists()
+    {
+        _harness.Set("IdentitySeeder:Application:Roles:0:Name", "ExistingRole");
+        await _harness.SeedAsync();
+        var firstRunLogCount = _harness.LogEntries.Count;
+
+        _harness.Set("IdentitySeeder:Application:Roles:0:Id", Guid.Empty.ToString("D"));
+        _harness.Set("IdentitySeeder:Application:Roles:1:Name", "PlaceholderRole");
+        _harness.Set("IdentitySeeder:Application:Roles:1:Id", Guid.Empty.ToString("B"));
+        _harness.Set("IdentitySeeder:Application:Roles:2:Name", "ValidRole");
+
+        await _harness.SeedAsync();
+
+        await using var scope = _harness.Services.CreateAsyncScope();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        Assert.That(await roles.RoleExistsAsync("PlaceholderRole"), Is.False);
+        Assert.That(await roles.Roles.CountAsync(), Is.EqualTo(2));
+        Assert.That(await roles.Roles.AnyAsync(role => role.Id == Guid.Empty.ToString("D")), Is.False);
+        var logs = _harness.LogEntries.Skip(firstRunLogCount).ToArray();
+        Assert.That(logs.Select(log => log.EventId), Is.EqualTo(new[] { 5, 5, 4, 3 }));
+        Assert.That(logs.Take(2).Select(log => log.Properties["Reason"]),
+            Is.All.EqualTo("Role ID must not be an empty GUID. Replace the placeholder value."));
+        AssertSummary(logs.Last(), succeeded: 1, failed: 2, skipped: 0);
+    }
+
+    [TestCase(true, "D")]
+    [TestCase(true, "B")]
+    [TestCase(true, "N")]
+    [TestCase(false, "D")]
+    public async Task SeedAsync_RejectsEmptyInvitationCodesWithoutCallingService(
+        bool registerInvitationService, string format)
+    {
+        await _harness.DisposeAsync();
+        _harness = await SeederHarness.CreateAsync(registerInvitationService: registerInvitationService);
+        _harness.AddExistingInvitation(Guid.Empty, InvitationStatus.Pending, "existing@example.com");
+        _harness.Set("IdentitySeeder:Application:Invitations:0:Code", Guid.Empty.ToString(format));
+
+        await _harness.SeedAsync();
+
+        Assert.That(_harness.InvitationServiceCallCount, Is.Zero);
+        var failure = _harness.LogEntries.Single(log => log.EventId == 5);
+        Assert.That(failure.Properties["ConfigurationPath"], Is.EqualTo("IdentitySeeder:Application:Invitations:0"));
+        Assert.That(failure.Properties["Reason"],
+            Is.EqualTo("Invitation code must not be an empty GUID. Replace the placeholder value."));
+        Assert.That(_harness.LogEntries.Last().EventId, Is.EqualTo(3));
+        AssertSummary(_harness.LogEntries.Last(), succeeded: 0, failed: 1, skipped: 0);
+    }
+
+    [Test]
     public async Task SeedAsync_ValidatesInvitationCodesAndExpiryAndCanonicalizesRoleIds()
     {
         // Given: A role with a non-canonical GUID, malformed and empty invitation codes, and a negative expiry.
@@ -399,6 +448,7 @@ public sealed class IdentitySeederTests
         Assert.That(_harness.LogText, Does.Not.Contain(invalidCode));
         Assert.That(_harness.LogText, Does.Not.Contain(negativeExpiryCode.ToString()));
         Assert.That(_harness.LogEventIds, Does.Contain(3));
+        AssertSummary(_harness.LogEntries.Last(), succeeded: 1, failed: 3, skipped: 0);
     }
 
     [Test]
@@ -801,6 +851,7 @@ public sealed class IdentitySeederTests
         public IReadOnlyList<CapturedLog> LogEntries => _loggerProvider.Entries;
         public string LogText => string.Join(Environment.NewLine, Logs);
         public int InvitationCreateCount => _invitationCreateCount;
+        public int InvitationServiceCallCount => _invitationService.Invocations.Count;
         public string[] LastInvitationRoles => _lastInvitationRoles;
         public IReadOnlyList<ClaimInfo> LastInvitationClaims => _lastInvitationClaims;
         public TimeSpan? LastInvitationExpiry => _lastInvitationExpiry;

@@ -187,7 +187,7 @@ responsible for registering any non-default configuration providers.
 
 ### Supported fields
 
-- **Roles:** `Name` is required. `Id` is optional and must be a GUID if
+- **Roles:** `Name` is required. `Id` is optional and must be a non-empty GUID if
   provided. The configured ID is used only when the role is created and is
   stored in canonical GUID format.
 - **Users:** `UserName` is required. `Email` and `Password` are optional.
@@ -257,12 +257,15 @@ refer to them.
 Invitation seeding uses the configured code to look up an existing invitation
 and calls `IInvitationService.CreateAsync` only when that code is absent. It
 does not use the test-invitation API. Existing Pending, Accepted, Expired, and
-Revoked invitations remain unchanged. An empty GUID is rejected and skipped
-with a warning.
+Revoked invitations remain unchanged. Empty GUID role IDs and invitation codes
+are placeholder values: they are reported as failures before any lookup or
+creation, even if the role already exists or the invitation service is absent.
+Replace these placeholders with non-empty GUIDs before seeding.
 
 If invitation entries are configured but `IInvitationService` is not
-registered, the seeder emits one warning and counts those entries as skipped;
-role and user seeding continues.
+registered, the seeder emits one warning and counts entries with valid codes as
+skipped; invalid or empty GUID codes still fail validation.
+Role and user seeding continues.
 
 ## Optional direct user seeding and secrets
 

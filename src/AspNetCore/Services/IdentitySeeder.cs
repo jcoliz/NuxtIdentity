@@ -66,7 +66,6 @@ public sealed partial class IdentitySeeder<TUser>
             if (invitationCount > 0)
             {
                 LogInvitationServiceNotRegistered(invitationCount);
-                summary.Skipped += invitationCount;
             }
         }
 
@@ -85,8 +84,7 @@ public sealed partial class IdentitySeeder<TUser>
             await SeedUserRolesAsync(group, summary, cancellationToken);
             await SeedUserClaimsAsync(group, summary, cancellationToken);
             await SeedRoleClaimsAsync(group, summary, cancellationToken);
-            if (_invitationService is { } invitationService)
-                await SeedInvitationsAsync(group, invitationService, summary, cancellationToken);
+            await SeedInvitationsAsync(group, _invitationService, summary, cancellationToken);
             await SeedCustomStagesAsync(group, summary, cancellationToken);
         }
 
@@ -117,18 +115,20 @@ public sealed partial class IdentitySeeder<TUser>
                 if (string.IsNullOrWhiteSpace(options.Name))
                     return SeedResult.Failure("Role name is required.");
 
-                var existingRole = await _roleManager.FindByNameAsync(options.Name);
-                if (existingRole is not null)
-                    return SeedResult.AlreadyExists("Role already exists.");
-
                 string? id = null;
                 if (!string.IsNullOrWhiteSpace(options.Id))
                 {
                     if (!Guid.TryParse(options.Id, out var roleId))
                         return SeedResult.Failure("Role ID must be a valid GUID.");
+                    if (roleId == Guid.Empty)
+                        return SeedResult.Failure("Role ID must not be an empty GUID. Replace the placeholder value.");
 
                     id = roleId.ToString("D");
                 }
+
+                var existingRole = await _roleManager.FindByNameAsync(options.Name);
+                if (existingRole is not null)
+                    return SeedResult.AlreadyExists("Role already exists.");
 
                 var role = new IdentityRole(options.Name);
                 if (id is not null)
@@ -294,7 +294,7 @@ public sealed partial class IdentitySeeder<TUser>
 
     private async Task SeedInvitationsAsync(
         SeedGroup group,
-        IInvitationService invitationService,
+        IInvitationService? invitationService,
         SeedSummary summary,
         CancellationToken cancellationToken)
     {
@@ -304,6 +304,13 @@ public sealed partial class IdentitySeeder<TUser>
         foreach (var options in group.Options.Invitations)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (invitationService is null &&
+                Guid.TryParse(options.Code, out var configuredCode) && configuredCode != Guid.Empty)
+            {
+                summary.Skipped++;
+                continue;
+            }
+
             var path = options.ConfigurationPath ?? group.Path;
             await RunOperationAsync(group.Name, path, "invitation", "configured invitation", summary, cancellationToken, async () =>
             {
@@ -312,13 +319,15 @@ public sealed partial class IdentitySeeder<TUser>
                 if (!Guid.TryParse(options.Code, out var code))
                     return SeedResult.Failure("Invitation code must be a valid GUID.");
                 if (code == Guid.Empty)
-                    return SeedResult.Skipped("Empty invitation code is not allowed.");
+                    return SeedResult.Failure("Invitation code must not be an empty GUID. Replace the placeholder value.");
                 if (options.ExpiresIn is { } expiresIn && expiresIn < TimeSpan.Zero)
                     return SeedResult.Failure("Invitation expiry must not be negative.");
                 if (options.Roles.Any(string.IsNullOrWhiteSpace))
                     return SeedResult.Failure("Invitation roles must not contain empty values.");
                 if (!TryGetClaims(options.Claims, out var claims, out var error))
                     return SeedResult.Failure(error);
+                if (invitationService is null)
+                    return SeedResult.Skipped("Required invitation service is unavailable.");
 
                 var codeText = code.ToString("D");
                 if (await invitationService.GetByCodeAsync(codeText) is not null)
