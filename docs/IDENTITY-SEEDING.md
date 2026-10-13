@@ -353,7 +353,7 @@ depend on ASP.NET Core:
 | --- | --- |
 | `ISeedStage` | The stage: `Name`, `Order`, and `SeedAsync(ISeedGroupContext, CancellationToken)`. |
 | `ISeedGroupContext` | The current group: `GroupName`, `Path`, `Items<T>(key)`, and `RunAsync(...)`. |
-| `SeedItem<T>` | One bound configuration item: `Value`, `Path`, and `Error`. |
+| `SeedItem<T>` | One bound configuration item (a record): `Value`, `Path`, and `Error`. `ToString()` omits `Value`. |
 | `SeedResult` | An item outcome: `Success()`, `AlreadyExists(reason)`, `Skipped(reason)`, or `Failure(reason)`. |
 
 Only the application's startup project needs `NuxtIdentity.AspNetCore`, to
