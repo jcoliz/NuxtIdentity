@@ -15,22 +15,6 @@ updates:
       - dependency-name: "Microsoft.Extensions.*"
         versions: [">= 11.0.0"]
 
-  - package-ecosystem: "npm"
-    directory: "/samples/Local"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "build(deps)"
-
-  - package-ecosystem: "npm"
-    directory: "/playground/local"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "build(deps)"
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
