@@ -79,5 +79,12 @@ public abstract partial class NuxtAuthControllerBase<TUser>
 
     [LoggerMessage(29, LogLevel.Error, "{Location}: Email delivery failed for user {UserId}")]
     private partial void LogEmailError(string userId, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(30, LogLevel.Warning, "{Location}: Rejected token request: {Error}")]
+    private partial void LogTokenRequestRejected(string error, [CallerMemberName] string? location = null);
+
+    [LoggerMessage(31, LogLevel.Information, "{Location}: OK")]
+    private partial void LogTokenOk([CallerMemberName] string? location = null);
+
     #endregion
 }
